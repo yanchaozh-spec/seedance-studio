@@ -454,11 +454,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                         key={asset.id}
                         className={cn(
                           "relative group bg-muted rounded-lg overflow-hidden",
-                          asset.isActivated ? "ring-2 ring-primary" : "opacity-60"
+                          !asset.isActivated && "opacity-50 grayscale"
                         )}
                       >
                         {/* 16:9 缩略图 */}
-                        <div className="aspect-video">
+                        <div className="aspect-video relative">
                           {asset.thumbnail_url || asset.url ? (
                             <img
                               src={asset.thumbnail_url || asset.url}
@@ -470,33 +470,38 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                               <Scissors className="w-10 h-10 text-primary" />
                             </div>
                           )}
+                          {asset.bound_audio_id && (
+                            <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Music className="w-3 h-3" />
+                            </div>
+                          )}
+                          {/* 删除按钮 */}
+                          <button
+                            onClick={() => handleRemoveAsset(asset.id)}
+                            className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
                         {/* 底部信息 */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2">
-                          <span className="text-xs text-white truncate block">
+                        <div className="p-2 space-y-1">
+                          <span className="text-xs truncate block">
                             {asset.display_name || asset.name}
                           </span>
+                          {/* 激活按钮 */}
+                          <button
+                            onClick={() => toggleAssetActivation(asset.id)}
+                            className={cn(
+                              "w-full flex items-center justify-center gap-1 py-1 rounded text-xs transition-all",
+                              asset.isActivated 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
+                            )}
+                          >
+                            <span>激活</span>
+                            {asset.isActivated && <Check className="w-3 h-3" />}
+                          </button>
                         </div>
-                        {/* 激活按钮 */}
-                        <button
-                          onClick={() => toggleAssetActivation(asset.id)}
-                          className={cn(
-                            "absolute top-2 right-2 rounded-full p-1.5 transition-all shadow-md",
-                            asset.isActivated 
-                              ? "bg-primary text-primary-foreground opacity-100" 
-                              : "bg-white/90 text-muted-foreground opacity-0 group-hover:opacity-100"
-                          )}
-                          title={asset.isActivated ? "已激活，点击取消" : "点击激活"}
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        {/* 删除按钮 */}
-                        <button
-                          onClick={() => handleRemoveAsset(asset.id)}
-                          className="absolute top-2 left-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -516,11 +521,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                         key={asset.id}
                         className={cn(
                           "relative group bg-muted rounded-lg overflow-hidden",
-                          asset.isActivated && "ring-2 ring-primary"
+                          !asset.isActivated && "opacity-50 grayscale"
                         )}
                       >
                         {/* 16:9 缩略图 */}
-                        <div className="aspect-video">
+                        <div className="aspect-video relative">
                           {asset.thumbnail_url ? (
                             <img
                               src={asset.thumbnail_url}
@@ -537,33 +542,33 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                               <Music className="w-3 h-3" />
                             </div>
                           )}
+                          {/* 删除按钮 */}
+                          <button
+                            onClick={() => handleRemoveAsset(asset.id)}
+                            className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
                         {/* 底部信息 */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2">
-                          <span className="text-xs text-white truncate block">
+                        <div className="p-2 space-y-1">
+                          <span className="text-xs truncate block">
                             {asset.display_name || asset.name}
                           </span>
+                          {/* 激活按钮 */}
+                          <button
+                            onClick={() => toggleAssetActivation(asset.id)}
+                            className={cn(
+                              "w-full flex items-center justify-center gap-1 py-1 rounded text-xs transition-all",
+                              asset.isActivated 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
+                            )}
+                          >
+                            <span>激活</span>
+                            {asset.isActivated && <Check className="w-3 h-3" />}
+                          </button>
                         </div>
-                        {/* 激活按钮 */}
-                        <button
-                          onClick={() => toggleAssetActivation(asset.id)}
-                          className={cn(
-                            "absolute top-2 right-2 rounded-full p-1.5 transition-all shadow-md",
-                            asset.isActivated 
-                              ? "bg-primary text-primary-foreground opacity-100" 
-                              : "bg-white/90 text-muted-foreground opacity-0 group-hover:opacity-100"
-                          )}
-                          title={asset.isActivated ? "已激活，点击取消" : "点击激活"}
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        {/* 删除按钮 */}
-                        <button
-                          onClick={() => handleRemoveAsset(asset.id)}
-                          className="absolute top-2 left-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -690,15 +695,37 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             <div className="mt-4">
               <h3 className="text-sm font-medium mb-2">使用的素材:</h3>
               <div className="flex flex-wrap gap-2">
-                {selectedAssets.map((asset) => (
-                  <div key={asset.id} className="bg-muted rounded px-2 py-1 text-sm flex items-center gap-1">
-                    {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : 
-                     asset.type === "image" ? <Image className="w-3 h-3" /> : 
-                     <Music className="w-3 h-3" />}
-                    {asset.display_name || asset.name}
-                  </div>
-                ))}
-                {selectedAssets.length === 0 && (
+                {/* 只显示激活的图片和关键帧 */}
+                {selectedAssets
+                  .filter((asset) => 
+                    (asset.type === "image" || asset.type === "keyframe") && 
+                    asset.isActivated
+                  )
+                  .map((asset) => (
+                    <div 
+                      key={asset.id} 
+                      className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
+                    >
+                      {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <Image className="w-3 h-3" />}
+                      {asset.display_name || asset.name}
+                      {asset.bound_audio_id && <Music className="w-3 h-3 ml-1" />}
+                    </div>
+                  ))}
+                {/* 显示绑定的音频 */}
+                {selectedAssets
+                  .filter((asset) => asset.type === "audio")
+                  .map((asset) => (
+                    <div 
+                      key={asset.id} 
+                      className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
+                    >
+                      <Music className="w-3 h-3" />
+                      {asset.display_name || asset.name}
+                    </div>
+                  ))}
+                {selectedAssets.filter((asset) => 
+                  (asset.type === "image" || asset.type === "keyframe") && asset.isActivated
+                ).length === 0 && selectedAssets.filter((asset) => asset.type === "audio").length === 0 && (
                   <span className="text-muted-foreground text-sm">无</span>
                 )}
               </div>
