@@ -16,19 +16,61 @@ function getStorageClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const projectId = formData.get("projectId") as string;
-    const type = formData.get("type") as "image" | "audio";
+    const contentType = request.headers.get("content-type") || "";
+    let file: File;
+    let projectId: string;
+    let type: "image" | "audio" | "keyframe";
+
+    // 检查是否是 multipart form data
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      file = formData.get("file") as File;
+      projectId = formData.get("projectId") as string;
+      type = formData.get("type") as "image" | "audio" | "keyframe";
+    } else if (contentType.includes("application/json")) {
+      // 如果是 JSON 格式（Coze 代理 URL）
+      const body = await request.json();
+      
+      // 如果 file 是字符串（可能是 Coze 代理 URL），需要下载它
+      if (typeof body.file === "string") {
+        const fileUrl = body.file;
+        console.log("Downloading file from URL:", fileUrl);
+        
+        const fileResponse = await fetch(fileUrl);
+        if (!fileResponse.ok) {
+          throw new Error(`Failed to download file: ${fileResponse.statusText}`);
+        }
+        
+        const blob = await fileResponse.blob();
+        const fileName = body.fileName || `upload_${Date.now()}`;
+        file = new File([blob], fileName, { type: blob.type || "application/octet-stream" });
+      } else {
+        file = body.file;
+      }
+      
+      projectId = body.projectId;
+      type = body.type;
+    } else {
+      return NextResponse.json({ error: "Unsupported content type" }, { status: 400 });
+    }
 
     if (!file || !projectId || !type) {
+      console.error("Missing fields:", { hasFile: !!file, projectId, type });
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    console.log("Uploading file:", {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      projectId,
+      assetType: type,
+    });
 
     const storage = getStorageClient();
     
     // 生成唯一文件名
-    const ext = file.name.split(".").pop();
+    const ext = file.name.split(".").pop() || "bin";
     const fileName = `${projectId}/${type}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     
     // 上传到存储
@@ -36,7 +78,7 @@ export async function POST(request: NextRequest) {
     const { data: uploadData, error: uploadError } = await storage.storage
       .from("materials")
       .upload(fileName, buffer, {
-        contentType: file.type,
+        contentType: file.type || "application/octet-stream",
         upsert: true,
       });
 
@@ -55,6 +97,8 @@ export async function POST(request: NextRequest) {
 
     // 如果是音频，获取时长（需要前端通过 audio 元素获取）
     const duration = type === "audio" ? null : null;
+
+    console.log("Upload successful:", urlData.publicUrl);
 
     return NextResponse.json({
       url: urlData.publicUrl,
