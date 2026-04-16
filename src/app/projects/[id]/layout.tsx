@@ -146,23 +146,49 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
         />
       )}
       {asset.type === "image" ? (
-        <div className="w-20 h-20">
-          {asset.thumbnail_url ? (
-            <img
-              src={asset.thumbnail_url}
-              alt={asset.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <Image className="w-8 h-8 text-muted-foreground" />
-            </div>
-          )}
-          {asset.bound_audio_id && (
-            <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs px-1 rounded">
+        <div className="w-full">
+          <div className="aspect-video relative">
+            {asset.thumbnail_url ? (
+              <img
+                src={asset.thumbnail_url}
+                alt={asset.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted">
+                <Image className="w-8 h-8 text-muted-foreground" />
+              </div>
+            )}
+            {/* 删除按钮 */}
+            {showRemove && onRemove && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onRemove(asset.id);
+                }}
+                className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          {/* 底部信息 */}
+          <div className="p-2 space-y-1">
+            <span className="text-xs truncate block">
+              {asset.display_name || asset.name}
+            </span>
+            {/* 音频参考按钮 */}
+            <div className={cn(
+              "flex items-center justify-center gap-1 py-1 rounded text-xs",
+              asset.bound_audio_id 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted-foreground/20 text-muted-foreground"
+            )}>
               <Music className="w-3 h-3" />
+              <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
             </div>
-          )}
+          </div>
         </div>
       ) : (
         <div className="w-20 h-20 flex flex-col items-center justify-center bg-muted">
@@ -171,22 +197,6 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
             {asset.display_name || asset.name}
           </span>
         </div>
-      )}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">
-        <span className="text-xs text-white truncate block">
-          {asset.display_name || asset.name}
-        </span>
-      </div>
-      {showRemove && onRemove && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(asset.id);
-          }}
-          className="absolute top-1 left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <X className="w-3 h-3" />
-        </button>
       )}
     </div>
   );
@@ -357,14 +367,10 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const addAssetToPool = (asset: Asset) => {
     setSelectedAssets((prev) => {
       if (prev.find((a) => a.id === asset.id)) return prev;
-      const sameType = prev.filter((a) => a.type === asset.type);
-      let prefix = "图";
-      if (asset.type === "audio") prefix = "音频";
-      else if (asset.type === "keyframe") prefix = "关键帧";
-      const displayName = `${prefix}${sameType.length + 1}`;
       // 图片和关键帧默认激活，音频不激活
       const isActivated = asset.type !== "audio";
-      return [...prev, { ...asset, display_name: displayName, isActivated }];
+      // 保留原始 display_name 或 name，不生成"图1"这种格式
+      return [...prev, { ...asset, isActivated }];
     });
   };
 

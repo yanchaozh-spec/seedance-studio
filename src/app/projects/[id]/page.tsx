@@ -488,6 +488,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           <span className="text-xs truncate block">
                             {asset.display_name || asset.name}
                           </span>
+                          {/* 音频参考按钮 */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-1 py-1 rounded text-xs",
+                            asset.bound_audio_id 
+                              ? "bg-primary text-primary-foreground" 
+                              : "bg-muted-foreground/20 text-muted-foreground"
+                          )}>
+                            <Music className="w-3 h-3" />
+                            <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+                          </div>
                           {/* 激活按钮 */}
                           <button
                             onClick={() => toggleAssetActivation(asset.id)}
@@ -555,6 +565,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           <span className="text-xs truncate block">
                             {asset.display_name || asset.name}
                           </span>
+                          {/* 音频参考按钮 */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-1 py-1 rounded text-xs",
+                            asset.bound_audio_id 
+                              ? "bg-primary text-primary-foreground" 
+                              : "bg-muted-foreground/20 text-muted-foreground"
+                          )}>
+                            <Music className="w-3 h-3" />
+                            <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+                          </div>
                           {/* 激活按钮 */}
                           <button
                             onClick={() => toggleAssetActivation(asset.id)}
