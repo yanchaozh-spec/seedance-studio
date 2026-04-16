@@ -109,9 +109,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     const lines: string[] = [];
     const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
 
-    if (nonEmptyBoxes.length === 0) return "";
-
-    // 找到第一个有激活素材的提示词框
+    // 找到第一个激活的素材
     const firstBoxWithAsset = nonEmptyBoxes.find((box) => box.isActivated && box.activatedAssetId);
     const firstActivatedAsset = firstBoxWithAsset
       ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
@@ -138,14 +136,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         }
       }
 
-      // 第一行：素材信息 + 第一个提示词
-      lines.push(`${header}，${nonEmptyBoxes[0].content.trim()}`);
+      // 如果有提示词内容
+      if (nonEmptyBoxes.length > 0) {
+        // 第一行：素材信息 + 第一个提示词
+        lines.push(`${header}，${nonEmptyBoxes[0].content.trim()}`);
 
-      // 后续行：仅提示词内容
-      for (let i = 1; i < nonEmptyBoxes.length; i++) {
-        lines.push(nonEmptyBoxes[i].content.trim());
+        // 后续行：仅提示词内容
+        for (let i = 1; i < nonEmptyBoxes.length; i++) {
+          lines.push(nonEmptyBoxes[i].content.trim());
+        }
+      } else {
+        // 没有提示词内容时，只显示素材信息
+        lines.push(header);
       }
-    } else {
+    } else if (nonEmptyBoxes.length > 0) {
       // 没有激活素材时，直接输出提示词
       nonEmptyBoxes.forEach((box) => {
         lines.push(box.content.trim());
