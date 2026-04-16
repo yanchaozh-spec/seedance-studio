@@ -524,9 +524,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-20",
+                          "relative group bg-muted rounded-lg overflow-hidden w-20 cursor-pointer",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
+                        onClick={() => toggleAssetActivation(asset.id)}
                       >
                         <div className="aspect-video relative">
                           {asset.thumbnail_url || asset.url ? (
@@ -541,41 +542,23 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             </div>
                           )}
                           {asset.bound_audio_id && (
-                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] px-1 rounded flex items-center gap-0.5">
+                            <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded flex items-center gap-0.5">
                               <Music className="w-2.5 h-2.5" />
                             </div>
                           )}
+                          {asset.isActivated && (
+                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                          )}
                           <button
-                            onClick={() => handleRemoveAsset(asset.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAsset(asset.id);
+                            }}
                             className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                        <div className="p-1 space-y-0.5">
-                          <span className="text-[10px] truncate block">{asset.display_name || asset.name}</span>
-                          {/* 声音状态 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
-                            asset.bound_audio_id 
-                              ? "bg-primary/20 text-primary" 
-                              : "bg-muted-foreground/10 text-muted-foreground"
-                          )}>
-                            <Music className="w-2.5 h-2.5" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
-                          </div>
-                          {/* 激活按钮 */}
-                          <button
-                            onClick={() => toggleAssetActivation(asset.id)}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
-                              asset.isActivated 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
-                            )}
-                          >
-                            <span>激活</span>
-                            {asset.isActivated && <Check className="w-2.5 h-2.5" />}
                           </button>
                         </div>
                       </div>
@@ -601,9 +584,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-20",
+                          "relative group bg-muted rounded-lg overflow-hidden w-20 cursor-pointer",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
+                        onClick={() => toggleAssetActivation(asset.id)}
                       >
                         <div className="aspect-video relative">
                           {asset.thumbnail_url ? (
@@ -618,41 +602,23 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             </div>
                           )}
                           {asset.bound_audio_id && (
-                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] px-1 rounded flex items-center gap-0.5">
+                            <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded flex items-center gap-0.5">
                               <Music className="w-2.5 h-2.5" />
                             </div>
                           )}
+                          {asset.isActivated && (
+                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                          )}
                           <button
-                            onClick={() => handleRemoveAsset(asset.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAsset(asset.id);
+                            }}
                             className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                        <div className="p-1 space-y-0.5">
-                          <span className="text-[10px] truncate block">{asset.display_name || asset.name}</span>
-                          {/* 声音状态 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
-                            asset.bound_audio_id 
-                              ? "bg-primary/20 text-primary" 
-                              : "bg-muted-foreground/10 text-muted-foreground"
-                          )}>
-                            <Music className="w-2.5 h-2.5" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
-                          </div>
-                          {/* 激活按钮 */}
-                          <button
-                            onClick={() => toggleAssetActivation(asset.id)}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
-                              asset.isActivated 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
-                            )}
-                          >
-                            <span>激活</span>
-                            {asset.isActivated && <Check className="w-2.5 h-2.5" />}
                           </button>
                         </div>
                       </div>

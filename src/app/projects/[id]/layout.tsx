@@ -50,9 +50,10 @@ interface DraggableAssetProps {
   showRemove?: boolean;
   onRemove?: (assetId: string) => void;
   size?: "small" | "large";
+  hideLabel?: boolean;
 }
 
-function DraggableAsset({ asset, showRemove, onRemove, size = "small" }: DraggableAssetProps) {
+function DraggableAsset({ asset, showRemove, onRemove, size = "small", hideLabel }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -166,6 +167,12 @@ function DraggableAsset({ asset, showRemove, onRemove, size = "small" }: Draggab
                 <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
               </div>
             )}
+            {/* 音频标记 */}
+            {asset.bound_audio_id && (
+              <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded flex items-center gap-0.5">
+                <Music className="w-2.5 h-2.5" />
+              </div>
+            )}
             {/* 删除按钮 */}
             {showRemove && onRemove && (
               <button
@@ -180,23 +187,25 @@ function DraggableAsset({ asset, showRemove, onRemove, size = "small" }: Draggab
               </button>
             )}
           </div>
-          {/* 底部信息 */}
-          <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
-            <span className={cn("truncate block", size === "small" ? "text-[10px]" : "text-xs")}>
-              {asset.display_name || asset.name}
-            </span>
-            {/* 音频参考按钮 */}
-            <div className={cn(
-              "flex items-center justify-center gap-1 rounded text-xs",
-              asset.bound_audio_id 
-                ? "bg-primary text-primary-foreground" 
-                : "bg-muted-foreground/20 text-muted-foreground",
-              size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
-            )}>
-              <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
-              <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+          {/* 底部信息 - 非隐藏时显示 */}
+          {!hideLabel && (
+            <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
+              <span className={cn("truncate block", size === "small" ? "text-[10px]" : "text-xs")}>
+                {asset.display_name || asset.name}
+              </span>
+              {/* 音频参考按钮 */}
+              <div className={cn(
+                "flex items-center justify-center gap-1 rounded text-xs",
+                asset.bound_audio_id 
+                  ? "bg-primary text-primary-foreground" 
+                  : "bg-muted-foreground/20 text-muted-foreground",
+                size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
+              )}>
+                <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
+                <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         <div className="w-20 h-20 flex flex-col items-center justify-center bg-muted">
@@ -528,16 +537,23 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {activeTab === "materials" && (
                 <>
                   {imageMaterials.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Image className="w-4 h-4" />
-                        图片素材 ({imageMaterials.length})
+                    <div className="mb-4">
+                      <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                        <Image className="w-3 h-3" />
+                        {imageMaterials.map((asset, idx) => (
+                          <span key={asset.id}>
+                            {asset.display_name || asset.name}
+                            {idx < imageMaterials.length - 1 && "、"}
+                          </span>
+                        ))}
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {imageMaterials.map((asset) => (
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
+                            size="small"
+                            hideLabel
                           />
                         ))}
                       </div>
@@ -545,16 +561,23 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   )}
 
                   {keyframeMaterials.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Scissors className="w-4 h-4" />
-                        关键帧 ({keyframeMaterials.length})
+                    <div className="mb-4">
+                      <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                        <Scissors className="w-3 h-3" />
+                        {keyframeMaterials.map((asset, idx) => (
+                          <span key={asset.id}>
+                            {asset.display_name || asset.name}
+                            {idx < keyframeMaterials.length - 1 && "、"}
+                          </span>
+                        ))}
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {keyframeMaterials.map((asset) => (
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
+                            size="small"
+                            hideLabel
                           />
                         ))}
                       </div>
@@ -562,16 +585,18 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   )}
 
                   {audioMaterials.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Music className="w-4 h-4" />
-                        音频素材 ({audioMaterials.length})
+                    <div className="mb-4">
+                      <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                        <Music className="w-3 h-3" />
+                        音频 ({audioMaterials.length})
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {audioMaterials.map((asset) => (
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
+                            size="small"
+                            hideLabel
                           />
                         ))}
                       </div>
