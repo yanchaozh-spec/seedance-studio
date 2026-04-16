@@ -448,6 +448,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>("all");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   useEffect(() => {
     loadData();
@@ -545,41 +546,92 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
-  // 抽帧处理函数
+  // 抽帧处理函数 - 抽取当前播放帧
   const handleExtractFrame = async (task: Task) => {
     if (!task.result || !task.result.video_url) return;
     
-    toast.promise(
-      async () => {
-        const response = await fetch("/api/assets/extract-frame", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            video_url: task.result!.video_url,
-            project_id: resolvedParams.id,
-            task_id: task.id,
-          }),
-        });
+    // 获取当前视频元素的引用
+    const video = videoRefs.current.get(task.id);
+    
+    if (video) {
+      // 确保视频已加载
+      if (video.readyState < 2) {
+        toast.error("视频尚未加载完成");
+        return;
+      }
+      
+      try {
+        // 创建 canvas 并绘制当前帧
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
         
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "抽帧失败");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          throw new Error("无法创建画布");
         }
         
-        const result = await response.json();
-        return result;
-      },
-      {
-        loading: "正在抽帧...",
-        success: (data) => {
-          setSelectedTask(null); // 关闭抽帧对话框
-          return `已保存为关键帧: ${data.asset.name}`;
-        },
-        error: (err) => err.message || "抽帧失败",
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // 转换为 blob 并上传
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const formData = new FormData();
+            formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+            formData.append("projectId", resolvedParams.id);
+            formData.append("taskId", task.id);
+            formData.append("timestamp", video.currentTime.toString());
+            formData.append("assetCategory", "keyframe");
+            formData.append("name", `关键帧_${Date.now()}`);
+            
+            const response = await fetch("/api/assets/extract-frame", {
+              method: "POST",
+              body: formData,
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              toast.success(`已保存为关键帧: ${result.asset.name}`);
+            } else {
+              const error = await response.json();
+              toast.error(error.error || "保存失败");
+            }
+          }
+        }, "image/png");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "抽帧失败");
       }
-    );
+    } else {
+      // 降级方案：使用 API 抽帧（默认第 0 帧）
+      toast.promise(
+        async () => {
+          const response = await fetch("/api/assets/extract-frame", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              video_url: task.result!.video_url,
+              project_id: resolvedParams.id,
+              task_id: task.id,
+            }),
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "抽帧失败");
+          }
+          
+          const result = await response.json();
+          return result;
+        },
+        {
+          loading: "正在抽帧...",
+          success: (data) => `已保存为关键帧: ${data.asset.name}`,
+          error: (err) => err.message || "抽帧失败",
+        }
+      );
+    }
   };
 
   const filteredTasks = tasks.filter((task) => {
@@ -647,38 +699,57 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
               <div key={task.id} className="bg-card border rounded-lg overflow-hidden">
                 {/* 视频播放器区域 */}
                 {task.status === "succeeded" && task.result?.video_url && (
-                  <div className="relative bg-black aspect-video" onClick={(e) => e.stopPropagation()}>
-                    <video
-                      src={task.result.video_url}
-                      controls
-                      className="w-full h-full object-contain"
-                      muted
-                    />
-                    <div className="absolute bottom-2 right-2 flex gap-1">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-black/50 hover:bg-black/70 border-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownload(task);
+                  <div className="flex gap-3 p-3 bg-black/5" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative w-48 h-28 bg-black rounded overflow-hidden flex-shrink-0">
+                      <video
+                        ref={(el) => {
+                          if (el) videoRefs.current.set(task.id, el);
                         }}
-                        title="下载"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-black/50 hover:bg-black/70 border-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExtractFrame(task);
-                        }}
-                        title="抽帧"
-                      >
-                        <Camera className="w-4 h-4" />
-                      </Button>
+                        src={task.result.video_url}
+                        controls
+                        className="w-full h-full object-contain"
+                        preload="metadata"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-center gap-2 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-xs h-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExtractFrame(task);
+                          }}
+                        >
+                          <Camera className="w-3 h-3" />
+                          抽帧
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-xs h-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(task);
+                          }}
+                        >
+                          <Download className="w-3 h-3" />
+                          下载
+                        </Button>
+                      </div>
+                      {task.completion_tokens && (
+                        <div className="flex items-center gap-1 text-xs text-yellow-600">
+                          <Sparkles className="w-3 h-3" />
+                          <span>{task.completion_tokens.toLocaleString()} tokens</span>
+                        </div>
+                      )}
+                      {task.generation_duration && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          <span>生成耗时 {formatSeconds(task.generation_duration)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

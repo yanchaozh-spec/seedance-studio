@@ -254,6 +254,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -603,44 +604,17 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           {task.status === "succeeded" && task.result?.video_url && (
                             <div className="space-y-2">
                               <div 
-                                className="relative aspect-video bg-black rounded overflow-hidden cursor-pointer group"
-                                onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
+                                className="relative aspect-video bg-black rounded overflow-hidden"
                               >
                                 <video
+                                  ref={(el) => {
+                                    if (el) videoRefs.current.set(task.id, el);
+                                  }}
                                   src={task.result.video_url}
                                   controls
-                                  className="w-full h-full object-cover"
-                                  muted
+                                  className="w-full h-full object-contain"
                                   preload="metadata"
                                 />
-                                {/* 悬浮操作层 */}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`);
-                                    }}
-                                  >
-                                    <Eye className="w-4 h-4 mr-1" />
-                                    详情
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const a = document.createElement("a");
-                                      a.href = task.result?.video_url || "";
-                                      a.download = `video-${task.id}.mp4`;
-                                      a.click();
-                                    }}
-                                  >
-                                    <Download className="w-4 h-4 mr-1" />
-                                    下载
-                                  </Button>
-                                </div>
                               </div>
                               
                               {/* 底部操作按钮 */}
@@ -649,74 +623,74 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                   variant="outline"
                                   size="sm"
                                   className="flex-1 gap-1 text-xs h-7"
-                                  onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
-                                >
-                                  <Film className="w-3 h-3" />
-                                  完整管理
-                                </Button>
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  className="flex-1 gap-1 text-xs h-7"
                                   onClick={() => {
-                                    // 直接在页面顶部添加一个临时视频元素进行抽帧
-                                    const video = document.createElement("video");
-                                    video.src = task.result?.video_url || "";
-                                    video.crossOrigin = "anonymous";
-                                    video.muted = true;
-                                    video.preload = "metadata";
+                                    const video = videoRefs.current.get(task.id);
+                                    if (!video) return;
                                     
-                                    video.onloadedmetadata = async () => {
-                                      video.currentTime = 0;
-                                    };
+                                    // 确保视频已加载
+                                    if (video.readyState < 2) {
+                                      toast.error("视频尚未加载完成");
+                                      return;
+                                    }
                                     
-                                    video.onseeked = async () => {
-                                      try {
-                                        const canvas = document.createElement("canvas");
-                                        canvas.width = video.videoWidth;
-                                        canvas.height = video.videoHeight;
-                                        const ctx = canvas.getContext("2d");
-                                        if (ctx) {
-                                          ctx.drawImage(video, 0, 0);
-                                          canvas.toBlob(async (blob) => {
-                                            if (blob) {
-                                              const formData = new FormData();
-                                              formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-                                              formData.append("projectId", resolvedParams.id);
-                                              formData.append("taskId", task.id);
-                                              formData.append("timestamp", "0");
-                                              formData.append("assetCategory", "keyframe");
-                                              formData.append("name", `关键帧_${Date.now()}`);
-                                              
-                                              const res = await fetch("/api/assets/extract-frame", {
-                                                method: "POST",
-                                                body: formData,
-                                              });
-                                              
-                                              if (res.ok) {
-                                                toast.success("已保存为关键帧");
-                                                loadMaterials?.();
-                                              } else {
-                                                toast.error("保存失败");
-                                              }
-                                            }
-                                            video.remove();
-                                          }, "image/png");
+                                    // 创建 canvas 并绘制当前帧
+                                    const canvas = document.createElement("canvas");
+                                    canvas.width = video.videoWidth;
+                                    canvas.height = video.videoHeight;
+                                    
+                                    const ctx = canvas.getContext("2d");
+                                    if (!ctx) {
+                                      toast.error("无法创建画布");
+                                      return;
+                                    }
+                                    
+                                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                    
+                                    canvas.toBlob(async (blob) => {
+                                      if (blob) {
+                                        const formData = new FormData();
+                                        formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+                                        formData.append("projectId", resolvedParams.id);
+                                        formData.append("taskId", task.id);
+                                        formData.append("timestamp", video.currentTime.toString());
+                                        formData.append("assetCategory", "keyframe");
+                                        formData.append("name", `关键帧_${Date.now()}`);
+                                        
+                                        try {
+                                          const res = await fetch("/api/assets/extract-frame", {
+                                            method: "POST",
+                                            body: formData,
+                                          });
+                                          
+                                          if (res.ok) {
+                                            toast.success("已保存为关键帧");
+                                            loadMaterials?.();
+                                          } else {
+                                            toast.error("保存失败");
+                                          }
+                                        } catch (e) {
+                                          toast.error("抽帧失败");
                                         }
-                                      } catch (e) {
-                                        toast.error("抽帧失败");
-                                        video.remove();
                                       }
-                                    };
-                                    
-                                    video.onerror = () => {
-                                      toast.error("视频加载失败");
-                                      video.remove();
-                                    };
+                                    }, "image/png");
                                   }}
                                 >
                                   <Camera className="w-3 h-3" />
                                   抽帧
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1 gap-1 text-xs h-7"
+                                  onClick={() => {
+                                    const a = document.createElement("a");
+                                    a.href = task.result?.video_url || "";
+                                    a.download = `video-${task.id}.mp4`;
+                                    a.click();
+                                  }}
+                                >
+                                  <Download className="w-3 h-3" />
+                                  下载
                                 </Button>
                               </div>
                             </div>
