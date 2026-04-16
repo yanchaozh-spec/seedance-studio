@@ -68,8 +68,8 @@ export async function bindAudioToImage(imageId: string, audioId: string, voiceDe
 // 解除音频绑定
 export async function unbindAudio(imageId: string): Promise<Asset> {
   return updateAsset(imageId, {
-    bound_audio_id: null,
-    voice_description: null,
+    bound_audio_id: undefined,
+    voice_description: undefined,
   });
 }
 

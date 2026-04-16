@@ -4,14 +4,14 @@ import { useEffect, useState, createContext, useContext, ReactNode, use } from "
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, PanelRightOpen, PanelRightClose, X } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
-import { useProjectLayout } from "@/components/layout/project-layout";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Asset, getAssets } from "@/lib/assets";
 import { Image, Music } from "lucide-react";
 import { useDraggable } from "@/hooks/use-draggable";
+import { useTheme } from "next-themes";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -118,27 +118,21 @@ interface ProjectDetailLayoutProps {
   params: Promise<{ id: string }>;
 }
 
-export default function ProjectDetailLayout({ children, params }: ProjectDetailLayoutProps) {
+export default function ProjectDetailLayoutInner({ children, params }: ProjectDetailLayoutProps) {
   const resolvedParams = use(params);
-  const { projectId, projectName, setProjectId, setProjectName } = useProjectLayout();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [materialsDrawerOpen, setMaterialsDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
   const [materials, setMaterials] = useState<Asset[]>([]);
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     loadProject();
   }, [resolvedParams.id]);
-
-  useEffect(() => {
-    if (project) {
-      setProjectId(project.id);
-      setProjectName(project.name);
-    }
-  }, [project, setProjectId, setProjectName]);
 
   const loadProject = async () => {
     try {
@@ -201,27 +195,88 @@ export default function ProjectDetailLayout({ children, params }: ProjectDetailL
         clearPool,
       }}
     >
-      <div className="flex h-[calc(100vh-3.5rem)]">
+      <div className="flex h-screen bg-background">
         {/* 左侧导航 */}
-        <aside className="w-48 border-r bg-card p-2 space-y-1">
-          {navItems.map((item) => (
+        <aside
+          className={cn(
+            "flex flex-col border-r bg-card transition-all duration-300",
+            collapsed ? "w-16" : "w-52"
+          )}
+        >
+          {/* Logo */}
+          <div className="flex items-center h-14 px-4 border-b">
+            <Link href="/projects">
+              <span className={cn("font-semibold text-lg", collapsed && "hidden")}>Seedance 2.0</span>
+            </Link>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="ml-auto p-1.5 hover:bg-accent rounded-md transition-colors"
+            >
+              {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* 导航项 */}
+          <nav className="flex-1 p-2 space-y-1">
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                  isActive(item.href, item.exact) && "bg-primary text-primary-foreground",
+                  !isActive(item.href, item.exact) && "hover:bg-accent"
+                )}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                <span className={cn(collapsed && "hidden")}>{item.label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          {/* 底部按钮 */}
+          <div className="p-2 border-t space-y-1">
+            {/* 主题切换 */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent transition-colors w-full"
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5 flex-shrink-0" /> : <Moon className="w-5 h-5 flex-shrink-0" />}
+              <span className={cn(collapsed && "hidden")}>{theme === "dark" ? "浅色模式" : "深色模式"}</span>
+            </button>
+
+            {/* 设置 */}
             <Link
-              key={item.label}
-              href={item.href}
+              href={`/projects/${resolvedParams.id}/settings`}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                isActive(item.href, item.exact) && "bg-primary text-primary-foreground",
-                !isActive(item.href, item.exact) && "hover:bg-accent"
+                isActive(`/projects/${resolvedParams.id}/settings`) && "bg-primary text-primary-foreground",
+                !isActive(`/projects/${resolvedParams.id}/settings`) && "hover:bg-accent"
               )}
             >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              <span>{item.label}</span>
+              <Settings className="w-5 h-5 flex-shrink-0" />
+              <span className={cn(collapsed && "hidden")}>设置</span>
             </Link>
-          ))}
+          </div>
         </aside>
 
         {/* 主内容区 */}
         <main className="flex-1 overflow-auto">{children}</main>
+
+        {/* 素材库抽屉触发按钮 */}
+        <button
+          onClick={() => setMaterialsDrawerOpen(!materialsDrawerOpen)}
+          className={cn(
+            "fixed right-0 top-1/2 -translate-y-1/2 z-40 p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-transform hover:bg-primary/90",
+            materialsDrawerOpen && "translate-x-[380px]"
+          )}
+        >
+          {materialsDrawerOpen ? (
+            <PanelRightClose className="w-5 h-5" />
+          ) : (
+            <PanelRightOpen className="w-5 h-5" />
+          )}
+        </button>
 
         {/* 素材库抽屉 */}
         <Sheet open={materialsDrawerOpen} onOpenChange={setMaterialsDrawerOpen}>
@@ -287,21 +342,6 @@ export default function ProjectDetailLayout({ children, params }: ProjectDetailL
             </div>
           </SheetContent>
         </Sheet>
-
-        {/* 素材库抽屉触发按钮 */}
-        <button
-          onClick={() => setMaterialsDrawerOpen(!materialsDrawerOpen)}
-          className={cn(
-            "fixed right-0 top-1/2 -translate-y-1/2 z-40 p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-transform hover:bg-primary/90",
-            materialsDrawerOpen && "translate-x-[380px]"
-          )}
-        >
-          {materialsDrawerOpen ? (
-            <PanelRightClose className="w-5 h-5" />
-          ) : (
-            <PanelRightOpen className="w-5 h-5" />
-          )}
-        </button>
       </div>
     </ProjectDetailContext.Provider>
   );

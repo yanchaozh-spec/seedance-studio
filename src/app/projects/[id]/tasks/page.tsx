@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,8 +60,16 @@ interface TaskDetailSheetProps {
 }
 
 function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDetailSheetProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+    }
+  };
 
   if (!task) return null;
 
@@ -128,10 +136,10 @@ function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDe
             <div className="space-y-3">
               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                 <video
+                  ref={videoRef}
                   src={task.result.video_url}
                   controls
                   className="w-full h-full"
-                  volume={volume}
                   muted={muted}
                 />
               </div>
@@ -158,7 +166,7 @@ function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDe
                   step="0.1"
                   value={muted ? 0 : volume}
                   onChange={(e) => {
-                    setVolume(parseFloat(e.target.value));
+                    handleVolumeChange(parseFloat(e.target.value));
                     if (parseFloat(e.target.value) > 0) setMuted(false);
                   }}
                   className="flex-1"

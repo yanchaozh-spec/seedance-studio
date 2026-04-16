@@ -42,10 +42,9 @@ export function useDraggable({ id, data }: DraggableOptions): UseDraggableReturn
     currentPos.current = { x: 0, y: 0 };
     
     // 设置拖拽数据
-    if (data) {
-      e.dataTransfer.setData("application/json", JSON.stringify(data));
+    if (data && e.currentTarget) {
+      (e.currentTarget as HTMLElement).dataset.dragData = JSON.stringify(data);
     }
-    e.dataTransfer.effectAllowed = "move";
   }, [data]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
