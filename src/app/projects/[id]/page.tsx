@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
-import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2, Check, Film, StopCircle } from "lucide-react";
+import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task } from "@/lib/tasks";
@@ -18,7 +18,6 @@ import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
-import { createLongVideo, getLongVideo, cancelLongVideo, LongVideo } from "@/lib/long-videos";
 
 // 选中的素材（带激活状态）
 export interface SelectedAsset extends Asset {
@@ -58,13 +57,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
-  
-  // 长视频相关状态
-  const [longVideoMode, setLongVideoMode] = useState(false);
-  const [longVideoTargetDuration, setLongVideoTargetDuration] = useState(60);
-  const [activeLongVideo, setActiveLongVideo] = useState<LongVideo | null>(null);
-  const [longVideoPolling, setLongVideoPolling] = useState(false);
-  const longVideoRef = useRef<NodeJS.Timeout | null>(null);
   
   // 素材池拖放区域
   const { dropZoneProps: poolDropZoneProps } = useDropZone({
@@ -351,166 +343,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
   };
 
-  // 生成最终提示词（用于长视频）
-  const buildFinalPrompt = useCallback(() => {
-    const finalPrompts: string[] = [];
-
-    promptBoxes.forEach((box, index) => {
-      if (!box.content.trim()) return;
-
-      let promptText = box.content.trim();
-
-      if (box.isActivated) {
-        const activatedAsset = selectedAssets.find(
-          (a) => (a.type === "image" || a.type === "keyframe") && a.id === box.activatedAssetId && a.isActivated
-        ) || selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
-
-        if (activatedAsset) {
-          const displayName = activatedAsset.display_name || activatedAsset.name;
-
-          if (activatedAsset.type === "keyframe") {
-            const desc = activatedAsset.keyframe_description || box.keyframeDescription || "";
-            if (desc) {
-              promptText = `视频首帧@"${displayName}"，${desc}，${promptText}`;
-            } else {
-              promptText = `视频首帧@"${displayName}"，${promptText}`;
-            }
-          } else {
-            let referenceText = `"${displayName}"@这张图片`;
-
-            if (activatedAsset.bound_audio_id) {
-              const boundAudio = selectedAssets.find(
-                (a) => a.id === activatedAsset.bound_audio_id
-              );
-              if (boundAudio?.voice_description) {
-                referenceText += `，声线为"${boundAudio.voice_description}"`;
-              }
-            }
-
-            promptText = `${referenceText}，${promptText}`;
-          }
-        }
-      }
-
-      finalPrompts.push(promptText);
-    });
-
-    return finalPrompts.join("\n");
-  }, [promptBoxes, selectedAssets]);
-
-  // 生成60秒长视频
-  const handleGenerateLongVideo = async () => {
-    try {
-      setGenerating(true);
-
-      const finalPrompt = buildFinalPrompt();
-
-      if (!finalPrompt.trim()) {
-        toast.error("请输入提示词");
-        return;
-      }
-
-      const result = await createLongVideo({
-        project_id: resolvedParams.id,
-        prompts: promptBoxes.map((box, idx) => ({
-          id: box.id,
-          content: box.content,
-          is_activated: box.isActivated,
-          activated_asset_id: box.activatedAssetId,
-          keyframe_description: box.keyframeDescription,
-          order: idx,
-        })),
-        selected_assets: selectedAssets.map((a) => a.id),
-        params: {
-          target_duration: longVideoTargetDuration,
-          ratio: params_.ratio,
-          resolution: params_.resolution,
-          generate_audio: true,
-        },
-      }, arkApiKey);
-
-      toast.success("长视频任务已创建");
-
-      // 开始轮询状态
-      setActiveLongVideo({
-        id: result.id,
-        project_id: resolvedParams.id,
-        status: "pending",
-        progress: 0,
-        total_segments: result.total_segments,
-        completed_segments: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      setLongVideoPolling(true);
-
-      // 开始轮询
-      longVideoRef.current = setInterval(async () => {
-        try {
-          const videoData = await getLongVideo(result.id);
-          if (videoData) {
-            const video = { ...videoData.long_video, segments: videoData.segments };
-            setActiveLongVideo(video);
-
-            if (video.status === "completed") {
-              toast.success("长视频生成完成！");
-              setLongVideoPolling(false);
-              if (longVideoRef.current) {
-                clearInterval(longVideoRef.current);
-                longVideoRef.current = null;
-              }
-            } else if (video.status === "failed") {
-              toast.error(`长视频生成失败: ${video.error_message}`);
-              setLongVideoPolling(false);
-              if (longVideoRef.current) {
-                clearInterval(longVideoRef.current);
-                longVideoRef.current = null;
-              }
-            }
-          }
-        } catch (error) {
-          console.error("轮询长视频状态失败:", error);
-        }
-      }, 3000);
-
-    } catch (error) {
-      console.error("创建长视频失败:", error);
-      toast.error("创建长视频失败");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // 取消长视频生成
-  const handleCancelLongVideo = async () => {
-    if (!activeLongVideo) return;
-
-    try {
-      await cancelLongVideo(activeLongVideo.id);
-      toast.success("长视频任务已取消");
-
-      setLongVideoPolling(false);
-      if (longVideoRef.current) {
-        clearInterval(longVideoRef.current);
-        longVideoRef.current = null;
-      }
-      setActiveLongVideo(null);
-    } catch (error) {
-      console.error("取消长视频失败:", error);
-      toast.error("取消长视频失败");
-    }
-  };
-
-  // 组件卸载时清理轮询
-  useEffect(() => {
-    return () => {
-      if (longVideoRef.current) {
-        clearInterval(longVideoRef.current);
-      }
-    };
-  }, []);
-
   const handleRemoveAsset = (assetId: string) => {
     removeAssetFromPool(assetId);
   };
@@ -583,68 +415,26 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         <div className="flex items-center justify-between">
           <h2 className="text-base font-medium">生成参数</h2>
           <div className="flex items-center gap-4">
-            {/* 长视频模式切换 */}
+            {/* 时长选择 */}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground flex items-center gap-1">
-                <Film className="w-3 h-3" />
-                长视频
+                <Clock className="w-3 h-3" />
+                时长
               </label>
               <Select
-                value={longVideoMode ? "long" : "short"}
-                onValueChange={(v) => setLongVideoMode(v === "long")}
+                value={params_.duration.toString()}
+                onValueChange={(v) => setParams({ ...params_, duration: parseInt(v) })}
               >
                 <SelectTrigger className="w-20 h-7 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="short">普通</SelectItem>
-                  <SelectItem value="long">长视频</SelectItem>
+                  {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((d) => (
+                    <SelectItem key={d} value={d.toString()}>{d}秒</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* 时长选择 */}
-            {longVideoMode ? (
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  时长
-                </label>
-                <Select
-                  value={longVideoTargetDuration.toString()}
-                  onValueChange={(v) => setLongVideoTargetDuration(parseInt(v))}
-                >
-                  <SelectTrigger className="w-20 h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[15, 30, 45, 60].map((d) => (
-                      <SelectItem key={d} value={d.toString()}>{d}秒</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  时长
-                </label>
-                <Select
-                  value={params_.duration.toString()}
-                  onValueChange={(v) => setParams({ ...params_, duration: parseInt(v) })}
-                >
-                  <SelectTrigger className="w-20 h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((d) => (
-                      <SelectItem key={d} value={d.toString()}>{d}秒</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
             
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground">画幅</label>
@@ -679,133 +469,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               </Select>
             </div>
 
-            {longVideoMode ? (
-              <>
-                <Button
-                  size="sm"
-                  onClick={handleGenerateLongVideo}
-                  disabled={generating || longVideoPolling}
-                  className="ml-2"
-                  variant="default"
-                >
-                  <Film className="w-3 h-3 mr-1.5" />
-                  {generating ? "创建中..." : "生成60秒"}
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" onClick={handleGenerate} disabled={generating} className="ml-2">
-                <Play className="w-3 h-3 mr-1.5" />
-                {generating ? "生成中..." : "开始生成"}
-              </Button>
-            )}
+            <Button size="sm" onClick={handleGenerate} disabled={generating} className="ml-2">
+              <Play className="w-3 h-3 mr-1.5" />
+              {generating ? "生成中..." : "开始生成"}
+            </Button>
           </div>
         </div>
       </div>
-
-      {/* 长视频生成状态 */}
-      {activeLongVideo && (
-        <div className="bg-card border rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Film className="w-4 h-4 text-primary" />
-              <h2 className="text-base font-medium">长视频生成中</h2>
-              <span className="text-xs text-muted-foreground">
-                ({activeLongVideo.completed_segments}/{activeLongVideo.total_segments} 段)
-              </span>
-            </div>
-            {longVideoPolling && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleCancelLongVideo}
-              >
-                <StopCircle className="w-3 h-3 mr-1.5" />
-                取消
-              </Button>
-            )}
-          </div>
-
-          {/* 进度条 */}
-          <div className="mb-3">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-muted-foreground">
-                {activeLongVideo.status === "pending" && "等待开始..."}
-                {activeLongVideo.status === "generating" && "正在生成视频段..."}
-                {activeLongVideo.status === "merging" && "正在拼接视频..."}
-                {activeLongVideo.status === "completed" && "生成完成！"}
-                {activeLongVideo.status === "failed" && `失败: ${activeLongVideo.error_message}`}
-              </span>
-              <span className="font-medium">{activeLongVideo.progress}%</span>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  "h-full transition-all duration-300",
-                  activeLongVideo.status === "failed" ? "bg-destructive" : "bg-primary"
-                )}
-                style={{ width: `${activeLongVideo.progress}%` }}
-              />
-            </div>
-          </div>
-
-          {/* 分段进度 */}
-          <div className="grid grid-cols-4 gap-2">
-            {activeLongVideo.segments?.map((segment) => (
-              <div
-                key={segment.id}
-                className={cn(
-                  "text-xs p-2 rounded border text-center",
-                  (segment.status === "confirmed" || segment.status === "waiting_confirm") && "bg-green-100 border-green-300 text-green-700",
-                  segment.status === "running" && "bg-blue-100 border-blue-300 text-blue-700 animate-pulse",
-                  segment.status === "queued" && "bg-yellow-100 border-yellow-300 text-yellow-700",
-                  segment.status === "pending" && "bg-gray-100 border-gray-300 text-gray-500",
-                  segment.status === "failed" && "bg-red-100 border-red-300 text-red-700"
-                )}
-              >
-                段 {segment.segment_index + 1}
-                <br />
-                <span className="text-[10px]">
-                  {(segment.status === "confirmed" || segment.status === "waiting_confirm") && "完成"}
-                  {segment.status === "running" && "生成中"}
-                  {segment.status === "queued" && "排队"}
-                  {segment.status === "pending" && "等待"}
-                  {segment.status === "failed" && "失败"}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* 最终视频预览 */}
-          {activeLongVideo.status === "completed" && activeLongVideo.final_video_url && (
-            <div className="mt-4 pt-4 border-t">
-              <h3 className="text-sm font-medium mb-2">最终视频</h3>
-              <video
-                src={activeLongVideo.final_video_url}
-                controls
-                className="w-full max-w-md rounded-lg"
-              />
-              <div className="mt-2 text-xs text-muted-foreground">
-                时长: {activeLongVideo.final_video_duration}秒
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => {
-                  if (activeLongVideo?.final_video_url) {
-                    const a = document.createElement("a");
-                    a.href = activeLongVideo.final_video_url;
-                    a.download = `long-video-${Date.now()}.mp4`;
-                    a.click();
-                  }
-                }}
-              >
-                下载视频
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* 素材池 */}
       <div className={cn(
