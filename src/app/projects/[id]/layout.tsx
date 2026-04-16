@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -564,82 +564,132 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   ) : (
                     <div className="space-y-3">
                       {tasks.slice(0, 10).map((task) => (
-                        <div key={task.id} className="bg-muted rounded-lg p-3">
+                        <div key={task.id} className="bg-muted rounded-lg p-2">
+                          {/* 任务状态行 */}
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-muted-foreground font-mono">
                               {task.id.slice(0, 8)}...
                             </span>
-                            <span className={cn("text-xs font-medium", 
-                              task.status === "succeeded" ? "text-green-500" :
-                              task.status === "running" ? "text-blue-500" :
-                              task.status === "failed" ? "text-red-500" : "text-muted-foreground"
-                            )}>
-                              {task.status === "succeeded" ? "已完成" :
-                               task.status === "running" ? "生成中" :
-                               task.status === "failed" ? "失败" : "排队中"}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {task.status === "succeeded" && task.completion_tokens && (
+                                <span className="text-xs text-yellow-600">
+                                  {task.completion_tokens.toLocaleString()}
+                                </span>
+                              )}
+                              <span className={cn("text-xs font-medium", 
+                                task.status === "succeeded" ? "text-green-500" :
+                                task.status === "running" ? "text-blue-500" :
+                                task.status === "failed" ? "text-red-500" : "text-muted-foreground"
+                              )}>
+                                {task.status === "succeeded" ? "已完成" :
+                                 task.status === "running" ? "生成中" :
+                                 task.status === "failed" ? "失败" : "排队中"}
+                              </span>
+                            </div>
                           </div>
                           
-                          {/* 操作按钮 */}
+                          {/* 视频播放器（已完成任务） */}
                           {task.status === "succeeded" && task.result?.video_url && (
-                            <div className="flex gap-2 mb-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 gap-1 text-xs h-7"
+                            <div className="space-y-2">
+                              <div 
+                                className="relative aspect-video bg-black rounded overflow-hidden cursor-pointer group"
                                 onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
                               >
-                                <Eye className="w-3 h-3" />
-                                预览
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 gap-1 text-xs h-7"
-                                onClick={() => {
-                                  // 打开新标签页下载
-                                  const a = document.createElement("a");
-                                  a.href = task.result?.video_url || "";
-                                  a.download = `video-${task.id}.mp4`;
-                                  a.click();
-                                }}
-                              >
-                                <Download className="w-3 h-3" />
-                                下载
-                              </Button>
+                                <video
+                                  src={task.result.video_url}
+                                  controls
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  preload="metadata"
+                                />
+                                {/* 悬浮操作层 */}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`);
+                                    }}
+                                  >
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    详情
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const a = document.createElement("a");
+                                      a.href = task.result?.video_url || "";
+                                      a.download = `video-${task.id}.mp4`;
+                                      a.click();
+                                    }}
+                                  >
+                                    <Download className="w-4 h-4 mr-1" />
+                                    下载
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {/* 底部操作按钮 */}
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1 gap-1 text-xs h-7"
+                                  onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  查看详情
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1 gap-1 text-xs h-7"
+                                  onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
+                                >
+                                  <Camera className="w-3 h-3" />
+                                  抽帧
+                                </Button>
+                              </div>
                             </div>
-                          )}
-                          
-                          {/* 抽帧按钮 */}
-                          {task.status === "succeeded" && task.result?.video_url && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="w-full gap-1 text-xs h-7"
-                              onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
-                            >
-                              <Camera className="w-3 h-3" />
-                              抽帧保存
-                            </Button>
                           )}
                           
                           {/* 生成中/失败状态 */}
                           {task.status === "running" && (
-                            <div className="w-full h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-blue-500 transition-all"
-                                style={{ width: `${task.progress || 0}%` }}
-                              />
+                            <div className="space-y-2">
+                              <div className="w-full h-24 bg-muted-foreground/10 rounded flex items-center justify-center">
+                                <Loader className="w-6 h-6 animate-spin text-blue-500" />
+                              </div>
+                              <div className="w-full h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-blue-500 transition-all"
+                                  style={{ width: `${task.progress || 0}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground text-center">
+                                {task.progress || 0}%
+                              </p>
                             </div>
                           )}
                           
-                          {task.status === "failed" && task.error_message && (
-                            <p className="text-xs text-red-500 mt-1 truncate">
-                              {task.error_message}
-                            </p>
+                          {task.status === "failed" && (
+                            <div className="w-full h-24 bg-muted-foreground/10 rounded flex flex-col items-center justify-center p-2">
+                              <XCircle className="w-6 h-6 text-red-500 mb-1" />
+                              <p className="text-xs text-red-500 text-center line-clamp-2">
+                                {task.error_message || "生成失败"}
+                              </p>
+                            </div>
                           )}
                           
-                          <p className="text-xs text-muted-foreground mt-2">
+                          {(task.status === "pending" || task.status === "queued") && (
+                            <div className="w-full h-24 bg-muted-foreground/10 rounded flex items-center justify-center">
+                              <Clock className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          
+                          <p className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
                           </p>
                         </div>
