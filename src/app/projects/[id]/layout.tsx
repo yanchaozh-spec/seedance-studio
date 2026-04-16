@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use } from "
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Sparkles, Zap } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Sparkles, Zap, Scissors } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -254,7 +254,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     setSelectedAssets((prev) => {
       if (prev.find((a) => a.id === asset.id)) return prev;
       const sameType = prev.filter((a) => a.type === asset.type);
-      const prefix = asset.type === "image" ? "图" : "音频";
+      let prefix = "图";
+      if (asset.type === "audio") prefix = "音频";
+      else if (asset.type === "keyframe") prefix = "关键帧";
       const displayName = `${prefix}${sameType.length + 1}`;
       return [...prev, { ...asset, display_name: displayName }];
     });
@@ -281,6 +283,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
   const imageMaterials = materials.filter((m) => m.type === "image");
   const audioMaterials = materials.filter((m) => m.type === "audio");
+  const keyframeMaterials = materials.filter((m) => m.type === "keyframe");
 
   return (
     <ProjectDetailContext.Provider
@@ -305,9 +308,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           {/* Logo */}
           <div className="flex items-center h-14 px-4 border-b">
             <Link href="/projects" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#FF6B35] to-[#FF8C42] flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="currentColor">
-                  <path d="M17.5 3C15.57 3 14 4.57 14 6.5V8h-2V6.5C12 4.57 13.57 3 15.5 3h2zM8 8H6V6.5C6 4.57 7.57 3 9.5 3h2V5h-2C9.57 5 9 5.57 9 6.5V8z"/>
+              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-neutral-800 to-neutral-600 dark:from-neutral-200 dark:to-neutral-400 flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-white dark:text-neutral-900" fill="currentColor">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
               </div>
               <span className={cn("font-semibold text-sm", collapsed && "hidden")}>焱超</span>
@@ -402,6 +405,24 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {imageMaterials.map((asset) => (
+                      <DraggableAsset
+                        key={asset.id}
+                        asset={asset}
+                        onDragStart={() => addAssetToPool(asset)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {keyframeMaterials.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Scissors className="w-4 h-4" />
+                    关键帧 ({keyframeMaterials.length})
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {keyframeMaterials.map((asset) => (
                       <DraggableAsset
                         key={asset.id}
                         asset={asset}

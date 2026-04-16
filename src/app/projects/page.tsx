@@ -207,10 +207,9 @@ export default function ProjectsPage() {
         <div className="flex h-16 items-center justify-between px-6">
           {/* Logo & 标题 */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF8C42] flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                <path d="M17.5 3C15.57 3 14 4.57 14 6.5V8h-2V6.5C12 4.57 13.57 3 15.5 3h2zM8 8H6V6.5C6 4.57 7.57 3 9.5 3h2V5h-2C9.57 5 9 5.57 9 6.5V8zM8 11h2v2H8v-2zm0 4h2v2H8v-2zm-2-2h6v2H6v-2zm0-4h6v2H6v-2z"/>
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-neutral-800 to-neutral-600 dark:from-neutral-200 dark:to-neutral-400 flex items-center justify-center shadow-lg">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white dark:text-neutral-900" fill="currentColor">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
               </svg>
             </div>
             <div className="flex flex-col">

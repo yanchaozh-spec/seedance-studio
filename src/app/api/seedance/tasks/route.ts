@@ -12,6 +12,7 @@ interface CreateTaskRequest {
     content: string;
     is_activated: boolean;
     activated_asset_id?: string;
+    keyframe_description?: string;
     order: number;
   }>;
   selected_assets: string[];
@@ -104,20 +105,40 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用 ARK API 创建任务
+    // 构建请求参数
+    const requestBody: Record<string, unknown> = {
+      model: MODEL_ID,
+      content,
+      generate_audio: true,
+      ratio: params.ratio,
+      duration: params.duration,
+      watermark: false,
+    };
+
+    // 处理关键帧 - 如果有关键帧素材，需要调整 content 结构
+    const keyframeAssets = (assets || []).filter((a: { type: string; is_keyframe?: boolean }) => a.type === "keyframe" || a.is_keyframe);
+    
+    // 如果有图片或关键帧，添加到 content 中
+    if (imageAssets.length > 0) {
+      const firstImage = imageAssets[0];
+      requestBody.first_frame_image = {
+        url: firstImage.url,
+      };
+      
+      // 如果有关键帧描述
+      const keyframeDesc = prompt_boxes.find((box) => box.keyframe_description)?.keyframe_description;
+      if (keyframeDesc) {
+        requestBody.first_frame_description = keyframeDesc;
+      }
+    }
+
     const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: MODEL_ID,
-        content,
-        generate_audio: true,
-        ratio: params.ratio,
-        duration: params.duration,
-        watermark: false,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();

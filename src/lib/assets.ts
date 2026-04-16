@@ -1,11 +1,16 @@
 // 素材相关的 API 调用
 
+export type AssetType = "image" | "audio" | "keyframe";
+
 export interface Asset {
   id: string;
   project_id: string;
   name: string;
   display_name?: string;
-  type: "image" | "audio";
+  type: AssetType;
+  is_keyframe?: boolean;
+  keyframe_description?: string;
+  keyframe_source_task_id?: string;
   url: string;
   thumbnail_url?: string;
   bound_audio_id?: string;

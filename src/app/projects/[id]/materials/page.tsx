@@ -28,6 +28,7 @@ import {
   Unlink,
   FolderOpen,
   Play,
+  Scissors,
 } from "lucide-react";
 import { Asset, getAssets, createAssetFromUrl, deleteAsset, bindAudioToImage, unbindAudio } from "@/lib/assets";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ interface MaterialDetailDialogProps {
 function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialDetailDialogProps) {
   const [binding, setBinding] = useState(false);
   const [voiceDescription, setVoiceDescription] = useState("");
+  const [keyframeDescription, setKeyframeDescription] = useState("");
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
   
   const audioAssets = allAssets.filter((a) => a.type === "audio" && a.id !== asset?.id);
@@ -53,6 +55,7 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
   useEffect(() => {
     if (asset) {
       setVoiceDescription(asset.voice_description || "");
+      setKeyframeDescription(asset.keyframe_description || "");
       setSelectedAudioId(asset.bound_audio_id || null);
     }
   }, [asset]);
@@ -67,6 +70,24 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
       onClose();
     } catch {
       toast.error("绑定失败");
+    } finally {
+      setBinding(false);
+    }
+  };
+
+  const handleUpdateKeyframeDescription = async () => {
+    if (!asset) return;
+    try {
+      setBinding(true);
+      await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyframe_description: keyframeDescription }),
+      });
+      toast.success("更新成功");
+      onUpdate();
+    } catch {
+      toast.error("更新失败");
     } finally {
       setBinding(false);
     }
@@ -110,21 +131,29 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
         
         <div className="space-y-4 py-4">
           {/* 预览 */}
-          {asset.type === "image" ? (
+          {(asset.type === "image" || asset.type === "keyframe") && (
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-              {asset.thumbnail_url ? (
+              {asset.thumbnail_url || asset.url ? (
                 <img
-                  src={asset.thumbnail_url}
+                  src={asset.thumbnail_url || asset.url}
                   alt={asset.name}
                   className="w-full h-full object-contain"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <ImageIcon className="w-16 h-16 text-muted-foreground" />
+                  <Scissors className="w-16 h-16 text-primary" />
+                </div>
+              )}
+              {asset.type === "keyframe" && (
+                <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
+                  <Scissors className="w-3 h-3 inline mr-1" />
+                  关键帧
                 </div>
               )}
             </div>
-          ) : (
+          )}
+          
+          {asset.type === "audio" && (
             <div className="bg-muted rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <Music className="w-8 h-8 text-primary" />
@@ -200,6 +229,31 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
               )}
             </div>
           )}
+
+          {/* 关键帧描述编辑 */}
+          {(asset.type === "keyframe" || asset.type === "image") && (
+            <div className="space-y-3">
+              <label className="text-sm font-medium">关键帧描述</label>
+              <Input
+                placeholder="描述该关键帧的特征（如：视频首帧，海边日落）"
+                value={keyframeDescription}
+                onChange={(e) => setKeyframeDescription(e.target.value)}
+              />
+              <Button 
+                onClick={handleUpdateKeyframeDescription} 
+                disabled={binding}
+                className="w-full"
+              >
+                <Scissors className="w-4 h-4 mr-2" />
+                保存描述
+              </Button>
+              {asset.type === "keyframe" && asset.keyframe_source_task_id && (
+                <p className="text-xs text-muted-foreground">
+                  来源任务: {asset.keyframe_source_task_id.slice(0, 8)}...
+                </p>
+              )}
+            </div>
+          )}
         </div>
         
         <DialogFooter className="sm:justify-between">
@@ -223,7 +277,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [filter, setFilter] = useState<"all" | "image" | "audio">("all");
+  const [filter, setFilter] = useState<"all" | "image" | "audio" | "keyframe">("all");
 
   useEffect(() => {
     loadAssets();
@@ -297,11 +351,13 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
 
   const filteredAssets = assets.filter((a) => {
     if (filter === "all") return true;
+    if (filter === "keyframe") return a.type === "keyframe" || a.is_keyframe;
     return a.type === filter;
   });
 
   const imageAssets = filteredAssets.filter((a) => a.type === "image");
   const audioAssets = filteredAssets.filter((a) => a.type === "audio");
+  const keyframeAssets = filteredAssets.filter((a) => a.type === "keyframe");
 
   return (
     <div className="p-6 h-full flex flex-col">
@@ -326,6 +382,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
             <SelectContent>
               <SelectItem value="all">全部</SelectItem>
               <SelectItem value="image">图片</SelectItem>
+              <SelectItem value="keyframe">关键帧</SelectItem>
               <SelectItem value="audio">音频</SelectItem>
             </SelectContent>
           </Select>
@@ -432,6 +489,46 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       <span className="text-sm text-muted-foreground">添加图片</span>
                     </div>
                   </label>
+                </div>
+              </div>
+            )}
+
+            {/* 关键帧素材 */}
+            {keyframeAssets.length > 0 && (
+              <div>
+                <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
+                  <Scissors className="w-5 h-5" />
+                  关键帧 ({keyframeAssets.length})
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {keyframeAssets.map((asset) => (
+                    <div
+                      key={asset.id}
+                      className="group bg-muted rounded-lg overflow-hidden cursor-pointer hover:bg-muted/80 transition-colors border-2 border-primary/30"
+                      onClick={() => setSelectedAsset(asset)}
+                    >
+                      <div className="aspect-video relative">
+                        {asset.thumbnail_url || asset.url ? (
+                          <img
+                            src={asset.thumbnail_url || asset.url}
+                            alt={asset.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Scissors className="w-8 h-8 text-primary" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      </div>
+                      <div className="p-2">
+                        <p className="text-sm font-medium truncate">{asset.display_name || asset.name}</p>
+                        {asset.keyframe_description && (
+                          <p className="text-xs text-muted-foreground truncate">{asset.keyframe_description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
