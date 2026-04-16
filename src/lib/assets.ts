@@ -119,3 +119,112 @@ export async function unbindAudio(imageId: string): Promise<void> {
     throw new Error("Failed to unbind audio");
   }
 }
+
+// 从视频提取帧并保存为素材
+export async function extractFrameFromVideo(params: {
+  projectId: string;
+  taskId?: string;
+  timestamp: number; // 时间点（秒）
+  assetCategory?: "keyframe" | "image";
+  name?: string;
+}): Promise<{ success: boolean; asset: Asset; url: string }> {
+  // 返回一个需要前端提供 canvas 截图的函数
+  // 使用方式：先调用此函数获取配置，然后在 canvas 上绘制视频帧并调用返回的提交函数
+  const { projectId, taskId, timestamp, assetCategory = "image", name } = params;
+
+  return new Promise((resolve, reject) => {
+    // 返回一个闭包，让调用者获取提交函数
+    const submitFrame = async (canvas: HTMLCanvasElement) => {
+      return new Promise<void>((res, rej) => {
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            rej(new Error("Failed to capture frame"));
+            return;
+          }
+
+          try {
+            const formData = new FormData();
+            formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+            formData.append("projectId", projectId);
+            formData.append("taskId", taskId || "");
+            formData.append("timestamp", timestamp.toString());
+            formData.append("assetCategory", assetCategory);
+            formData.append("name", name || `frame-${Date.now()}`);
+
+            const response = await fetch("/api/assets/extract-frame", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              rej(new Error(error.error || "Failed to extract frame"));
+              return;
+            }
+
+            const result = await response.json();
+            resolve(result);
+          } catch (error) {
+            rej(error);
+          }
+        }, "image/png");
+      });
+    };
+
+    // 返回一个对象包含配置和提交函数
+    resolve({
+      success: true,
+      asset: null as unknown as Asset,
+      url: "",
+      // @ts-expect-error - 返回提交函数
+      submitFrame,
+    });
+  });
+}
+
+// 简化版：从 canvas 直接提交帧
+export async function submitFrameFromCanvas(
+  canvas: HTMLCanvasElement,
+  projectId: string,
+  options?: {
+    taskId?: string;
+    timestamp?: number;
+    assetCategory?: "keyframe" | "image";
+    name?: string;
+  }
+): Promise<{ success: boolean; asset: Asset; url: string }> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        reject(new Error("Failed to capture frame"));
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+        formData.append("projectId", projectId);
+        formData.append("taskId", options?.taskId || "");
+        formData.append("timestamp", (options?.timestamp || 0).toString());
+        formData.append("assetCategory", options?.assetCategory || "image");
+        formData.append("name", options?.name || `frame-${Date.now()}`);
+
+        const response = await fetch("/api/assets/extract-frame", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          reject(new Error(error.error || "Failed to extract frame"));
+          return;
+        }
+
+        const result = await response.json();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }, "image/png");
+  });
+}

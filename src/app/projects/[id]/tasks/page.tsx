@@ -40,9 +40,11 @@ import {
   Coins,
   Sparkles,
   Play,
+  Camera,
+  Film,
 } from "lucide-react";
 import { Task, getTasks, deleteTask, TaskStatus } from "@/lib/tasks";
-import { getAssets, Asset } from "@/lib/assets";
+import { getAssets, Asset, submitFrameFromCanvas } from "@/lib/assets";
 import { TaskCard, TaskList } from "@/components/tasks/TaskCard";
 import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -64,15 +66,20 @@ const statusConfig: Record<TaskStatus, { icon: React.ElementType; label: string;
 interface TaskDetailSheetProps {
   task: Task | null;
   assets: Asset[];
+  projectId: string;
   onClose: () => void;
   onRollback: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  onAssetCreated?: () => void; // 素材创建后的回调
 }
 
-function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDetailSheetProps) {
+function TaskDetailSheet({ task, assets, projectId, onClose, onRollback, onDelete, onAssetCreated }: TaskDetailSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [showAssetTypeDialog, setShowAssetTypeDialog] = useState(false);
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
@@ -110,6 +117,53 @@ function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDe
   const handleRollbackAction = () => {
     onRollback(task);
     onClose();
+  };
+
+  // 抽帧保存为素材
+  const handleExtractFrame = async (assetCategory: "keyframe" | "image" = "image") => {
+    if (!videoRef.current || !task) return;
+
+    const video = videoRef.current;
+    
+    // 确保视频已加载
+    if (video.readyState < 2) {
+      toast.error("视频尚未加载完成");
+      return;
+    }
+
+    setExtracting(true);
+    
+    try {
+      // 创建 canvas 并绘制当前帧
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("无法创建 canvas 上下文");
+      }
+      
+      // 暂停视频并绘制当前帧
+      const currentTime = video.currentTime;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // 提交到服务器
+      const result = await submitFrameFromCanvas(canvas, projectId, {
+        taskId: task.id,
+        timestamp: currentTime,
+        assetCategory,
+        name: `视频帧_${new Date().toLocaleTimeString().replace(/:/g, "-")}`,
+      });
+      
+      toast.success("已保存到素材库");
+      onAssetCreated?.();
+    } catch (error) {
+      console.error("抽帧失败:", error);
+      toast.error(error instanceof Error ? error.message : "抽帧失败");
+    } finally {
+      setExtracting(false);
+    }
   };
 
   return (
@@ -245,6 +299,40 @@ function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDe
                 <span className="text-sm text-muted-foreground w-8">
                   {Math.round((muted ? 0 : volume) * 100)}%
                 </span>
+              </div>
+              {/* 抽帧功能 */}
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExtractFrame("image")}
+                  disabled={extracting}
+                  className="flex-1"
+                >
+                  {extracting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4 mr-2" />
+                  )}
+                  保存当前帧到素材库
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" disabled={extracting}>
+                      <ImageIcon className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleExtractFrame("image")}>
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                      保存为美术资产
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExtractFrame("keyframe")}>
+                      <Film className="w-4 h-4 mr-2" />
+                      保存为关键帧
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )}
@@ -629,9 +717,11 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       <TaskDetailSheet
         task={selectedTask}
         assets={assets}
+        projectId={resolvedParams.id}
         onClose={() => setSelectedTask(null)}
         onRollback={handleRollback}
         onDelete={handleDelete}
+        onAssetCreated={loadData}
       />
     </div>
   );

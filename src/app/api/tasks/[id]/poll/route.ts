@@ -88,8 +88,9 @@ export async function GET(
             
             if (Array.isArray(externalTask.content)) {
               // 数组格式
-              const videoItem = externalTask.content.find((c: { type: string }) => c.type === "video_url");
-              const lastFrameItem = externalTask.content.find((c: { type: string }) => c.type === "image_url" && c.role === "last_frame");
+              const contentItem = externalTask.content as Array<{ type: string; role?: string; video_url?: { url: string }; image_url?: { url: string } }>;
+              const videoItem = contentItem.find((c) => c.type === "video_url");
+              const lastFrameItem = contentItem.find((c) => c.type === "image_url" && c.role === "last_frame");
               videoUrl = videoItem?.video_url?.url || "";
               lastFrameUrl = lastFrameItem?.image_url?.url || "";
             } else if (externalTask.content) {
