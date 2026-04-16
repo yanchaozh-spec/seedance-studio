@@ -40,10 +40,10 @@ function buildPrompt(
     name: string;
     type: string;
     bound_audio_id?: string;
-    voice_description?: string;
     keyframe_description?: string;
   } | null,
-  keyframeDesc?: string
+  keyframeDesc?: string,
+  audioAssets?: Array<{ id: string; name: string; display_name?: string }>
 ): string {
   if (!asset) return boxContent;
 
@@ -62,8 +62,12 @@ function buildPrompt(
   let referenceText = `"${displayName}"@这张图片`;
 
   // 如果绑定了音频，添加声线描述
-  if (asset.voice_description) {
-    referenceText += `，声线为"${asset.voice_description}"`;
+  if (asset.bound_audio_id && audioAssets) {
+    const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+    if (boundAudio) {
+      const audioName = boundAudio.display_name || boundAudio.name;
+      referenceText += `，声线为@${audioName}`;
+    }
   }
 
   return `${referenceText}，${boxContent}`;
@@ -216,13 +220,6 @@ async function processLongVideo(longVideoId: string): Promise<void> {
         activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
       }
 
-      // 获取绑定的音频信息
-      let voiceDesc: string | undefined;
-      if (activatedAsset?.bound_audio_id) {
-        const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
-        voiceDesc = boundAudio?.voice_description;
-      }
-
       // 构建 content 数组
       const content: ContentItem[] = [];
 
@@ -244,13 +241,9 @@ async function processLongVideo(longVideoId: string): Promise<void> {
       // 构建提示词文本
       const promptText = buildPrompt(
         prompt.content.trim(),
-        activatedAsset
-          ? {
-              ...activatedAsset,
-              voice_description: voiceDesc,
-            }
-          : null,
-        prompt.keyframe_description
+        activatedAsset || null,
+        prompt.keyframe_description,
+        audioAssets
       );
 
       content.push({

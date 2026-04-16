@@ -180,7 +180,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               );
               if (boundAudio) {
                 const audioName = boundAudio.display_name || boundAudio.name;
-                referenceText += `，声线：@${audioName}`;
+                referenceText += `，声线为@${audioName}`;
               }
             }
             

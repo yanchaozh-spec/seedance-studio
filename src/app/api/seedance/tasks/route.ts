@@ -118,7 +118,7 @@ function buildContent(
           const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
           if (boundAudio) {
             const audioName = boundAudio.display_name || boundAudio.name;
-            referenceText += `，声线：@${audioName}`;
+            referenceText += `，声线为@${audioName}`;
           }
         }
         
