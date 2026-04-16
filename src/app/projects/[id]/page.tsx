@@ -105,9 +105,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
   // 生成最终提示词
   // 格式：
-  //   - 美术资产：第一行 "图片名"@这张图片，声线为@音频文件名，提示词
-  //   - 关键帧：第一行 关键帧描述@文件名，提示词
-  //   后续行：提示词内容
+  //   - 第一行：素材引用信息
+  //   - 第二行开始：提示词内容
   const generateFinalPrompt = useCallback(() => {
     const lines: string[] = [];
     const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
@@ -122,41 +121,35 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
       const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
       
-      let header = "";
+      let assetLine = "";
 
       if (isKeyframe) {
         // 关键帧：关键帧描述@文件名
         const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
         if (keyframeDesc) {
-          header = `${keyframeDesc}@${displayName}`;
+          assetLine = `${keyframeDesc}@${displayName}`;
         } else {
-          header = `@${displayName}`;
+          assetLine = `@${displayName}`;
         }
       } else {
         // 美术资产："图片名"@这张图片，声线为@音频文件名
-        header = `"${displayName}"@这张图片`;
+        assetLine = `"${displayName}"@这张图片`;
         if (firstActivatedAsset.bound_audio_id) {
           const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
           if (boundAudio) {
             const audioName = boundAudio.display_name || boundAudio.name;
-            header += `，声线为@${audioName}`;
+            assetLine += `，声线为@${audioName}`;
           }
         }
       }
 
-      // 如果有提示词内容
-      if (nonEmptyBoxes.length > 0) {
-        // 第一行：素材信息 + 第一个提示词
-        lines.push(`${header}，${nonEmptyBoxes[0].content.trim()}`);
+      // 第一行：素材信息
+      lines.push(assetLine);
 
-        // 后续行：仅提示词内容
-        for (let i = 1; i < nonEmptyBoxes.length; i++) {
-          lines.push(nonEmptyBoxes[i].content.trim());
-        }
-      } else {
-        // 没有提示词内容时，只显示素材信息
-        lines.push(header);
-      }
+      // 后续行：提示词内容
+      nonEmptyBoxes.forEach((box) => {
+        lines.push(box.content.trim());
+      });
     } else if (nonEmptyBoxes.length > 0) {
       // 没有激活素材时，直接输出提示词
       nonEmptyBoxes.forEach((box) => {
@@ -250,7 +243,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     try {
       setGenerating(true);
       
-      // 构建提示词：第一行包含素材引用，后续行仅提示词内容
+      // 构建提示词：第一行素材引用，后续行提示词内容
       const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
       const promptLines: string[] = [];
 
@@ -264,35 +257,35 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
         const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
         
-        let header = "";
+        let assetLine = "";
 
         if (isKeyframe) {
           // 关键帧：关键帧描述@文件名
           const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
           if (keyframeDesc) {
-            header = `${keyframeDesc}@${displayName}`;
+            assetLine = `${keyframeDesc}@${displayName}`;
           } else {
-            header = `@${displayName}`;
+            assetLine = `@${displayName}`;
           }
         } else {
           // 美术资产："图片名"@这张图片，声线为@音频文件名
-          header = `"${displayName}"@这张图片`;
+          assetLine = `"${displayName}"@这张图片`;
           if (firstActivatedAsset.bound_audio_id) {
             const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
             if (boundAudio) {
               const audioName = boundAudio.display_name || boundAudio.name;
-              header += `，声线为@${audioName}`;
+              assetLine += `，声线为@${audioName}`;
             }
           }
         }
 
-        // 第一行：素材信息 + 第一个提示词
-        promptLines.push(`${header}，${nonEmptyBoxes[0].content.trim()}`);
+        // 第一行：素材信息
+        promptLines.push(assetLine);
 
-        // 后续行：仅提示词内容
-        for (let i = 1; i < nonEmptyBoxes.length; i++) {
-          promptLines.push(nonEmptyBoxes[i].content.trim());
-        }
+        // 后续行：提示词内容
+        nonEmptyBoxes.forEach((box) => {
+          promptLines.push(box.content.trim());
+        });
       } else {
         // 没有激活素材时，直接输出提示词
         nonEmptyBoxes.forEach((box) => {

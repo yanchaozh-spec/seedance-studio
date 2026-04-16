@@ -33,6 +33,7 @@ type ContentItem =
   | { type: "audio_url"; audio_url: { url: string }; role?: string };
 
 // 构建符合 Seedance 2.0 格式的提示词
+// 格式：第一行素材引用，第二行提示词内容
 function buildPrompt(
   boxContent: string,
   asset: {
@@ -50,28 +51,34 @@ function buildPrompt(
 
   const displayName = asset.display_name || asset.name;
   const isKeyframe = asset.asset_category === "keyframe";
+  let assetLine = "";
 
   if (isKeyframe) {
     // 关键帧：关键帧描述@文件名
     const desc = keyframeDesc || asset.keyframe_description || "";
     if (desc) {
-      return `${desc}@${displayName}，${boxContent}`;
+      assetLine = `${desc}@${displayName}`;
+    } else {
+      assetLine = `@${displayName}`;
     }
-    return `@${displayName}，${boxContent}`;
+  } else {
+    // 美术资产："图片名"@这张图片，声线为@音频文件名
+    assetLine = `"${displayName}"@这张图片`;
+
+    if (asset.bound_audio_id && audioAssets) {
+      const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+      if (boundAudio) {
+        const audioName = boundAudio.display_name || boundAudio.name;
+        assetLine += `，声线为@${audioName}`;
+      }
+    }
   }
 
-  // 美术资产：添加声线描述
-  let referenceText = `"${displayName}"@这张图片`;
-
-  if (asset.bound_audio_id && audioAssets) {
-    const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-    if (boundAudio) {
-      const audioName = boundAudio.display_name || boundAudio.name;
-      referenceText += `，声线为@${audioName}`;
-    }
+  // 第一行素材引用，第二行提示词内容
+  if (boxContent) {
+    return `${assetLine}\n${boxContent}`;
   }
-
-  return `${referenceText}，${boxContent}`;
+  return assetLine;
 }
 
 // 计算需要多少段

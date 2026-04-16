@@ -97,7 +97,7 @@ function buildContent(
     }
 
     // 构建文本内容
-    let textContent = box.content.trim();
+    // 格式：第一行素材引用，后续行提示词内容
     const isKeyframe = activatedAsset?.asset_category === "keyframe";
     
     if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
@@ -107,12 +107,12 @@ function buildContent(
         // 关键帧：关键帧描述@文件名
         const desc = box.keyframe_description || activatedAsset.keyframe_description || "";
         if (desc) {
-          textContent = `${desc}@${displayName}，${textContent}`;
+          content.push({ type: "text", text: `${desc}@${displayName}` });
         } else {
-          textContent = `@${displayName}，${textContent}`;
+          content.push({ type: "text", text: `@${displayName}` });
         }
       } else {
-        // 美术资产：添加声线描述
+        // 美术资产："图片名"@这张图片，声线为@音频文件名
         let referenceText = `"${displayName}"@这张图片`;
         
         if (activatedAsset.bound_audio_id) {
@@ -123,19 +123,17 @@ function buildContent(
           }
         }
         
-        textContent = `${referenceText}，${textContent}`;
+        content.push({ type: "text", text: referenceText });
       }
     }
 
-    content.push({
-      type: "text",
-      text: textContent,
-    });
+    // 添加提示词内容
+    if (box.content.trim()) {
+      content.push({ type: "text", text: box.content.trim() });
+    }
 
     // 添加图片内容（如果有）
     if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
-      const displayName = activatedAsset.display_name || activatedAsset.name;
-      
       // 根据素材类型设置 role
       let role: "first_frame" | "reference_image" | undefined;
       if (isKeyframe) {
