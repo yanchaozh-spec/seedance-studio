@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Scissors,
   ImageOff,
+  Music,
 } from "lucide-react";
 import { Asset, getAssets, createAssetFromUrl, AssetCategory } from "@/lib/assets";
 import { toast } from "sonner";
@@ -196,8 +197,18 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                           <span className="text-white text-sm font-medium">查看详情</span>
                         </div>
                       </div>
-                      <div className="p-2">
+                      <div className="p-2 space-y-1">
                         <p className="text-xs truncate text-center">{asset.display_name || asset.name}</p>
+                        {/* 音频状态 */}
+                        <div className={cn(
+                          "flex items-center justify-center gap-1 py-0.5 rounded text-[10px]",
+                          asset.bound_audio_id 
+                            ? "bg-primary/20 text-primary" 
+                            : "bg-muted-foreground/10 text-muted-foreground"
+                        )}>
+                          <Music className="w-3 h-3" />
+                          <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -253,8 +264,18 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                           </div>
                         )}
                       </div>
-                      <div className="p-2">
+                      <div className="p-2 space-y-1">
                         <p className="text-xs truncate text-center">{asset.display_name || asset.name}</p>
+                        {/* 音频状态 */}
+                        <div className={cn(
+                          "flex items-center justify-center gap-1 py-0.5 rounded text-[10px]",
+                          asset.bound_audio_id 
+                            ? "bg-primary/20 text-primary" 
+                            : "bg-muted-foreground/10 text-muted-foreground"
+                        )}>
+                          <Music className="w-3 h-3" />
+                          <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+                        </div>
                       </div>
                     </div>
                   ))}

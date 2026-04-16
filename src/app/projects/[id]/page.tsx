@@ -561,7 +561,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        <div className="p-1">
+                        <div className="p-1 space-y-0.5">
+                          {/* 声音状态 */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
+                            asset.bound_audio_id 
+                              ? "bg-primary/20 text-primary" 
+                              : "bg-muted-foreground/10 text-muted-foreground"
+                          )}>
+                            <Music className="w-2.5 h-2.5" />
+                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
+                          </div>
                           {/* 激活按钮 */}
                           <button
                             onClick={(e) => {
@@ -632,7 +642,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        <div className="p-1">
+                        <div className="p-1 space-y-0.5">
+                          {/* 声音状态 */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
+                            asset.bound_audio_id 
+                              ? "bg-primary/20 text-primary" 
+                              : "bg-muted-foreground/10 text-muted-foreground"
+                          )}>
+                            <Music className="w-2.5 h-2.5" />
+                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
+                          </div>
                           {/* 激活按钮 */}
                           <button
                             onClick={(e) => {
