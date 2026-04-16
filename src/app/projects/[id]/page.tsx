@@ -446,7 +446,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <Scissors className="w-4 h-4" />
-                    关键帧 ({keyframeAssets.length})
+                    {keyframeAssets.map((asset, idx) => (
+                      <span key={asset.id}>
+                        {asset.display_name || asset.name}
+                        {idx < keyframeAssets.length - 1 && "、"}
+                      </span>
+                    ))}
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {keyframeAssets.map((asset) => (
@@ -523,7 +528,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <Image className="w-4 h-4" />
-                    图片 ({imageAssets.length})
+                    {imageAssets.map((asset, idx) => (
+                      <span key={asset.id}>
+                        {asset.display_name || asset.name}
+                        {idx < imageAssets.length - 1 && "、"}
+                      </span>
+                    ))}
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {imageAssets.map((asset) => (

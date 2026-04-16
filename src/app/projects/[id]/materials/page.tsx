@@ -479,37 +479,52 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
               <div>
                 <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
                   <ImageIcon className="w-5 h-5" />
-                  图片素材 ({imageAssets.length})
+                  {imageAssets.map((asset, idx) => (
+                    <span key={asset.id}>
+                      {asset.display_name || asset.name}
+                      {idx < imageAssets.length - 1 && "、"}
+                    </span>
+                  ))}
                 </h2>
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {imageAssets.map((asset) => (
                     <div
                       key={asset.id}
-                      className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                      className="group bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                       onClick={() => setSelectedAsset(asset)}
                     >
-                      {asset.thumbnail_url ? (
-                        <img
-                          src={asset.thumbnail_url}
-                          alt={asset.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="w-12 h-12 text-muted-foreground" />
+                      <div className="aspect-video relative">
+                        {asset.thumbnail_url ? (
+                          <img
+                            src={asset.thumbnail_url}
+                            alt={asset.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="w-12 h-12 text-muted-foreground" />
+                          </div>
+                        )}
+                        {/* 悬停覆盖层 */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <span className="text-white text-sm font-medium">查看详情</span>
                         </div>
-                      )}
-                      
-                      {/* 音频绑定标记 */}
-                      {asset.bound_audio_id && (
-                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
+                      </div>
+                      {/* 底部信息 */}
+                      <div className="p-2 space-y-1">
+                        <span className="text-xs truncate block">
+                          {asset.display_name || asset.name}
+                        </span>
+                        {/* 音频参考按钮 */}
+                        <div className={cn(
+                          "flex items-center justify-center gap-1 py-1 rounded text-xs",
+                          asset.bound_audio_id 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-muted-foreground/20 text-muted-foreground"
+                        )}>
                           <Music className="w-3 h-3" />
+                          <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
                         </div>
-                      )}
-                      
-                      {/* 悬停覆盖层 */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <span className="text-white text-sm font-medium">查看详情</span>
                       </div>
                     </div>
                   ))}
@@ -523,7 +538,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       onChange={(e) => handleUpload(e.target.files)}
                       className="hidden"
                     />
-                    <div className="aspect-square border-2 border-dashed border-muted-foreground/20 rounded-lg flex flex-col items-center justify-center hover:border-primary/50 transition-colors">
+                    <div className="aspect-video border-2 border-dashed border-muted-foreground/20 rounded-lg flex flex-col items-center justify-center hover:border-primary/50 transition-colors">
                       <Upload className="w-8 h-8 text-muted-foreground mb-2" />
                       <span className="text-sm text-muted-foreground">添加图片</span>
                     </div>
@@ -537,7 +552,12 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
               <div>
                 <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
                   <Scissors className="w-5 h-5" />
-                  关键帧 ({keyframeAssets.length})
+                  {keyframeAssets.map((asset, idx) => (
+                    <span key={asset.id}>
+                      {asset.display_name || asset.name}
+                      {idx < keyframeAssets.length - 1 && "、"}
+                    </span>
+                  ))}
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {keyframeAssets.map((asset) => (
@@ -577,7 +597,12 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
               <div>
                 <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
                   <Music className="w-5 h-5" />
-                  音频素材 ({audioAssets.length})
+                  {audioAssets.map((asset, idx) => (
+                    <span key={asset.id}>
+                      {asset.display_name || asset.name}
+                      {idx < audioAssets.length - 1 && "、"}
+                    </span>
+                  ))}
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {audioAssets.map((asset) => (

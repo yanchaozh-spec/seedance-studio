@@ -49,9 +49,10 @@ interface DraggableAssetProps {
   asset: Asset;
   showRemove?: boolean;
   onRemove?: (assetId: string) => void;
+  size?: "small" | "large";
 }
 
-function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
+function DraggableAsset({ asset, showRemove, onRemove, size = "small" }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -133,7 +134,10 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
-      className="relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none"
+      className={cn(
+        "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
+        size === "small" ? "w-24" : "w-full"
+      )}
     >
       {/* 隐藏的图片元素用于拖拽 */}
       {asset.thumbnail_url && (
@@ -147,7 +151,10 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
       )}
       {asset.type === "image" ? (
         <div className="w-full">
-          <div className="aspect-video relative">
+          <div className={cn(
+            "relative",
+            size === "small" ? "aspect-square" : "aspect-video"
+          )}>
             {asset.thumbnail_url ? (
               <img
                 src={asset.thumbnail_url}
@@ -156,7 +163,7 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted">
-                <Image className="w-8 h-8 text-muted-foreground" />
+                <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
               </div>
             )}
             {/* 删除按钮 */}
@@ -169,23 +176,24 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
                 }}
                 className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <X className="w-3 h-3" />
+                <X className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
               </button>
             )}
           </div>
           {/* 底部信息 */}
-          <div className="p-2 space-y-1">
-            <span className="text-xs truncate block">
+          <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
+            <span className={cn("truncate block", size === "small" ? "text-[10px]" : "text-xs")}>
               {asset.display_name || asset.name}
             </span>
             {/* 音频参考按钮 */}
             <div className={cn(
-              "flex items-center justify-center gap-1 py-1 rounded text-xs",
+              "flex items-center justify-center gap-1 rounded text-xs",
               asset.bound_audio_id 
                 ? "bg-primary text-primary-foreground" 
-                : "bg-muted-foreground/20 text-muted-foreground"
+                : "bg-muted-foreground/20 text-muted-foreground",
+              size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
             )}>
-              <Music className="w-3 h-3" />
+              <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
               <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
             </div>
           </div>
