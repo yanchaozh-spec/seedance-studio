@@ -4,14 +4,19 @@ import { useEffect, useState, createContext, useContext, ReactNode, use } from "
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Sparkles, Zap } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Asset, getAssets } from "@/lib/assets";
 import { Image, Music } from "lucide-react";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
+import { useSettingsStore } from "@/lib/settings";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -113,6 +118,101 @@ function DraggableAsset({ asset, onDragStart, showRemove, onRemove }: DraggableA
   );
 }
 
+// 设置弹窗组件
+function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { arkApiKey, modelMode, setArkApiKey, setModelMode } = useSettingsStore();
+  const { theme, setTheme } = useTheme();
+  const [localApiKey, setLocalApiKey] = useState(arkApiKey);
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveApiKey = () => {
+    setArkApiKey(localApiKey);
+    setSaving(true);
+    setTimeout(() => setSaving(false), 1500);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Settings className="w-5 h-5" />
+            设置
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          {/* 主题设置 */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">外观</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={theme === "light" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTheme("light")}
+                className="flex-1 gap-1.5"
+              >
+                <Sun className="w-4 h-4" />
+                浅色
+              </Button>
+              <Button
+                variant={theme === "dark" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTheme("dark")}
+                className="flex-1 gap-1.5"
+              >
+                <Moon className="w-4 h-4" />
+                深色
+              </Button>
+            </div>
+          </div>
+
+          {/* 模型设置 */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">模型模式</Label>
+            <Select value={modelMode} onValueChange={(v) => setModelMode(v as "fast" | "standard")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Seedance 2.0 标准</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="fast">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    <span>Seedance 2.0 Fast</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* API Key */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">API 配置</Label>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="ARK API Key"
+                value={localApiKey}
+                onChange={(e) => setLocalApiKey(e.target.value)}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleSaveApiKey} disabled={saving}>
+                {saving ? "已保存" : "保存"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface ProjectDetailLayoutProps {
   children: ReactNode;
   params: Promise<{ id: string }>;
@@ -123,6 +223,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [materialsDrawerOpen, setMaterialsDrawerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
   const [materials, setMaterials] = useState<Asset[]>([]);
@@ -139,7 +240,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       setLoading(true);
       const data = await getProject(resolvedParams.id);
       setProject(data);
-      // 加载素材
       const assets = await getAssets(resolvedParams.id);
       setMaterials(assets);
     } catch (error) {
@@ -153,7 +253,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const addAssetToPool = (asset: Asset) => {
     setSelectedAssets((prev) => {
       if (prev.find((a) => a.id === asset.id)) return prev;
-      // 生成显示名称
       const sameType = prev.filter((a) => a.type === asset.type);
       const prefix = asset.type === "image" ? "图" : "音频";
       const displayName = `${prefix}${sameType.length + 1}`;
@@ -205,8 +304,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         >
           {/* Logo */}
           <div className="flex items-center h-14 px-4 border-b">
-            <Link href="/projects">
-              <span className={cn("font-semibold text-lg", collapsed && "hidden")}>Seedance 2.0</span>
+            <Link href="/projects" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#FF6B35] to-[#FF8C42] flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="currentColor">
+                  <path d="M17.5 3C15.57 3 14 4.57 14 6.5V8h-2V6.5C12 4.57 13.57 3 15.5 3h2zM8 8H6V6.5C6 4.57 7.57 3 9.5 3h2V5h-2C9.57 5 9 5.57 9 6.5V8z"/>
+                </svg>
+              </div>
+              <span className={cn("font-semibold text-sm", collapsed && "hidden")}>焱超</span>
             </Link>
             <button
               onClick={() => setCollapsed(!collapsed)}
@@ -242,21 +346,17 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent transition-colors w-full"
             >
               {theme === "dark" ? <Sun className="w-5 h-5 flex-shrink-0" /> : <Moon className="w-5 h-5 flex-shrink-0" />}
-              <span className={cn(collapsed && "hidden")}>{theme === "dark" ? "浅色模式" : "深色模式"}</span>
+              <span className={cn(collapsed && "hidden")}>{theme === "dark" ? "浅色" : "深色"}</span>
             </button>
 
-            {/* 设置 */}
-            <Link
-              href={`/projects/${resolvedParams.id}/settings`}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                isActive(`/projects/${resolvedParams.id}/settings`) && "bg-primary text-primary-foreground",
-                !isActive(`/projects/${resolvedParams.id}/settings`) && "hover:bg-accent"
-              )}
+            {/* 设置按钮 */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent transition-colors w-full"
             >
               <Settings className="w-5 h-5 flex-shrink-0" />
               <span className={cn(collapsed && "hidden")}>设置</span>
-            </Link>
+            </button>
           </div>
         </aside>
 
@@ -294,7 +394,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               </div>
             </SheetHeader>
             <div className="flex-1 overflow-auto p-4">
-              {/* 图片素材 */}
               {imageMaterials.length > 0 && (
                 <div className="mb-6">
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -313,7 +412,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                 </div>
               )}
 
-              {/* 音频素材 */}
               {audioMaterials.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -342,6 +440,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
             </div>
           </SheetContent>
         </Sheet>
+
+        {/* 设置弹窗 */}
+        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       </div>
     </ProjectDetailContext.Provider>
   );

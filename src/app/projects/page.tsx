@@ -17,14 +17,133 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Plus, Trash2, FolderOpen, Calendar, ListTodo } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  MoreVertical,
+  Plus,
+  Trash2,
+  FolderOpen,
+  Calendar,
+  ListTodo,
+  Settings,
+  Sun,
+  Moon,
+  Sparkles,
+  Zap,
+  Key,
+} from "lucide-react";
 import { getProjects, createProject, deleteProject, getProjectTaskCount, Project } from "@/lib/projects";
 import { formatDistanceToNow } from "date-fns";
+import { useTheme } from "next-themes";
+import { useSettingsStore } from "@/lib/settings";
+
+// 设置弹窗组件
+function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { arkApiKey, modelMode, setArkApiKey, setModelMode } = useSettingsStore();
+  const { theme, setTheme } = useTheme();
+  const [localApiKey, setLocalApiKey] = useState(arkApiKey);
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveApiKey = () => {
+    setArkApiKey(localApiKey);
+    setSaving(true);
+    setTimeout(() => setSaving(false), 1500);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Settings className="w-5 h-5" />
+            设置
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          {/* 主题设置 */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">外观</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={theme === "light" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTheme("light")}
+                className="flex-1 gap-1.5"
+              >
+                <Sun className="w-4 h-4" />
+                浅色
+              </Button>
+              <Button
+                variant={theme === "dark" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTheme("dark")}
+                className="flex-1 gap-1.5"
+              >
+                <Moon className="w-4 h-4" />
+                深色
+              </Button>
+            </div>
+          </div>
+
+          {/* 模型设置 */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">模型模式</Label>
+            <Select value={modelMode} onValueChange={(v) => setModelMode(v as "fast" | "standard")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Seedance 2.0 标准</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="fast">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    <span>Seedance 2.0 Fast</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* API Key */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">API 配置</Label>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="ARK API Key"
+                value={localApiKey}
+                onChange={(e) => setLocalApiKey(e.target.value)}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleSaveApiKey} disabled={saving}>
+                {saving ? "已保存" : "保存"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<(Project & { taskCount?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -38,7 +157,6 @@ export default function ProjectsPage() {
     try {
       setLoading(true);
       const data = await getProjects();
-      // 获取每个项目的任务数量
       const projectsWithCount = await Promise.all(
         data.map(async (project) => {
           const count = await getProjectTaskCount(project.id);
@@ -83,97 +201,127 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* 头部 */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold">项目管理</h1>
-          <p className="text-muted-foreground mt-1">创建和管理您的视频生成项目</p>
-        </div>
-        <Button onClick={() => setDialogOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          新建项目
-        </Button>
-      </div>
+    <>
+      {/* 顶部导航 */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
+        <div className="flex h-16 items-center justify-between px-6">
+          {/* Logo & 标题 */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF8C42] flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                <path d="M17.5 3C15.57 3 14 4.57 14 6.5V8h-2V6.5C12 4.57 13.57 3 15.5 3h2zM8 8H6V6.5C6 4.57 7.57 3 9.5 3h2V5h-2C9.57 5 9 5.57 9 6.5V8zM8 11h2v2H8v-2zm0 4h2v2H8v-2zm-2-2h6v2H6v-2zm0-4h6v2H6v-2z"/>
+              </svg>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-semibold tracking-tight">焱超</span>
+              <span className="text-xs text-muted-foreground -mt-0.5">SEEDANCE 工作台</span>
+            </div>
+          </div>
 
-      {/* 项目列表 */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-40 bg-muted/50 rounded-lg animate-pulse" />
-          ))}
+          {/* 右侧操作 */}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)} className="gap-2">
+              <Settings className="w-4 h-4" />
+              设置
+            </Button>
+            <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              新建项目
+            </Button>
+          </div>
         </div>
-      ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FolderOpen className="w-16 h-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">暂无项目</h3>
-          <p className="text-muted-foreground mb-4">创建您的第一个项目开始生成视频</p>
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            新建项目
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="group relative bg-card border rounded-lg p-5 hover:border-primary/50 transition-colors cursor-pointer"
-              onClick={() => openProject(project.id)}
-            >
-              {/* 菜单按钮 */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    className="text-destructive gap-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(project.id);
-                    }}
-                    disabled={deletingId === project.id}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    删除项目
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+      </header>
 
-              {/* 项目内容 */}
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <FolderOpen className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium truncate">{project.name}</h3>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <ListTodo className="w-3.5 h-3.5" />
-                      {project.taskCount || 0} 个任务
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
-                    </span>
+      {/* 主内容区 */}
+      <main className="px-6 py-8 max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold mb-1">我的项目</h1>
+          <p className="text-muted-foreground">管理和创建您的视频生成项目</p>
+        </div>
+
+        {/* 项目列表 */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-40 bg-muted/50 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-6">
+              <FolderOpen className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">暂无项目</h3>
+            <p className="text-muted-foreground mb-6">创建您的第一个项目开始生成视频</p>
+            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              新建项目
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="group relative bg-card border rounded-xl p-5 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => openProject(project.id)}
+              >
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(project.id);
+                      }}
+                      disabled={deletingId === project.id}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      删除项目
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <FolderOpen className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate mb-1">{project.name}</h3>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <ListTodo className="w-3 h-3" />
+                        {project.taskCount || 0} 个任务
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* 设置弹窗 */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       {/* 新建项目对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>新建项目</DialogTitle>
           </DialogHeader>
@@ -196,6 +344,6 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
