@@ -104,53 +104,91 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const generateFinalPrompt = useCallback(() => {
     const nonEmptyPrompts = currentPrompts.filter((p) => p.content.trim());
 
-    // 找到第一个激活的图片或关键帧素材
-    const firstActivatedAsset = selectedAssets.find(
-      (a) => a.type === "image" || a.type === "keyframe"
-    );
+    // 收集所有激活的图片素材（按顺序编号）
+    const referencedAssets: Array<{
+      asset: (typeof selectedAssets)[0];
+      index: number;
+    }> = [];
 
-    const contentItems: Array<Record<string, unknown>> = [];
+    // 遍历每个提示词框，收集激活的素材
+    for (const prompt of nonEmptyPrompts) {
+      let activatedAsset = null;
 
-    if (firstActivatedAsset) {
-      const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
+      if (prompt.activatedAssetId) {
+        activatedAsset = selectedAssets.find(
+          (a) => a.id === prompt.activatedAssetId
+        );
+      }
 
-      // 添加图片 URL
-      contentItems.push({
-        type: "image_url",
-        image_url: { url: firstActivatedAsset.url },
-        role: isKeyframe ? "first_frame" : "reference_image",
-      });
+      if (!activatedAsset) {
+        activatedAsset = selectedAssets.find(
+          (a) => a.type === "image" || a.type === "keyframe"
+        );
+      }
 
-      // 添加提示词文本
-      nonEmptyPrompts.forEach((p) => {
-        if (p.content.trim()) {
-          contentItems.push({
-            type: "text",
-            text: p.content.trim(),
-          });
-        }
-      });
+      if (activatedAsset) {
+        const alreadyReferenced = referencedAssets.find(
+          (ref) => ref.asset.id === activatedAsset!.id
+        );
 
-      // 如果绑定了音频，添加音频
-      if (firstActivatedAsset.bound_audio_id) {
-        const boundAudio = assets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
-        if (boundAudio) {
-          contentItems.push({
-            type: "audio_url",
-            audio_url: { url: boundAudio.url },
-            role: "reference_audio",
+        if (!alreadyReferenced) {
+          referencedAssets.push({
+            asset: activatedAsset,
+            index: referencedAssets.length + 1,
           });
         }
       }
-    } else if (nonEmptyPrompts.length > 0) {
-      // 没有激活素材时，直接输出提示词
-      nonEmptyPrompts.forEach((p) => {
-        if (p.content.trim()) {
-          contentItems.push({
-            type: "text",
-            text: p.content.trim(),
-          });
-        }
+    }
+
+    // 如果没有激活的素材，使用第一个可用的图片或关键帧
+    if (referencedAssets.length === 0) {
+      const defaultAsset = selectedAssets.find(
+        (a) => a.type === "image" || a.type === "keyframe"
+      );
+      if (defaultAsset) {
+        referencedAssets.push({ asset: defaultAsset, index: 1 });
+      }
+    }
+
+    const contentItems: Array<Record<string, unknown>> = [];
+
+    // 添加所有图片（使用 [图N] 编号）
+    for (const ref of referencedAssets) {
+      const isKeyframe = ref.asset.asset_category === "keyframe";
+      contentItems.push({
+        type: "image_url",
+        image_url: { url: ref.asset.url },
+        role: isKeyframe ? "first_frame" : "reference_image",
+      });
+    }
+
+    // 构建合并的文本提示词（使用 [图N] 引用）
+    const textParts: string[] = [];
+
+    for (const ref of referencedAssets) {
+      const displayName = ref.asset.display_name || ref.asset.name;
+      const isKeyframe = ref.asset.asset_category === "keyframe";
+
+      if (isKeyframe) {
+        const desc = (ref.asset as { keyframe_description?: string }).keyframe_description || "";
+        textParts.push(desc ? `[图${ref.index}]${desc}@${displayName}` : `[图${ref.index}]@${displayName}`);
+      } else {
+        textParts.push(`[图${ref.index}]"${displayName}"`);
+      }
+    }
+
+    // 添加每个提示词的内容
+    for (const prompt of nonEmptyPrompts) {
+      if (prompt.content.trim()) {
+        textParts.push(prompt.content.trim());
+      }
+    }
+
+    // 添加合并的文本（只有一个 text 对象）
+    if (textParts.length > 0) {
+      contentItems.push({
+        type: "text",
+        text: textParts.join("\n"),
       });
     }
 
@@ -167,7 +205,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
     };
 
     return JSON.stringify(requestBody, null, 2);
-  }, [currentPrompts, selectedAssets, assets, currentRatio, currentDuration, currentResolution]);
+  }, [currentPrompts, selectedAssets, currentRatio, currentDuration, currentResolution]);
 
   // 加载素材
   useEffect(() => {

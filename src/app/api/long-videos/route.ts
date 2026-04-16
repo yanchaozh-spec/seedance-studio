@@ -33,6 +33,7 @@ type ContentItem =
   | { type: "audio_url"; audio_url: { url: string }; role?: string };
 
 // 构建符合 Seedance 2.0 格式的提示词
+// 使用 [图1]、[图2] 等方式引用图片
 function buildPrompt(
   boxContent: string,
   asset: {
@@ -44,14 +45,14 @@ function buildPrompt(
     keyframe_description?: string;
     url: string;
   } | null,
-  keyframeDesc?: string,
+  imageIndex: number = 1,
   audioAssets?: Array<{ id: string; name: string; display_name?: string; url: string }>
 ): ContentItem[] {
   if (!asset) return [];
 
+  const contentItems: ContentItem[] = [];
   const displayName = asset.display_name || asset.name;
   const isKeyframe = asset.asset_category === "keyframe";
-  const contentItems: ContentItem[] = [];
 
   // 添加图片
   if (isKeyframe) {
@@ -68,22 +69,35 @@ function buildPrompt(
     });
   }
 
-  // 添加提示词
-  if (boxContent) {
-    contentItems.push({ type: "text", text: boxContent });
+  // 构建文本引用标记
+  let textRef = "";
+  if (isKeyframe) {
+    const desc = asset.keyframe_description || "";
+    textRef = desc ? `[图${imageIndex}]${desc}@${displayName}` : `[图${imageIndex}]@${displayName}`;
+  } else {
+    textRef = `[图${imageIndex}]"${displayName}"`;
   }
 
-  // 添加绑定的音频
+  // 构建文本内容
+  const textParts: string[] = [textRef];
+
+  if (boxContent) {
+    textParts.push(boxContent);
+  }
+
+  // 添加绑定的音频引用
   if (!isKeyframe && asset.bound_audio_id && audioAssets) {
     const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
     if (boundAudio) {
-      contentItems.push({
-        type: "audio_url",
-        audio_url: { url: boundAudio.url },
-        role: "reference_audio",
-      });
+      const audioName = boundAudio.display_name || boundAudio.name;
+      textParts.push(`[图${imageIndex}]声线为@${audioName}`);
     }
   }
+
+  contentItems.push({
+    type: "text",
+    text: textParts.join("\n"),
+  });
 
   return contentItems;
 }
@@ -257,30 +271,54 @@ async function processLongVideo(longVideoId: string): Promise<void> {
       const content: ContentItem[] = [];
 
       // 添加首帧图片（如果是第一段之后，需要使用上一段的尾帧）
+      let imageIndex = 1;
       if (lastFrameUrl && i > 0) {
+        // 后续段使用上一段的尾帧作为首帧
         content.push({
           type: "image_url",
           image_url: { url: lastFrameUrl },
           role: "first_frame",
         });
+        // 激活的素材作为参考图 [图1]
+        if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+          imageIndex = 2;
+          const isKeyframe = activatedAsset.asset_category === "keyframe";
+          content.push({
+            type: "image_url",
+            image_url: { url: activatedAsset.url },
+            role: isKeyframe ? "first_frame" : "reference_image",
+          });
+        }
       } else if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+        // 第一段使用激活的素材作为首帧
+        const isKeyframe = activatedAsset.asset_category === "keyframe";
         content.push({
           type: "image_url",
           image_url: { url: activatedAsset.url },
-          role: "first_frame",
+          role: isKeyframe ? "first_frame" : "reference_image",
         });
       }
 
-      // 构建符合 Seedance 2.0 格式的提示词
+      // 构建符合 Seedance 2.0 格式的提示词（包含 [图N] 引用）
       const promptContent = buildPrompt(
         prompt.content.trim(),
         activatedAsset || null,
-        prompt.keyframe_description,
+        imageIndex,
         audioAssets
       );
 
-      // 将构建好的内容添加到 content 数组
-      content.push(...promptContent);
+      // 找到文本对象并合并
+      const existingTextIndex = content.findIndex((item) => item.type === "text");
+      const newTextItem = promptContent.find((item) => item.type === "text") as { type: "text"; text: string } | undefined;
+
+      if (existingTextIndex >= 0 && newTextItem) {
+        // 合并到现有文本
+        const existingText = content[existingTextIndex] as { type: "text"; text: string };
+        existingText.text += "\n" + newTextItem.text;
+      } else {
+        // 添加新的文本内容
+        content.push(...promptContent);
+      }
 
       // 调用 Seedance API
       const requestBody = {
