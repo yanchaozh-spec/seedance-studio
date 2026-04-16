@@ -16,7 +16,7 @@ import {
   Plus, X, Play, Pause, RotateCcw, Check, AlertCircle,
   Film, Clock, Settings2, ChevronRight, ChevronLeft, Trash2,
   Volume2, Download, Eye, Image as ImageIcon, Music, PanelRight,
-  Loader2
+  Loader2, Scissors
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -36,6 +36,7 @@ import {
 import { useSettingsStore } from "@/lib/settings";
 import { Asset, getAssets } from "@/lib/assets";
 import { toast } from "sonner";
+import { AssetCard } from "@/components/asset-card";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useDragStore } from "@/lib/drag-store";
 
@@ -64,11 +65,40 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const [currentResolution, setCurrentResolution] = useState("720p");
   const [currentGenerateAudio, setCurrentGenerateAudio] = useState(true);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [materialsDrawerOpen, setMaterialsDrawerOpen] = useState(false);
 
   // 生成状态
   const [generating, setGenerating] = useState(false);
   const [merging, setMerging] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 选中的素材（带激活状态）
+  const selectedAssets = assets.filter((a) => selectedAssetIds.includes(a.id));
+
+  // 切换素材选择状态
+  const toggleAssetSelection = (assetId: string) => {
+    setSelectedAssetIds((prev) =>
+      prev.includes(assetId)
+        ? prev.filter((id) => id !== assetId)
+        : [...prev, assetId]
+    );
+  };
+
+  // 从选中列表移除素材
+  const handleRemoveSelectedAsset = (assetId: string) => {
+    setSelectedAssetIds((prev) => prev.filter((id) => id !== assetId));
+  };
+
+  // 清空选中素材
+  const handleClearSelectedAssets = () => {
+    setSelectedAssetIds([]);
+  };
+
+  // 筛选关键帧和图片素材
+  const keyframeAssets = assets.filter((a) => a.type === "keyframe");
+  const imageAssets = assets.filter((a) => a.type === "image");
+  const selectedKeyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
+  const selectedImageAssets = selectedAssets.filter((a) => a.type === "image");
 
   // 加载素材
   useEffect(() => {
@@ -438,9 +468,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const confirmedCount = segments.filter((s) => s.status === "confirmed").length;
   const progress = segments.length > 0 ? Math.round((confirmedCount / segments.length) * 100) : 0;
 
-  // 选中的素材
-  const selectedAssets = assets.filter((a) => selectedAssetIds.includes(a.id));
-
   // 未选中状态的开始界面
   if (!longVideo) {
     return (
@@ -565,6 +592,81 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                 </Select>
               </div>
             </div>
+
+            {/* 素材选择区域 */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium flex items-center gap-1">
+                  <ImageIcon className="w-4 h-4" />
+                  素材选择
+                  {selectedAssetIds.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">{selectedAssetIds.length}</Badge>
+                  )}
+                </label>
+                <div className="flex items-center gap-2">
+                  {selectedAssetIds.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={handleClearSelectedAssets}>
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      清空
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setMaterialsDrawerOpen(true)}>
+                    <PanelRight className="w-3 h-3 mr-1" />
+                    选择素材
+                  </Button>
+                </div>
+              </div>
+
+              {/* 已选素材展示 */}
+              {selectedAssets.length === 0 ? (
+                <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-4 text-center text-muted-foreground text-sm">
+                  <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-50" />
+                  <p>暂无选择素材</p>
+                  <p className="text-xs mt-1">点击"选择素材"从素材库中添加</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {selectedKeyframeAssets.length > 0 && (
+                    <div className="w-full">
+                      <p className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                        <Scissors className="w-3 h-3" />
+                        关键帧
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedKeyframeAssets.map((asset) => (
+                          <AssetCard
+                            key={asset.id}
+                            asset={asset}
+                            showRemove
+                            onRemove={() => handleRemoveSelectedAsset(asset.id)}
+                            className="w-24 h-24"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedImageAssets.length > 0 && (
+                    <div className="w-full">
+                      <p className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3" />
+                        图片
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedImageAssets.map((asset) => (
+                          <AssetCard
+                            key={asset.id}
+                            asset={asset}
+                            showRemove
+                            onRemove={() => handleRemoveSelectedAsset(asset.id)}
+                            className="w-24 h-24"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -581,6 +683,101 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
         <p className="text-xs text-muted-foreground text-center mt-4">
           每段视频生成后可以预览、确认或重新生成
         </p>
+
+        {/* 素材选择抽屉 - 开始界面 */}
+        <Sheet open={materialsDrawerOpen && !longVideo} onOpenChange={setMaterialsDrawerOpen}>
+          <SheetContent className="w-[400px] sm:w-[480px] flex flex-col">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5" />
+                选择素材
+              </SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-auto py-4">
+              {keyframeAssets.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <Scissors className="w-4 h-4" />
+                    关键帧 ({keyframeAssets.length})
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {keyframeAssets.map((asset) => {
+                      const isSelected = selectedAssetIds.includes(asset.id);
+                      return (
+                        <div
+                          key={asset.id}
+                          onClick={() => toggleAssetSelection(asset.id)}
+                          className={cn(
+                            "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                            isSelected
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent hover:border-muted-foreground/30"
+                          )}
+                        >
+                          <AssetCard asset={asset} className="aspect-square" />
+                          {isSelected && (
+                            <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {imageAssets.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4" />
+                    图片 ({imageAssets.length})
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {imageAssets.map((asset) => {
+                      const isSelected = selectedAssetIds.includes(asset.id);
+                      return (
+                        <div
+                          key={asset.id}
+                          onClick={() => toggleAssetSelection(asset.id)}
+                          className={cn(
+                            "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                            isSelected
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent hover:border-muted-foreground/30"
+                          )}
+                        >
+                          <AssetCard asset={asset} className="aspect-square" />
+                          {isSelected && (
+                            <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {keyframeAssets.length === 0 && imageAssets.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>暂无素材</p>
+                  <p className="text-xs mt-1">请先在素材库中上传素材</p>
+                </div>
+              )}
+            </div>
+            <div className="border-t pt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                已选 {selectedAssetIds.length} 个素材
+              </p>
+              <Button onClick={() => setMaterialsDrawerOpen(false)}>
+                确定
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     );
   }
@@ -847,6 +1044,83 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                   </Select>
                 </div>
               </div>
+
+              {/* 素材选择区域 */}
+              <div className="space-y-3 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <ImageIcon className="w-4 h-4" />
+                    素材选择
+                    {selectedAssetIds.length > 0 && (
+                      <Badge variant="secondary" className="ml-1">{selectedAssetIds.length}</Badge>
+                    )}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {selectedAssetIds.length > 0 && canEdit && (
+                      <Button variant="ghost" size="sm" onClick={handleClearSelectedAssets}>
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        清空
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button variant="outline" size="sm" onClick={() => setMaterialsDrawerOpen(true)}>
+                        <PanelRight className="w-3 h-3 mr-1" />
+                        选择素材
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 已选素材展示 */}
+                {selectedAssets.length === 0 ? (
+                  <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-4 text-center text-muted-foreground text-sm">
+                    <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-50" />
+                    <p>暂无选择素材</p>
+                    <p className="text-xs mt-1">点击"选择素材"从素材库中添加</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedKeyframeAssets.length > 0 && (
+                      <div className="w-full">
+                        <p className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                          <Scissors className="w-3 h-3" />
+                          关键帧
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedKeyframeAssets.map((asset) => (
+                            <AssetCard
+                              key={asset.id}
+                              asset={asset}
+                              showRemove
+                              onRemove={() => handleRemoveSelectedAsset(asset.id)}
+                              className="w-24 h-24"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedImageAssets.length > 0 && (
+                      <div className="w-full">
+                        <p className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                          <ImageIcon className="w-3 h-3" />
+                          图片
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedImageAssets.map((asset) => (
+                            <AssetCard
+                              key={asset.id}
+                              asset={asset}
+                              showRemove
+                              onRemove={() => handleRemoveSelectedAsset(asset.id)}
+                              className="w-24 h-24"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -954,6 +1228,104 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
           )}
         </div>
       </div>
+
+      {/* 素材选择抽屉 */}
+      <Sheet open={materialsDrawerOpen} onOpenChange={setMaterialsDrawerOpen}>
+        <SheetContent className="w-[400px] sm:w-[480px] flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5" />
+              选择素材
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-auto py-4">
+            {/* 关键帧素材 */}
+            {keyframeAssets.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <Scissors className="w-4 h-4" />
+                  关键帧 ({keyframeAssets.length})
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {keyframeAssets.map((asset) => {
+                    const isSelected = selectedAssetIds.includes(asset.id);
+                    return (
+                      <div
+                        key={asset.id}
+                        onClick={() => toggleAssetSelection(asset.id)}
+                        className={cn(
+                          "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                          isSelected
+                            ? "border-primary ring-2 ring-primary/20"
+                            : "border-transparent hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <AssetCard asset={asset} className="aspect-square" />
+                        {isSelected && (
+                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 图片素材 */}
+            {imageAssets.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4" />
+                  图片 ({imageAssets.length})
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {imageAssets.map((asset) => {
+                    const isSelected = selectedAssetIds.includes(asset.id);
+                    return (
+                      <div
+                        key={asset.id}
+                        onClick={() => toggleAssetSelection(asset.id)}
+                        className={cn(
+                          "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                          isSelected
+                            ? "border-primary ring-2 ring-primary/20"
+                            : "border-transparent hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <AssetCard asset={asset} className="aspect-square" />
+                        {isSelected && (
+                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 无素材提示 */}
+            {keyframeAssets.length === 0 && imageAssets.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>暂无素材</p>
+                <p className="text-xs mt-1">请先在素材库中上传素材</p>
+              </div>
+            )}
+          </div>
+          <div className="border-t pt-4 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              已选 {selectedAssetIds.length} 个素材
+            </p>
+            <Button onClick={() => setMaterialsDrawerOpen(false)}>
+              确定
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* 视频预览弹窗 */}
       {previewingSegment && (
