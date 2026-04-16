@@ -129,6 +129,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       } else {
         assetRefParts.push(`${displayName}：${asset.url}`);
 
+        // 检查是否绑定音频
         if (asset.bound_audio_id) {
           const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
           if (boundAudio) {
@@ -148,6 +149,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         image_url: { url: asset.url },
         role: isKeyframe ? "first_frame" : "reference_image",
       });
+    }
+
+    // 添加所有绑定的音频（作为单独的 content item）
+    for (const asset of allImageAssets) {
+      if (asset.asset_category !== "keyframe" && asset.bound_audio_id) {
+        const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+        if (boundAudio) {
+          contentItems.push({
+            type: "audio_url",
+            audio_url: { url: boundAudio.url },
+            role: "reference_audio",
+          });
+        }
+      }
     }
 
     // 构建文本内容
