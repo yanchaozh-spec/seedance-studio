@@ -276,6 +276,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   };
 
+  // 关闭右侧抽屉
+  const closeDrawer = () => {
+    setRightDrawerOpen(false);
+  };
+
   const addAssetToPool = (asset: Asset) => {
     setSelectedAssets((prev) => {
       if (prev.find((a) => a.id === asset.id)) return prev;
@@ -393,33 +398,26 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         <main className="flex-1 overflow-auto">{children}</main>
 
         {/* 右侧抽屉悬浮按钮 */}
-        <div className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1">
-          <button
-            onClick={() => openDrawer("materials")}
-            className={cn(
-              "p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-all hover:bg-primary/90",
-              rightDrawerOpen && activeTab === "materials" && "translate-x-[380px]"
-            )}
-          >
-            <Image className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => openDrawer("tasks")}
-            className={cn(
-              "p-2 bg-card border text-foreground rounded-l-lg shadow-lg transition-all hover:bg-accent",
-              rightDrawerOpen && activeTab === "tasks" && "translate-x-[380px]"
-            )}
-          >
-            <Video className="w-5 h-5" />
-          </button>
-        </div>
+        <button
+          onClick={() => openDrawer("materials")}
+          className={cn(
+            "fixed right-0 top-1/2 -translate-y-1/2 z-40 p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-transform hover:bg-primary/90"
+          )}
+        >
+          <PanelRightOpen className="w-5 h-5" />
+        </button>
 
         {/* 合并的抽屉（素材库 + 任务管理） */}
         <Sheet open={rightDrawerOpen} onOpenChange={setRightDrawerOpen}>
           <SheetContent className="w-80 sm:max-w-[400px] p-0" side="right">
             <SheetHeader className="p-4 border-b">
               <div className="flex items-center justify-between">
-                <SheetTitle>素材库与任务</SheetTitle>
+                <SheetTitle>
+                  {activeTab === "materials" ? "素材库" : "任务管理"}
+                </SheetTitle>
+                <Button variant="ghost" size="sm" onClick={closeDrawer}>
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
               {/* 标签页切换 */}
               <div className="flex gap-2 mt-3">
@@ -442,7 +440,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   }}
                 >
                   <ListTodo className="w-4 h-4" />
-                  任务
+                  任务管理
                 </Button>
               </div>
             </SheetHeader>
