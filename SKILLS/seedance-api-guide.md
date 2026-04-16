@@ -156,23 +156,9 @@ curl https://ark.cn-beijing.volces.com/api/v3/chat/completions \
 #### 请求参数
 
 **model** `string` **必填**
-- 需要调用的模型 ID（Model ID）
+- 需要调用的模型 ID（Model ID）或自定义推理节点接入点 ID
 - 可通过 [模型列表](https://www.volcengine.com/docs/82379/1330310) 查询
-- 推荐模型：
-  - `doubao-seedance-2-0-260128`（seedance 2.0 standard）
-  - `doubao-seedance-2-0-fast-260128`（seedance 2.0 fast）
-  - `doubao-seedance-1-5-pro-251215`（seedance 1.5 pro）
-
-#### 模型选择说明
-
-本系统支持两种视频生成模型模式：
-
-| 模式 | Model ID | 特点 | 适用场景 |
-|------|----------|------|----------|
-| `standard` | `doubao-seedance-2-0-260128` | 标准模式，画质更好 | 高质量视频生成 |
-| `fast` | `doubao-seedance-2-0-fast-260128` | 快速模式，生成速度更快 | 快速预览、迭代 |
-
-在前端通过设置界面的"模型模式"选项选择，API 调用时会自动映射到对应的 Model ID。
+- 本系统使用自定义推理节点接入点 ID：`ep-m-20260417004442-42dzs`
 
 **content** `object[]` **必填**
 - 输入给模型生成视频的信息，支持文本、图片、音频、视频

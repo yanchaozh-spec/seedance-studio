@@ -3,18 +3,12 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 
-// 模型 ID 映射
-const MODEL_IDS = {
-  standard: "doubao-seedance-2-0-260128",   // seedance 2.0 标准版
-  fast: "doubao-seedance-2-0-fast-260128",   // seedance 2.0 fast 版
-} as const;
-
-type ModelMode = keyof typeof MODEL_IDS;
+// 固定使用自定义推理节点接入点 ID
+const MODEL_ID = "ep-m-20260417004442-42dzs";
 
 // 请求体类型
 interface CreateTaskRequest {
   project_id: string;
-  model_mode?: ModelMode;  // 可选，默认 standard
   prompt_boxes: Array<{
     id: string;
     content: string;
@@ -139,11 +133,7 @@ function buildContent(
 export async function POST(request: NextRequest) {
   try {
     const body: CreateTaskRequest = await request.json();
-    const { project_id, model_mode, prompt_boxes, selected_assets, params } = body;
-
-    // 确定使用的模型
-    const mode: ModelMode = model_mode || "standard";
-    const modelId = MODEL_IDS[mode];
+    const { project_id, prompt_boxes, selected_assets, params } = body;
 
     // 获取 ARK API Key - 优先从请求头获取，其次从环境变量获取
     const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
@@ -189,8 +179,8 @@ export async function POST(request: NextRequest) {
       project_id,
       id: tempTaskId,
       status: "pending",
-      model_mode: mode,
-      model_id: modelId,
+      model_mode: "standard",
+      model_id: MODEL_ID,
       progress: 0,
       prompt_boxes,
       selected_assets,

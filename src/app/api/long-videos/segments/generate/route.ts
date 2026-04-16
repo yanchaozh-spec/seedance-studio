@@ -3,13 +3,8 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 
-// 模型 ID 映射
-const MODEL_IDS = {
-  standard: "doubao-seedance-2-0-260128",
-  fast: "doubao-seedance-2-0-fast-260128",
-} as const;
-
-type ModelMode = keyof typeof MODEL_IDS;
+// 固定使用自定义推理节点接入点 ID
+const MODEL_ID = "ep-m-20260417004442-42dzs";
 
 // Content item 类型定义
 type ContentItem =
@@ -20,7 +15,7 @@ type ContentItem =
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { segment_id, first_frame_url, model_mode } = body;
+    const { segment_id, first_frame_url } = body;
 
     if (!segment_id) {
       return NextResponse.json(
@@ -37,10 +32,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    // 确定使用的模型
-    const mode: ModelMode = model_mode || "standard";
-    const modelId = MODEL_IDS[mode];
 
     const client = getSupabaseClient();
 
@@ -129,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // 构建请求体
     const requestBody = {
-      model: modelId,
+      model: MODEL_ID,
       content,
       generate_audio: segment.segment_generate_audio ?? true,
       ratio: segment.segment_ratio || "16:9",
@@ -179,8 +170,8 @@ export async function POST(request: NextRequest) {
         task_id: taskId,
         status: "running",
         first_frame_url: firstFrame || imageUrl,
-        model_mode: mode,
-        model_id: modelId,
+        model_mode: "standard",
+        model_id: MODEL_ID,
         queued_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -194,7 +185,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       segment_id,
       task_id: taskId,
-      model: modelId,
+      model: MODEL_ID,
     });
   } catch (error) {
     console.error("Generate segment error:", error);

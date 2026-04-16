@@ -3,13 +3,8 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 
-// 模型 ID 映射
-const MODEL_IDS = {
-  standard: "doubao-seedance-2-0-260128",
-  fast: "doubao-seedance-2-0-fast-260128",
-} as const;
-
-type ModelMode = keyof typeof MODEL_IDS;
+// 固定使用自定义推理节点接入点 ID
+const MODEL_ID = "ep-m-20260417004442-42dzs";
 
 // 重新生成单个分段
 export async function POST(
@@ -74,10 +69,6 @@ export async function POST(
       }
     }
 
-    // 确定使用的模型
-    const mode: ModelMode = segment.model_mode || "standard";
-    const modelId = MODEL_IDS[mode];
-
     // 重置分段状态
     await client
       .from("video_segments")
@@ -131,7 +122,7 @@ export async function POST(
     }
 
     const requestBody = {
-      model: modelId,
+      model: MODEL_ID,
       content,
       generate_audio: segment.segment_generate_audio ?? true,
       ratio: segment.segment_ratio || "16:9",
@@ -189,7 +180,7 @@ export async function POST(
     return NextResponse.json({
       segment_id: segmentId,
       task_id: taskId,
-      model: modelId,
+      model: MODEL_ID,
     });
   } catch (error) {
     console.error("Regenerate segment error:", error);

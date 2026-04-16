@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Sparkles, Zap, Scissors, Image, Music, Film } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Scissors, Image, Music, Film } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -233,7 +233,7 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
 
 // 设置弹窗组件
 function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { arkApiKey, modelMode, setArkApiKey, setModelMode } = useSettingsStore();
+  const { arkApiKey, setArkApiKey } = useSettingsStore();
   const { theme, setTheme } = useTheme();
   const [localApiKey, setLocalApiKey] = useState(arkApiKey);
   const [saving, setSaving] = useState(false);
@@ -278,30 +278,6 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                 深色
               </Button>
             </div>
-          </div>
-
-          {/* 模型设置 */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">模型模式</Label>
-            <Select value={modelMode} onValueChange={(v) => setModelMode(v as "fast" | "standard")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="standard">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Seedance 2.0 标准</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="fast">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4" />
-                    <span>Seedance 2.0 Fast</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* API Key */}

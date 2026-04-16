@@ -44,7 +44,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const isDragging = useIsDragging();
   const setOverDropZone = useDragStore((state) => state.setOverDropZone);
   const isOverDropZone = useDragStore((state) => state.isOverDropZone);
-  const { arkApiKey, modelMode } = useSettingsStore();
+  const { arkApiKey } = useSettingsStore();
   const poolDropRef = useRef<HTMLDivElement>(null);
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
@@ -320,7 +320,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
       await createTask({
         project_id: resolvedParams.id,
-        model_mode: modelMode,
         prompt_boxes: promptBoxes.map((box, idx) => ({
           id: box.id,
           content: box.content,
