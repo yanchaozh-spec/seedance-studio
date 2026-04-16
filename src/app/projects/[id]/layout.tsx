@@ -4,11 +4,12 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets } from "@/lib/assets";
 import { Task, getTasks, TaskStatus } from "@/lib/tasks";
@@ -254,6 +255,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<Task | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const pathname = usePathname();
   const router = useRouter();
@@ -276,6 +278,15 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     } finally {
       setLoading(false);
     }
+  };
+
+  // 格式化时间
+  const formatSeconds = (seconds: number | undefined | null) => {
+    if (!seconds) return "-";
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}m ${secs}s`;
   };
 
   // 加载素材列表
@@ -452,29 +463,29 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           <main className="flex-1 overflow-auto">{children}</main>
 
           {/* 右侧常驻面板（素材库 + 任务管理） */}
-          <aside className="w-80 border-l bg-card flex flex-col">
+          <aside className="w-72 border-l bg-card flex flex-col">
             {/* 标签页切换 */}
-            <div className="p-4 border-b">
-              <div className="flex gap-2">
+            <div className="p-3 border-b">
+              <div className="flex gap-1.5">
                 <Button
                   variant={activeTab === "materials" ? "default" : "outline"}
                   size="sm"
-                  className="flex-1 gap-1.5"
+                  className="flex-1 gap-1 text-xs h-8"
                   onClick={() => setActiveTab("materials")}
                 >
-                  <FolderOpen className="w-4 h-4" />
+                  <FolderOpen className="w-3.5 h-3.5" />
                   素材库
                 </Button>
                 <Button
                   variant={activeTab === "tasks" ? "default" : "outline"}
                   size="sm"
-                  className="flex-1 gap-1.5"
+                  className="flex-1 gap-1 text-xs h-8"
                   onClick={() => {
                     setActiveTab("tasks");
                     loadTasks();
                   }}
                 >
-                  <ListTodo className="w-4 h-4" />
+                  <ListTodo className="w-3.5 h-3.5" />
                   任务管理
                 </Button>
               </div>
@@ -484,11 +495,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {/* 素材库内容 */}
               {activeTab === "materials" && (
                 <>
-                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-4">
-                    <TabsList className="w-full">
-                      <TabsTrigger value="all" className="flex-1">全部</TabsTrigger>
-                      <TabsTrigger value="keyframe" className="flex-1">关键帧</TabsTrigger>
-                      <TabsTrigger value="image" className="flex-1">美术</TabsTrigger>
+                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-3">
+                    <TabsList className="w-full h-8">
+                      <TabsTrigger value="all" className="flex-1 text-xs">全部</TabsTrigger>
+                      <TabsTrigger value="keyframe" className="flex-1 text-xs">关键帧</TabsTrigger>
+                      <TabsTrigger value="image" className="flex-1 text-xs">美术</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   {filtered.image.length > 0 && (
@@ -574,37 +585,15 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       <p className="text-sm">开始生成视频后将显示在这里</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {tasks.slice(0, 10).map((task) => (
-                        <div key={task.id} className="bg-muted rounded-lg p-2">
-                          {/* 任务状态行 */}
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-muted-foreground font-mono">
-                              {task.id.slice(0, 8)}...
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {task.status === "succeeded" && task.completion_tokens && (
-                                <span className="text-xs text-yellow-600">
-                                  {task.completion_tokens.toLocaleString()}
-                                </span>
-                              )}
-                              <span className={cn("text-xs font-medium", 
-                                task.status === "succeeded" ? "text-green-500" :
-                                task.status === "running" ? "text-blue-500" :
-                                task.status === "failed" ? "text-red-500" : "text-muted-foreground"
-                              )}>
-                                {task.status === "succeeded" ? "已完成" :
-                                 task.status === "running" ? "生成中" :
-                                 task.status === "failed" ? "失败" : "排队中"}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {/* 视频播放器（已完成任务） */}
-                          {task.status === "succeeded" && task.result?.video_url && (
-                            <div className="space-y-2">
+                        <div key={task.id} className="bg-muted rounded-lg overflow-hidden">
+                          {/* 水平布局：左侧视频 + 右侧信息 */}
+                          <div className="flex">
+                            {/* 左侧视频区域 */}
+                            {task.status === "succeeded" && task.result?.video_url ? (
                               <div 
-                                className="relative aspect-video bg-black rounded overflow-hidden"
+                                className="w-32 h-20 bg-black flex-shrink-0"
                               >
                                 <video
                                   ref={(el) => {
@@ -616,72 +605,64 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                   preload="metadata"
                                 />
                               </div>
+                            ) : task.status === "running" ? (
+                              <div className="w-32 h-20 bg-muted-foreground/10 flex items-center justify-center flex-shrink-0">
+                                <Loader className="w-6 h-6 animate-spin text-blue-500" />
+                              </div>
+                            ) : task.status === "failed" ? (
+                              <div className="w-32 h-20 bg-muted-foreground/10 flex items-center justify-center flex-shrink-0">
+                                <XCircle className="w-6 h-6 text-red-500" />
+                              </div>
+                            ) : (
+                              <div className="w-32 h-20 bg-muted-foreground/10 flex items-center justify-center flex-shrink-0">
+                                <Clock className="w-5 h-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            
+                            {/* 右侧详情区域 */}
+                            <div className="flex-1 p-2 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-muted-foreground font-mono truncate">
+                                  {task.id.slice(0, 8)}...
+                                </span>
+                                <span className={cn("text-xs font-medium flex-shrink-0 ml-2", 
+                                  task.status === "succeeded" ? "text-green-500" :
+                                  task.status === "running" ? "text-blue-500" :
+                                  task.status === "failed" ? "text-red-500" : "text-muted-foreground"
+                                )}>
+                                  {task.status === "succeeded" ? "已完成" :
+                                   task.status === "running" ? "生成中" :
+                                   task.status === "failed" ? "失败" : "排队中"}
+                                </span>
+                              </div>
                               
-                              {/* 底部操作按钮 */}
-                              <div className="flex gap-2">
+                              {/* Token 和时间 */}
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                                {task.completion_tokens && (
+                                  <span className="text-yellow-600">
+                                    {task.completion_tokens.toLocaleString()} tokens
+                                  </span>
+                                )}
+                                {task.generation_duration && (
+                                  <span>{formatSeconds(task.generation_duration)}</span>
+                                )}
+                              </div>
+                              
+                              {/* 操作按钮 */}
+                              <div className="flex gap-1.5">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="flex-1 gap-1 text-xs h-7"
-                                  onClick={() => {
-                                    const video = videoRefs.current.get(task.id);
-                                    if (!video) return;
-                                    
-                                    // 确保视频已加载
-                                    if (video.readyState < 2) {
-                                      toast.error("视频尚未加载完成");
-                                      return;
-                                    }
-                                    
-                                    // 创建 canvas 并绘制当前帧
-                                    const canvas = document.createElement("canvas");
-                                    canvas.width = video.videoWidth;
-                                    canvas.height = video.videoHeight;
-                                    
-                                    const ctx = canvas.getContext("2d");
-                                    if (!ctx) {
-                                      toast.error("无法创建画布");
-                                      return;
-                                    }
-                                    
-                                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                    
-                                    canvas.toBlob(async (blob) => {
-                                      if (blob) {
-                                        const formData = new FormData();
-                                        formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-                                        formData.append("projectId", resolvedParams.id);
-                                        formData.append("taskId", task.id);
-                                        formData.append("timestamp", video.currentTime.toString());
-                                        formData.append("assetCategory", "keyframe");
-                                        formData.append("name", `关键帧_${Date.now()}`);
-                                        
-                                        try {
-                                          const res = await fetch("/api/assets/extract-frame", {
-                                            method: "POST",
-                                            body: formData,
-                                          });
-                                          
-                                          if (res.ok) {
-                                            toast.success("已保存为关键帧");
-                                            loadMaterials?.();
-                                          } else {
-                                            toast.error("保存失败");
-                                          }
-                                        } catch (e) {
-                                          toast.error("抽帧失败");
-                                        }
-                                      }
-                                    }, "image/png");
-                                  }}
+                                  className="flex-1 gap-1 text-xs h-6 px-1"
+                                  onClick={() => setSelectedTaskDetail(task)}
                                 >
-                                  <Camera className="w-3 h-3" />
-                                  抽帧
+                                  <Eye className="w-3 h-3" />
+                                  详情
                                 </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="flex-1 gap-1 text-xs h-7"
+                                  className="flex-1 gap-1 text-xs h-6 px-1"
                                   onClick={() => {
                                     const a = document.createElement("a");
                                     a.href = task.result?.video_url || "";
@@ -694,44 +675,17 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 </Button>
                               </div>
                             </div>
-                          )}
+                          </div>
                           
-                          {/* 生成中/失败状态 */}
+                          {/* 生成进度条 */}
                           {task.status === "running" && (
-                            <div className="space-y-2">
-                              <div className="w-full h-24 bg-muted-foreground/10 rounded flex items-center justify-center">
-                                <Loader className="w-6 h-6 animate-spin text-blue-500" />
-                              </div>
-                              <div className="w-full h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-blue-500 transition-all"
-                                  style={{ width: `${task.progress || 0}%` }}
-                                />
-                              </div>
-                              <p className="text-xs text-muted-foreground text-center">
-                                {task.progress || 0}%
-                              </p>
+                            <div className="h-1 bg-muted-foreground/20">
+                              <div 
+                                className="h-full bg-blue-500 transition-all"
+                                style={{ width: `${task.progress || 0}%` }}
+                              />
                             </div>
                           )}
-                          
-                          {task.status === "failed" && (
-                            <div className="w-full h-24 bg-muted-foreground/10 rounded flex flex-col items-center justify-center p-2">
-                              <XCircle className="w-6 h-6 text-red-500 mb-1" />
-                              <p className="text-xs text-red-500 text-center line-clamp-2">
-                                {task.error_message || "生成失败"}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {(task.status === "pending" || task.status === "queued") && (
-                            <div className="w-full h-24 bg-muted-foreground/10 rounded flex items-center justify-center">
-                              <Clock className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                          )}
-                          
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
-                          </p>
                         </div>
                       ))}
                       
@@ -776,6 +730,158 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
             loadProject();
           }}
         />
+        
+        {/* 任务详情抽屉 */}
+        <Sheet open={!!selectedTaskDetail} onOpenChange={() => setSelectedTaskDetail(null)}>
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <span>任务详情</span>
+                <span className="text-sm font-normal text-muted-foreground font-mono">{selectedTaskDetail?.id.slice(0, 20)}...</span>
+              </SheetTitle>
+            </SheetHeader>
+            
+            {selectedTaskDetail && (
+              <div className="mt-6 space-y-6">
+                {/* 状态信息 */}
+                <div className="flex items-center gap-4">
+                  <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full",
+                    selectedTaskDetail.status === "succeeded" ? "bg-green-100 text-green-700" :
+                    selectedTaskDetail.status === "running" ? "bg-blue-100 text-blue-700" :
+                    selectedTaskDetail.status === "failed" ? "bg-red-100 text-red-700" :
+                    "bg-gray-100 text-gray-700"
+                  )}>
+                    {selectedTaskDetail.status === "succeeded" && <CheckCircle className="w-4 h-4" />}
+                    {selectedTaskDetail.status === "running" && <Loader className="w-4 h-4 animate-spin" />}
+                    {selectedTaskDetail.status === "failed" && <XCircle className="w-4 h-4" />}
+                    {selectedTaskDetail.status === "pending" && <Clock className="w-4 h-4" />}
+                    {selectedTaskDetail.status === "queued" && <Clock className="w-4 h-4" />}
+                    <span className="text-sm font-medium">
+                      {selectedTaskDetail.status === "succeeded" ? "已完成" :
+                       selectedTaskDetail.status === "running" ? "生成中" :
+                       selectedTaskDetail.status === "failed" ? "失败" : "排队中"}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* 视频预览 */}
+                {selectedTaskDetail.result?.video_url && (
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    <video
+                      src={selectedTaskDetail.result.video_url}
+                      controls
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+                
+                {/* Token 消耗 */}
+                {selectedTaskDetail.completion_tokens && (
+                  <div className="flex items-center gap-4 p-3 bg-yellow-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-yellow-600" />
+                      <span className="text-sm font-medium">Token 消耗</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-yellow-500" />
+                      <span className="text-yellow-700 font-medium">
+                        {selectedTaskDetail.completion_tokens.toLocaleString()}
+                      </span>
+                      <span className="text-yellow-600">tokens</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 时间信息 */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    时间信息
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="text-xs text-muted-foreground mb-1">提交时间</div>
+                      <div className="text-sm">
+                        {new Date(selectedTaskDetail.created_at).toLocaleString("zh-CN")}
+                      </div>
+                    </div>
+                    {selectedTaskDetail.completed_at && (
+                      <div className="bg-muted rounded-lg p-3">
+                        <div className="text-xs text-muted-foreground mb-1">完成时间</div>
+                        <div className="text-sm">
+                          {new Date(selectedTaskDetail.completed_at).toLocaleString("zh-CN")}
+                        </div>
+                      </div>
+                    )}
+                    {(selectedTaskDetail.queue_duration || selectedTaskDetail.generation_duration) && (
+                      <>
+                        {selectedTaskDetail.queue_duration && (
+                          <div className="bg-muted rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground mb-1">排队耗时</div>
+                            <div className="text-sm">{formatSeconds(selectedTaskDetail.queue_duration)}</div>
+                          </div>
+                        )}
+                        {selectedTaskDetail.generation_duration && (
+                          <div className="bg-muted rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground mb-1">生成耗时</div>
+                            <div className="text-sm">{formatSeconds(selectedTaskDetail.generation_duration)}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+                
+                {/* 提示词信息 */}
+                {selectedTaskDetail.prompt_boxes && selectedTaskDetail.prompt_boxes.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <Image className="w-4 h-4" />
+                      提示词
+                    </h3>
+                    <div className="bg-muted rounded-lg p-3 space-y-2">
+                      {selectedTaskDetail.prompt_boxes.filter(box => box.is_activated).map((box, idx) => (
+                        <p key={box.id} className="text-sm whitespace-pre-wrap">{box.content}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 错误信息 */}
+                {selectedTaskDetail.status === "failed" && selectedTaskDetail.error_message && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2 text-red-600">
+                      <AlertCircle className="w-4 h-4" />
+                      错误信息
+                    </h3>
+                    <div className="bg-red-50 rounded-lg p-3">
+                      <p className="text-sm text-red-700 whitespace-pre-wrap">{selectedTaskDetail.error_message}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 操作按钮 */}
+                <div className="flex gap-2 pt-4 border-t">
+                  {selectedTaskDetail.result?.video_url && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2"
+                      onClick={() => {
+                        const a = document.createElement("a");
+                        a.href = selectedTaskDetail.result!.video_url!;
+                        a.download = `video-${selectedTaskDetail.id}.mp4`;
+                        a.click();
+                      }}
+                    >
+                      <Download className="w-4 h-4" />
+                      下载视频
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </ProjectDetailContext.Provider>
   );
