@@ -15,8 +15,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import {
   Plus, X, Play, Pause, RotateCcw, Check, AlertCircle,
   Film, Clock, Settings2, ChevronRight, ChevronLeft, Trash2,
-  Volume2, Download, Eye, Image as ImageIcon, Music, PanelRight,
-  Loader2, Scissors
+  Download, Eye, Image as ImageIcon, Music, PanelRight,
+  Loader2, Scissors, Copy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -55,6 +55,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const [segments, setSegments] = useState<VideoSegment[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [previewingSegment, setPreviewingSegment] = useState<VideoSegment | null>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   // 当前段配置
   const [currentPrompts, setCurrentPrompts] = useState<SegmentPrompt[]>([
@@ -63,7 +64,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const [currentDuration, setCurrentDuration] = useState(5);
   const [currentRatio, setCurrentRatio] = useState("16:9");
   const [currentResolution, setCurrentResolution] = useState("720p");
-  const [currentGenerateAudio, setCurrentGenerateAudio] = useState(true);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [materialsDrawerOpen, setMaterialsDrawerOpen] = useState(false);
 
@@ -100,6 +100,55 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const selectedKeyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
   const selectedImageAssets = selectedAssets.filter((a) => a.type === "image");
 
+  // 生成最终提示词（用于预览）
+  const generateFinalPrompt = useCallback(() => {
+    const lines: string[] = [];
+    const nonEmptyPrompts = currentPrompts.filter((p) => p.content.trim());
+
+    // 找到第一个激活的图片或关键帧素材
+    const firstActivatedAsset = selectedAssets.find(
+      (a) => a.type === "image" || a.type === "keyframe"
+    );
+
+    if (firstActivatedAsset) {
+      const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
+      const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
+
+      let assetLine = "";
+
+      if (isKeyframe) {
+        // 关键帧：关键帧描述@文件名
+        assetLine = `@${displayName}`;
+      } else {
+        // 美术资产："图片名"@这张图片
+        assetLine = `"${displayName}"@这张图片`;
+        if (firstActivatedAsset.bound_audio_id) {
+          // 从 assets 中查找绑定的音频
+          const boundAudio = assets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+          if (boundAudio) {
+            const audioName = boundAudio.display_name || boundAudio.name;
+            assetLine += `，声线为@${audioName}`;
+          }
+        }
+      }
+
+      // 第一行：素材信息
+      lines.push(assetLine);
+
+      // 后续行：提示词内容
+      nonEmptyPrompts.forEach((p) => {
+        lines.push(p.content.trim());
+      });
+    } else if (nonEmptyPrompts.length > 0) {
+      // 没有激活素材时，直接输出提示词
+      nonEmptyPrompts.forEach((p) => {
+        lines.push(p.content.trim());
+      });
+    }
+
+    return lines.join("\n");
+  }, [currentPrompts, selectedAssets, assets]);
+
   // 加载素材
   useEffect(() => {
     loadAssets();
@@ -130,7 +179,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
           duration: currentDuration,
           ratio: currentRatio,
           resolution: currentResolution,
-          generateAudio: currentGenerateAudio,
+          generateAudio: true,
         }],
       });
 
@@ -171,7 +220,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
           duration: currentDuration,
           ratio: currentRatio,
           resolution: currentResolution,
-          generateAudio: currentGenerateAudio,
+          generateAudio: true,
         }),
       });
 
@@ -186,7 +235,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
               segment_duration: currentDuration,
               segment_ratio: currentRatio,
               segment_resolution: currentResolution,
-              segment_generate_audio: currentGenerateAudio,
+              segment_generate_audio: true,
             };
           }
           return s;
@@ -290,7 +339,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
         setCurrentDuration(nextSegment.segment_duration || 5);
         setCurrentRatio(nextSegment.segment_ratio || "16:9");
         setCurrentResolution(nextSegment.segment_resolution || "720p");
-        setCurrentGenerateAudio(nextSegment.segment_generate_audio ?? true);
       }
 
       setCurrentStep(currentStep + 1);
@@ -315,7 +363,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
         duration: 5,
         ratio: currentRatio,
         resolution: currentResolution,
-        generateAudio: currentGenerateAudio,
+        generateAudio: true,
       });
 
       setSegments(result.segments);
@@ -443,7 +491,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
     setCurrentDuration(5);
     setCurrentRatio("16:9");
     setCurrentResolution("720p");
-    setCurrentGenerateAudio(true);
   };
 
   // 组件卸载时清理
@@ -484,12 +531,24 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">第一段配置</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">第一段配置</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => setPreviewDialogOpen(true)}>
+                <Copy className="w-3 h-3 mr-1.5" />
+                预览
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 提示词 */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">提示词</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">提示词</label>
+                <Button variant="ghost" size="sm" onClick={() => setPreviewDialogOpen(true)}>
+                  <Copy className="w-3 h-3 mr-1.5" />
+                  预览
+                </Button>
+              </div>
               {currentPrompts.map((prompt, index) => (
                 <div key={prompt.id} className="flex gap-2">
                   <Textarea
@@ -572,22 +631,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                   <SelectContent>
                     <SelectItem value="480p">480p</SelectItem>
                     <SelectItem value="720p">720p</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Volume2 className="w-3 h-3" />
-                  音频
-                </label>
-                <Select value={currentGenerateAudio ? "true" : "false"} onValueChange={(v) => setCurrentGenerateAudio(v === "true")}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">生成</SelectItem>
-                    <SelectItem value="false">不生成</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -778,6 +821,47 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
             </div>
           </SheetContent>
         </Sheet>
+
+        {/* 预览提示词对话框 - 开始界面 */}
+        {previewDialogOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setPreviewDialogOpen(false)}>
+            <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">最终提示词预览</h2>
+                <Button variant="ghost" size="sm" onClick={() => setPreviewDialogOpen(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="bg-muted rounded-lg p-4 whitespace-pre-wrap text-sm">
+                {generateFinalPrompt() || "(空)"}
+              </div>
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">使用的素材:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAssets
+                    .filter((asset) => 
+                      (asset.type === "image" || asset.type === "keyframe")
+                    )
+                    .map((asset) => (
+                      <div 
+                        key={asset.id} 
+                        className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
+                      >
+                        {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
+                        {asset.display_name || asset.name}
+                        {asset.bound_audio_id && <Music className="w-3 h-3 ml-1" />}
+                      </div>
+                    ))}
+                  {selectedAssets.filter((asset) => 
+                    (asset.type === "image" || asset.type === "keyframe")
+                  ).length === 0 && (
+                    <span className="text-muted-foreground text-sm">无</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -821,7 +905,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                     setCurrentDuration(segment.segment_duration || 5);
                     setCurrentRatio(segment.segment_ratio || "16:9");
                     setCurrentResolution(segment.segment_resolution || "720p");
-                    setCurrentGenerateAudio(segment.segment_generate_audio ?? true);
                   }}
                   className={cn(
                     "w-full p-3 rounded-lg border text-left transition-all",
@@ -917,12 +1000,24 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
           {/* 配置区域 */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="text-lg">段落配置</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">段落配置</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setPreviewDialogOpen(true)}>
+                  <Copy className="w-3 h-3 mr-1.5" />
+                  预览
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* 提示词 */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">提示词</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">提示词</label>
+                  <Button variant="ghost" size="sm" onClick={() => setPreviewDialogOpen(true)}>
+                    <Copy className="w-3 h-3 mr-1.5" />
+                    预览
+                  </Button>
+                </div>
                 {currentPrompts.map((prompt, index) => (
                   <div key={prompt.id} className="flex gap-2">
                     <Textarea
@@ -1020,26 +1115,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                     <SelectContent>
                       <SelectItem value="480p">480p</SelectItem>
                       <SelectItem value="720p">720p</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Volume2 className="w-3 h-3" />
-                    音频
-                  </label>
-                  <Select
-                    value={currentGenerateAudio ? "true" : "false"}
-                    onValueChange={(v) => setCurrentGenerateAudio(v === "true")}
-                    disabled={!canEdit}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">生成</SelectItem>
-                      <SelectItem value="false">不生成</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1351,6 +1426,47 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                 className="w-full rounded"
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 预览提示词对话框 */}
+      {previewDialogOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setPreviewDialogOpen(false)}>
+          <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">最终提示词预览</h2>
+              <Button variant="ghost" size="sm" onClick={() => setPreviewDialogOpen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="bg-muted rounded-lg p-4 whitespace-pre-wrap text-sm">
+              {generateFinalPrompt() || "(空)"}
+            </div>
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">使用的素材:</h3>
+              <div className="flex flex-wrap gap-2">
+                {selectedAssets
+                  .filter((asset) => 
+                    (asset.type === "image" || asset.type === "keyframe")
+                  )
+                  .map((asset) => (
+                    <div 
+                      key={asset.id} 
+                      className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
+                    >
+                      {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
+                      {asset.display_name || asset.name}
+                      {asset.bound_audio_id && <Music className="w-3 h-3 ml-1" />}
+                    </div>
+                  ))}
+                {selectedAssets.filter((asset) => 
+                  (asset.type === "image" || asset.type === "keyframe")
+                ).length === 0 && (
+                  <span className="text-muted-foreground text-sm">无</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
