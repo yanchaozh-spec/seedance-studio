@@ -4,15 +4,12 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Scissors, Image, Music, Film } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Asset, getAssets } from "@/lib/assets";
 import { Task, getTasks, TaskStatus } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
@@ -23,6 +20,7 @@ import { formatDistanceToNow } from "date-fns";
 import { SelectedAsset } from "./page";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -234,75 +232,7 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
 }
 
 // 设置弹窗组件
-function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { arkApiKey, setArkApiKey } = useSettingsStore();
-  const { theme, setTheme } = useTheme();
-  const [localApiKey, setLocalApiKey] = useState(arkApiKey);
-  const [saving, setSaving] = useState(false);
-
-  const handleSaveApiKey = () => {
-    setArkApiKey(localApiKey);
-    setSaving(true);
-    setTimeout(() => setSaving(false), 1500);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Settings className="w-5 h-5" />
-            设置
-          </DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-6 py-4">
-          {/* 主题设置 */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">外观</Label>
-            <div className="flex gap-2">
-              <Button
-                variant={theme === "light" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTheme("light")}
-                className="flex-1 gap-1.5"
-              >
-                <Sun className="w-4 h-4" />
-                浅色
-              </Button>
-              <Button
-                variant={theme === "dark" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTheme("dark")}
-                className="flex-1 gap-1.5"
-              >
-                <Moon className="w-4 h-4" />
-                深色
-              </Button>
-            </div>
-          </div>
-
-          {/* API Key */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">API 配置</Label>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                placeholder="ARK API Key"
-                value={localApiKey}
-                onChange={(e) => setLocalApiKey(e.target.value)}
-                className="flex-1"
-              />
-              <Button size="sm" onClick={handleSaveApiKey} disabled={saving}>
-                {saving ? "已保存" : "保存"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+// 使用公共组件 SettingsDialog
 
 interface ProjectDetailLayoutProps {
   children: ReactNode;
