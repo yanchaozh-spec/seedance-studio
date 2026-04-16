@@ -25,11 +25,11 @@ import {
   Image as ImageIcon,
   Music,
   Trash2,
-  Link2,
   Unlink,
   FolderOpen,
   Play,
   Scissors,
+  Loader2,
 } from "lucide-react";
 import { Asset, getAssets, createAssetFromUrl, deleteAsset, bindAudioToImage, unbindAudio } from "@/lib/assets";
 import { toast } from "sonner";
@@ -44,13 +44,12 @@ interface MaterialDetailDialogProps {
 
 function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialDetailDialogProps) {
   const [binding, setBinding] = useState(false);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
   const [voiceDescription, setVoiceDescription] = useState("");
   const [keyframeDescription, setKeyframeDescription] = useState("");
-  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   
-  const audioAssets = allAssets.filter((a) => a.type === "audio" && a.id !== asset?.id);
   const boundAudio = asset?.bound_audio_id 
     ? allAssets.find((a) => a.id === asset.bound_audio_id) 
     : null;
@@ -59,7 +58,6 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
     if (asset) {
       setVoiceDescription(asset.voice_description || "");
       setKeyframeDescription(asset.keyframe_description || "");
-      setSelectedAudioId(asset.bound_audio_id || null);
       setDisplayName(asset.display_name || asset.name);
     }
   }, [asset]);
@@ -82,18 +80,58 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
     }
   };
 
-  const handleBindAudio = async () => {
-    if (!asset || !selectedAudioId) return;
+  // 上传音频并绑定到当前图片
+  const handleUploadAudio = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !asset) return;
+    
+    const file = files[0];
+    if (!file.type.startsWith("audio/")) {
+      toast.error("请选择音频文件");
+      return;
+    }
+
     try {
-      setBinding(true);
-      await bindAudioToImage(asset.id, selectedAudioId);
-      toast.success("绑定成功");
+      setUploadingAudio(true);
+      
+      // 上传到对象存储
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("projectId", asset.project_id);
+      formData.append("type", "audio");
+
+      const response = await fetch("/api/assets/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("上传失败");
+      const result = await response.json();
+
+      // 创建素材记录
+      const createResponse = await fetch(`/api/projects/${asset.project_id}/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          type: "audio",
+          url: result.url,
+          duration: result.duration,
+        }),
+      });
+
+      if (!createResponse.ok) throw new Error("创建素材失败");
+      const audioAsset = await createResponse.json();
+
+      // 绑定音频到图片
+      await bindAudioToImage(asset.id, audioAsset.id);
+      
+      toast.success("音频上传并绑定成功");
       onUpdate();
       onClose();
     } catch {
-      toast.error("绑定失败");
+      toast.error("上传失败");
     } finally {
-      setBinding(false);
+      setUploadingAudio(false);
     }
   };
 
@@ -215,11 +253,11 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
             </div>
           )}
 
-          {/* 绑定音频（仅图片显示） */}
-          {asset.type === "image" && (
+          {/* 音频参考（仅图片显示） */}
+          {(asset.type === "image" || asset.type === "keyframe") && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">绑定音频</label>
+                <label className="text-sm font-medium">音频参考</label>
                 {boundAudio && (
                   <Button variant="ghost" size="sm" onClick={handleUnbindAudio} disabled={binding}>
                     <Unlink className="w-4 h-4 mr-1" />
@@ -238,32 +276,33 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Select value={selectedAudioId || ""} onValueChange={setSelectedAudioId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择音频文件" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {audioAssets.map((audio) => (
-                        <SelectItem key={audio.id} value={audio.id}>
-                          {audio.name}
-                        </SelectItem>
-                      ))}
-                      {audioAssets.length === 0 && (
-                        <div className="p-2 text-sm text-muted-foreground text-center">
-                          暂无音频素材
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Button 
-                    onClick={handleBindAudio} 
-                    disabled={!selectedAudioId || binding}
-                    className="w-full"
+                  <label
+                    htmlFor="audio-upload-detail"
+                    className="flex items-center justify-center gap-2 w-full h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
                   >
-                    <Link2 className="w-4 h-4 mr-2" />
-                    绑定
-                  </Button>
+                    {uploadingAudio ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm">上传中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">点击上传音频</span>
+                      </>
+                    )}
+                  </label>
+                  <input
+                    id="audio-upload-detail"
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={handleUploadAudio}
+                    disabled={uploadingAudio}
+                  />
+                  <p className="text-xs text-muted-foreground text-center">
+                    支持 MP3、WAV、AAC 等格式
+                  </p>
                 </div>
               )}
             </div>
@@ -395,7 +434,6 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
   });
 
   const imageAssets = filteredAssets.filter((a) => a.type === "image");
-  const audioAssets = filteredAssets.filter((a) => a.type === "audio");
   const keyframeAssets = filteredAssets.filter((a) => a.type === "keyframe");
 
   return (
@@ -409,7 +447,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
           <div>
             <h1 className="text-2xl font-semibold">素材库</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              共 {assets.length} 个素材（图片 {assets.filter((a) => a.type === "image").length}，音频 {assets.filter((a) => a.type === "audio").length}）
+              共 {imageAssets.length + keyframeAssets.length} 个素材
             </p>
           </div>
         </div>
@@ -422,14 +460,13 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
               <SelectItem value="all">全部</SelectItem>
               <SelectItem value="image">图片</SelectItem>
               <SelectItem value="keyframe">关键帧</SelectItem>
-              <SelectItem value="audio">音频</SelectItem>
             </SelectContent>
           </Select>
           <label className="cursor-pointer">
             <input
               type="file"
               multiple
-              accept="image/*,audio/*"
+              accept="image/*"
               onChange={(e) => handleUpload(e.target.files)}
               className="hidden"
               disabled={uploading}
@@ -437,25 +474,11 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
             <Button asChild disabled={uploading}>
               <span>
                 <Upload className="w-4 h-4 mr-2" />
-                {uploading ? "上传中..." : "上传素材"}
+                {uploading ? "上传中..." : "上传图片"}
               </span>
             </Button>
           </label>
         </div>
-      </div>
-
-      {/* 上传区域 */}
-      <div
-        className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-8 mb-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
-        onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-      >
-        <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-        <p className="text-muted-foreground">
-          拖拽图片或音频文件到此处，或点击上传
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">
-          支持 .png, .jpg, .gif, .mp3, .wav 等格式
-        </p>
       </div>
 
       {/* 内容区 */}
@@ -470,7 +493,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">暂无素材</h3>
-            <p className="text-muted-foreground">上传图片或音频开始使用</p>
+            <p className="text-muted-foreground">点击右上角上传图片开始使用</p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -588,60 +611,6 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       </div>
                     </div>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* 音频素材 */}
-            {audioAssets.length > 0 && (
-              <div>
-                <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-                  <Music className="w-5 h-5" />
-                  {audioAssets.map((asset, idx) => (
-                    <span key={asset.id}>
-                      {asset.display_name || asset.name}
-                      {idx < audioAssets.length - 1 && "、"}
-                    </span>
-                  ))}
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {audioAssets.map((asset) => (
-                    <div
-                      key={asset.id}
-                      className="group bg-muted rounded-lg p-4 cursor-pointer hover:bg-muted/80 transition-colors"
-                      onClick={() => setSelectedAsset(asset)}
-                    >
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <Music className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate text-sm">{asset.name}</p>
-                          {asset.duration && (
-                            <p className="text-xs text-muted-foreground">
-                              {Math.floor(asset.duration / 60)}:{String(asset.duration % 60).padStart(2, "0")}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <audio src={asset.url} controls className="w-full h-8" />
-                    </div>
-                  ))}
-                  
-                  {/* 添加按钮 */}
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      multiple
-                      onChange={(e) => handleUpload(e.target.files)}
-                      className="hidden"
-                    />
-                    <div className="bg-muted rounded-lg p-4 flex flex-col items-center justify-center hover:bg-muted/80 transition-colors min-h-[100px] border-2 border-dashed border-muted-foreground/20">
-                      <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                      <span className="text-sm text-muted-foreground">添加音频</span>
-                    </div>
-                  </label>
                 </div>
               </div>
             )}
