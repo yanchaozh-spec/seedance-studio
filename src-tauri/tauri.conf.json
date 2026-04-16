@@ -1,0 +1,53 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "焱超视频工具",
+  "version": "1.0.0",
+  "identifier": "com.yanchao.seedance",
+  "build": {
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:5000",
+    "beforeDevCommand": "pnpm dev --port 5000",
+    "beforeBuildCommand": "pnpm build",
+    "devtools": true
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "焱超视频工具",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "fs": {
+      "scope": {
+        "allow": ["$APPDATA/**", "$LOCALAPPDATA/**", "$HOME/**", "$DOCUMENT/**", "$DOWNLOAD/**", "**"]
+      }
+    }
+  }
+}
