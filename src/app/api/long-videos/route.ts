@@ -3,7 +3,7 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 import { mergeVideos } from "@/lib/merge-videos";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
-const MODEL_ID = "ep-m-20260417004442-42dzs";
+const MODEL_ID = "ep-20260416124751-x4tfn";
 const SEGMENT_DURATION = 15; // 每段最大时长（秒）
 
 interface CreateLongVideoRequest {

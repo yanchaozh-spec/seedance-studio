@@ -4,7 +4,7 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 
 // 固定使用自定义推理节点接入点 ID
-const MODEL_ID = "ep-m-20260417004442-42dzs";
+const MODEL_ID = "ep-20260416124751-x4tfn";
 
 // Content item 类型定义
 type ContentItem =

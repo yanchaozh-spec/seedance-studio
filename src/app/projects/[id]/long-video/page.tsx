@@ -190,7 +190,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
 
     // 返回 JSON 格式预览
     const requestBody = {
-      model: "ep-m-20260417004442-42dzs",
+      model: "ep-20260416124751-x4tfn",
       content: contentItems,
       generate_audio: true,
       ratio: currentRatio,
