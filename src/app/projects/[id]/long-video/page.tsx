@@ -104,10 +104,13 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
   const generateFinalPrompt = useCallback(() => {
     const nonEmptyPrompts = currentPrompts.filter((p) => p.content.trim());
 
+    // 使用所有素材
+    const allAssetsList = assets;
+
     // 分类素材
-    const imageAssets = selectedAssets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
-    const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
-    const audioAssets = selectedAssets.filter((a) => a.type === "audio");
+    const imageAssets = allAssetsList.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
+    const keyframeAssets = allAssetsList.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
+    const audioAssets = allAssetsList.filter((a) => a.type === "audio");
 
     // 按顺序收集所有图片（美术资产 + 关键帧）
     const allImageAssets = [...imageAssets, ...keyframeAssets];
