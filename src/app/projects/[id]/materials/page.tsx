@@ -16,6 +16,7 @@ import { Asset, getAssets, createAssetFromUrl, AssetCategory } from "@/lib/asset
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
+import { AssetCard } from "@/components/asset-card";
 
 export default function MaterialsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -175,42 +176,12 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {imageAssets.map((asset) => (
-                    <div
+                    <AssetCard
                       key={asset.id}
-                      className="group bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                      asset={asset}
                       onClick={() => setSelectedAsset(asset)}
-                    >
-                      <div className="aspect-video relative">
-                        {asset.thumbnail_url || asset.url ? (
-                          <img
-                            src={asset.thumbnail_url || asset.url}
-                            alt={asset.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="w-12 h-12 text-muted-foreground" />
-                          </div>
-                        )}
-                        {/* 悬停覆盖层 */}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                          <span className="text-white text-sm font-medium">查看详情</span>
-                        </div>
-                      </div>
-                      <div className="p-2 space-y-1">
-                        <p className="text-xs truncate text-center">{asset.display_name || asset.name}</p>
-                        {/* 音频状态 */}
-                        <div className={cn(
-                          "flex items-center justify-center gap-1 py-0.5 rounded text-[10px]",
-                          asset.bound_audio_id 
-                            ? "bg-primary/20 text-primary" 
-                            : "bg-muted-foreground/10 text-muted-foreground"
-                        )}>
-                          <Music className="w-3 h-3" />
-                          <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
-                        </div>
-                      </div>
-                    </div>
+                      size="md"
+                    />
                   ))}
                   
                   {/* 添加按钮 */}
@@ -240,44 +211,12 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {keyframeAssets.map((asset) => (
-                    <div
+                    <AssetCard
                       key={asset.id}
-                      className="group bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all border-2 border-primary/30"
+                      asset={asset}
                       onClick={() => setSelectedAsset(asset)}
-                    >
-                      <div className="aspect-video relative">
-                        {asset.thumbnail_url || asset.url ? (
-                          <img
-                            src={asset.thumbnail_url || asset.url}
-                            alt={asset.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Scissors className="w-8 h-8 text-primary" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        {asset.keyframe_description && (
-                          <div className="absolute bottom-0 left-0 right-0 p-2">
-                            <p className="text-white text-xs line-clamp-2">{asset.keyframe_description}</p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-2 space-y-1">
-                        <p className="text-xs truncate text-center">{asset.display_name || asset.name}</p>
-                        {/* 音频状态 */}
-                        <div className={cn(
-                          "flex items-center justify-center gap-1 py-0.5 rounded text-[10px]",
-                          asset.bound_audio_id 
-                            ? "bg-primary/20 text-primary" 
-                            : "bg-muted-foreground/10 text-muted-foreground"
-                        )}>
-                          <Music className="w-3 h-3" />
-                          <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
-                        </div>
-                      </div>
-                    </div>
+                      size="md"
+                    />
                   ))}
                 </div>
               </div>

@@ -18,6 +18,7 @@ import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
+import { AssetCard } from "@/components/asset-card";
 
 // 选中的素材（带激活状态）
 export interface SelectedAsset extends Asset {
@@ -507,68 +508,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {keyframeAssets.map((asset) => (
-                      <div
+                      <AssetCard
                         key={asset.id}
-                        className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-20 cursor-pointer hover:ring-2 hover:ring-primary transition-all",
-                          !asset.isActivated && "opacity-50 grayscale"
-                        )}
-                        onClick={(e) => {
-                          if ((e.target as HTMLElement).closest('button')) return;
-                          setSelectedDetailAsset(asset);
-                        }}
-                      >
-                        <div className="aspect-video relative">
-                          {asset.thumbnail_url || asset.url ? (
-                            <img
-                              src={asset.thumbnail_url || asset.url}
-                              alt={asset.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Scissors className="w-6 h-6 text-primary" />
-                            </div>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveAsset(asset.id);
-                            }}
-                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                        <div className="p-1 space-y-0.5">
-                          {/* 声音状态 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
-                            asset.bound_audio_id 
-                              ? "bg-primary/20 text-primary" 
-                              : "bg-muted-foreground/10 text-muted-foreground"
-                          )}>
-                            <Music className="w-2.5 h-2.5" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
-                          </div>
-                          {/* 激活按钮 */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleAssetActivation(asset.id);
-                            }}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
-                              asset.isActivated 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
-                            )}
-                          >
-                            <span>激活</span>
-                            {asset.isActivated && <Check className="w-2.5 h-2.5" />}
-                          </button>
-                        </div>
-                      </div>
+                        asset={asset}
+                        onClick={() => setSelectedDetailAsset(asset)}
+                        onRemove={() => handleRemoveAsset(asset.id)}
+                        onToggleActivation={() => toggleAssetActivation(asset.id)}
+                        showRemove
+                        showActivation
+                        className={cn(!asset.isActivated && "opacity-50 grayscale")}
+                      />
                     ))}
                   </div>
                 </div>
@@ -588,68 +537,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {imageAssets.map((asset) => (
-                      <div
+                      <AssetCard
                         key={asset.id}
-                        className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-20 cursor-pointer hover:ring-2 hover:ring-primary transition-all",
-                          !asset.isActivated && "opacity-50 grayscale"
-                        )}
-                        onClick={(e) => {
-                          if ((e.target as HTMLElement).closest('button')) return;
-                          setSelectedDetailAsset(asset);
-                        }}
-                      >
-                        <div className="aspect-video relative">
-                          {asset.thumbnail_url ? (
-                            <img
-                              src={asset.thumbnail_url}
-                              alt={asset.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Image className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveAsset(asset.id);
-                            }}
-                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                        <div className="p-1 space-y-0.5">
-                          {/* 声音状态 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
-                            asset.bound_audio_id 
-                              ? "bg-primary/20 text-primary" 
-                              : "bg-muted-foreground/10 text-muted-foreground"
-                          )}>
-                            <Music className="w-2.5 h-2.5" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
-                          </div>
-                          {/* 激活按钮 */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleAssetActivation(asset.id);
-                            }}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
-                              asset.isActivated 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
-                            )}
-                          >
-                            <span>激活</span>
-                            {asset.isActivated && <Check className="w-2.5 h-2.5" />}
-                          </button>
-                        </div>
-                      </div>
+                        asset={asset}
+                        onClick={() => setSelectedDetailAsset(asset)}
+                        onRemove={() => handleRemoveAsset(asset.id)}
+                        onToggleActivation={() => toggleAssetActivation(asset.id)}
+                        showRemove
+                        showActivation
+                        className={cn(!asset.isActivated && "opacity-50 grayscale")}
+                      />
                     ))}
                   </div>
                 </div>

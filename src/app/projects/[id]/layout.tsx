@@ -22,6 +22,7 @@ import { useDragStore } from "@/lib/drag-store";
 import { formatDistanceToNow } from "date-fns";
 import { SelectedAsset } from "./page";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
+import { AssetCard } from "@/components/asset-card";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -204,17 +205,19 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
           {/* 底部信息 - 非隐藏时显示 */}
           {!hideLabel && (
             <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
-              {/* 音频参考按钮 */}
-              <div className={cn(
-                "flex items-center justify-center gap-1 rounded text-xs",
-                asset.bound_audio_id 
-                  ? "bg-primary text-primary-foreground" 
-                  : "bg-muted-foreground/20 text-muted-foreground",
-                size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
-              )}>
-                <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
-                <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
-              </div>
+              {/* 音频参考按钮 - 仅美术资产显示 */}
+              {asset.asset_category !== "keyframe" && (
+                <div className={cn(
+                  "flex items-center justify-center gap-1 rounded text-xs",
+                  asset.bound_audio_id 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted-foreground/20 text-muted-foreground",
+                  size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
+                )}>
+                  <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
+                  <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+                </div>
+              )}
             </div>
           )}
         </div>
