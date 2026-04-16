@@ -33,7 +33,8 @@ type ContentItem =
   | { type: "audio_url"; audio_url: { url: string }; role?: string };
 
 // 构建符合 Seedance 2.0 格式的提示词
-// 使用 [图1]、[图2] 等方式引用图片
+// 格式：素材定义行 + 提示词分行
+// 示例：素材名1：[图1]，声线为：[音频1]；素材名2：[图2]；关键帧描述：[图3]
 function buildPrompt(
   boxContent: string,
   asset: {
@@ -72,10 +73,19 @@ function buildPrompt(
   // 构建文本引用标记
   let textRef = "";
   if (isKeyframe) {
-    const desc = asset.keyframe_description || "";
-    textRef = desc ? `[图${imageIndex}]${desc}@${displayName}` : `[图${imageIndex}]@${displayName}`;
+    const desc = asset.keyframe_description || displayName;
+    textRef = `${desc}：[图${imageIndex}]`;
   } else {
-    textRef = `[图${imageIndex}]"${displayName}"`;
+    textRef = `${displayName}：[图${imageIndex}]`;
+
+    // 检查是否绑定音频
+    if (asset.bound_audio_id && audioAssets) {
+      const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+      if (boundAudio) {
+        const audioName = boundAudio.display_name || boundAudio.name;
+        textRef += `，声线为：[音频1]`;
+      }
+    }
   }
 
   // 构建文本内容
@@ -85,19 +95,22 @@ function buildPrompt(
     textParts.push(boxContent);
   }
 
-  // 添加绑定的音频引用
-  if (!isKeyframe && asset.bound_audio_id && audioAssets) {
-    const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-    if (boundAudio) {
-      const audioName = boundAudio.display_name || boundAudio.name;
-      textParts.push(`[图${imageIndex}]声线为@${audioName}`);
-    }
-  }
-
   contentItems.push({
     type: "text",
     text: textParts.join("\n"),
   });
+
+  // 添加绑定的音频
+  if (!isKeyframe && asset.bound_audio_id && audioAssets) {
+    const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+    if (boundAudio) {
+      contentItems.push({
+        type: "audio_url",
+        audio_url: { url: boundAudio.url },
+        role: "reference_audio",
+      });
+    }
+  }
 
   return contentItems;
 }

@@ -107,87 +107,82 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const generateFinalPrompt = useCallback(() => {
     const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
 
-    // 收集所有激活的图片素材（按顺序编号）
-    const referencedAssets: Array<{
-      asset: (typeof selectedAssets)[0];
-      index: number;
-    }> = [];
+    // 分类素材
+    const imageAssets = selectedAssets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
+    const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
+    const audioAssets = selectedAssets.filter((a) => a.type === "audio");
 
-    // 遍历每个提示词框，收集激活的素材
-    for (const box of nonEmptyBoxes) {
-      let activatedAsset = null;
+    // 按顺序收集所有图片（美术资产 + 关键帧）
+    const allImageAssets = [...imageAssets, ...keyframeAssets];
 
-      if (box.isActivated && box.activatedAssetId) {
-        activatedAsset = selectedAssets.find(
-          (a) => a.id === box.activatedAssetId && a.isActivated
-        );
-      }
+    // 构建素材定义行
+    const assetRefParts: string[] = [];
+    const audioRefParts: string[] = [];
 
-      if (!activatedAsset) {
-        activatedAsset = selectedAssets.find(
-          (a) => (a.type === "image" || a.type === "keyframe") && a.isActivated
-        );
-      }
+    for (let i = 0; i < allImageAssets.length; i++) {
+      const asset = allImageAssets[i];
+      const imageIndex = i + 1;
+      const displayName = asset.display_name || asset.name;
+      const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
 
-      if (activatedAsset) {
-        const alreadyReferenced = referencedAssets.find(
-          (ref) => ref.asset.id === activatedAsset!.id
-        );
+      if (isKeyframe) {
+        const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
+        assetRefParts.push(`${desc}：[图${imageIndex}]`);
+      } else {
+        assetRefParts.push(`${displayName}：[图${imageIndex}]`);
 
-        if (!alreadyReferenced) {
-          referencedAssets.push({
-            asset: activatedAsset,
-            index: referencedAssets.length + 1,
-          });
+        if (asset.bound_audio_id) {
+          const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+          if (boundAudio) {
+            const audioName = boundAudio.display_name || boundAudio.name;
+            const audioIndex = audioRefParts.length + 1;
+            assetRefParts[assetRefParts.length - 1] += `，声线为：[音频${audioIndex}]`;
+            audioRefParts.push(audioName);
+          }
         }
-      }
-    }
-
-    // 如果没有激活的素材，使用第一个可用的图片或关键帧
-    if (referencedAssets.length === 0) {
-      const defaultAsset = selectedAssets.find(
-        (a) => a.type === "image" || a.type === "keyframe"
-      );
-      if (defaultAsset) {
-        referencedAssets.push({ asset: defaultAsset, index: 1 });
       }
     }
 
     const contentItems: Array<Record<string, unknown>> = [];
 
-    // 添加所有图片（使用 [图N] 编号）
-    for (const ref of referencedAssets) {
-      const isKeyframe = ref.asset.asset_category === "keyframe";
+    // 添加所有图片
+    for (const asset of allImageAssets) {
+      const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
       contentItems.push({
         type: "image_url",
-        image_url: { url: ref.asset.url },
+        image_url: { url: asset.url },
         role: isKeyframe ? "first_frame" : "reference_image",
       });
     }
 
-    // 构建合并的文本提示词（使用 [图N] 引用）
-    const textParts: string[] = [];
-
-    for (const ref of referencedAssets) {
-      const displayName = ref.asset.display_name || ref.asset.name;
-      const isKeyframe = ref.asset.asset_category === "keyframe";
-
-      if (isKeyframe) {
-        const desc = (ref.asset as { keyframe_description?: string }).keyframe_description || "";
-        textParts.push(desc ? `[图${ref.index}]${desc}@${displayName}` : `[图${ref.index}]@${displayName}`);
-      } else {
-        textParts.push(`[图${ref.index}]"${displayName}"`);
+    // 添加所有音频
+    for (const audioName of audioRefParts) {
+      const audioAsset = audioAssets.find((a) => a.display_name === audioName || a.name === audioName);
+      if (audioAsset) {
+        contentItems.push({
+          type: "audio_url",
+          audio_url: { url: audioAsset.url },
+          role: "reference_audio",
+        });
       }
     }
 
-    // 添加每个提示词框的内容
+    // 构建文本内容
+    const textParts: string[] = [];
+
+    // 第一行：素材定义
+    const assetDefLine = assetRefParts.join("；");
+    if (assetDefLine) {
+      textParts.push(assetDefLine);
+    }
+
+    // 后续行：提示词
     for (const box of nonEmptyBoxes) {
       if (box.content.trim()) {
         textParts.push(box.content.trim());
       }
     }
 
-    // 添加合并的文本（只有一个 text 对象）
     if (textParts.length > 0) {
       contentItems.push({
         type: "text",

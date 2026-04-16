@@ -58,6 +58,10 @@ interface AudioContent {
 type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
 
 // 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
+// 格式：素材定义行 + 提示词分行
+// 示例：素材名1：[图1]，声线为：[音频1]；素材名2：[图2]；关键帧描述：[图3]
+//       提示词1
+//       提示词2
 function buildContent(
   promptBoxes: CreateTaskRequest["prompt_boxes"],
   assets: Array<{
@@ -76,102 +80,93 @@ function buildContent(
   const content: ContentItem[] = [];
 
   // 分类素材
-  const imageAssets = assets.filter((a) => a.type === "image");
-  const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.is_keyframe);
+  const imageAssets = assets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
+  const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
 
-  // 收集所有需要引用的图片素材（按顺序编号）
-  const referencedAssets: Array<{
-    asset: typeof imageAssets[0] | typeof keyframeAssets[0];
-    index: number;
-  }> = [];
+  // 按顺序收集所有图片（美术资产 + 关键帧）
+  const allImageAssets: typeof imageAssets = [];
+  allImageAssets.push(...imageAssets);
+  allImageAssets.push(...keyframeAssets);
 
-  // 按顺序处理每个提示词框，收集激活的素材
+  // 构建素材定义行
+  // 格式：素材名1：[图1]，声线为：[音频1]；素材名2：[图2]；关键帧描述：[图3]
+  const assetRefParts: string[] = [];
+  const audioRefParts: string[] = [];
+
+  for (let i = 0; i < allImageAssets.length; i++) {
+    const asset = allImageAssets[i];
+    const imageIndex = i + 1;
+    const displayName = asset.display_name || asset.name;
+    const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe;
+
+    if (isKeyframe) {
+      // 关键帧：使用 keyframe_description 或 name
+      const desc = asset.keyframe_description || displayName;
+      assetRefParts.push(`${desc}：[图${imageIndex}]`);
+    } else {
+      // 美术资产
+      assetRefParts.push(`${displayName}：[图${imageIndex}]`);
+
+      // 检查是否绑定音频
+      if (asset.bound_audio_id) {
+        const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+        if (boundAudio) {
+          const audioName = boundAudio.display_name || boundAudio.name;
+          const audioIndex = audioRefParts.length + 1;
+          assetRefParts[assetRefParts.length - 1] += `，声线为：[音频${audioIndex}]`;
+          audioRefParts.push(audioName);
+        }
+      }
+    }
+  }
+
+  // 按顺序处理提示词框
   const sortedBoxes = promptBoxes
     .filter((box) => box.content.trim())
     .sort((a, b) => a.order - b.order);
 
-  for (const box of sortedBoxes) {
-    let activatedAsset = null;
+  // 构建文本内容
+  const textParts: string[] = [];
 
-    // 优先使用框内激活的素材
-    if (box.is_activated && box.activated_asset_id) {
-      activatedAsset = assets.find((a) => a.id === box.activated_asset_id);
-    }
-
-    // 如果没有指定，使用第一个可用的图片或关键帧
-    if (!activatedAsset) {
-      activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
-    }
-
-    // 检查是否已经引用过这个素材
-    if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
-      const alreadyReferenced = referencedAssets.find(
-        (ref) => ref.asset.id === activatedAsset!.id
-      );
-
-      if (!alreadyReferenced) {
-        referencedAssets.push({
-          asset: activatedAsset,
-          index: referencedAssets.length + 1,
-        });
-      }
-    }
+  // 第一行：素材定义（用分号隔开）
+  const assetDefLine = assetRefParts.join("；");
+  if (assetDefLine) {
+    textParts.push(assetDefLine);
   }
 
-  // 如果没有任何激活的素材，使用第一个可用的图片或关键帧
-  if (referencedAssets.length === 0) {
-    const defaultAsset = imageAssets[0] || keyframeAssets[0];
-    if (defaultAsset) {
-      referencedAssets.push({
-        asset: defaultAsset,
-        index: 1,
-      });
+  // 后续行：每个提示词框一行
+  for (const box of sortedBoxes) {
+    if (box.content.trim()) {
+      textParts.push(box.content.trim());
     }
   }
 
   // 添加所有图片（使用 [图N] 编号）
-  for (const ref of referencedAssets) {
-    const isKeyframe = ref.asset.asset_category === "keyframe";
-
-    // 关键帧用 first_frame，参考图用 reference_image
-    const role = isKeyframe ? "first_frame" : "reference_image";
+  for (let i = 0; i < allImageAssets.length; i++) {
+    const asset = allImageAssets[i];
+    const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe;
 
     content.push({
       type: "image_url",
       image_url: {
-        url: ref.asset.url,
+        url: asset.url,
       },
-      role,
+      role: isKeyframe ? "first_frame" : "reference_image",
     });
   }
 
-  // 构建合并的文本提示词（使用 [图1]、[图2] 等引用）
-  const textParts: string[] = [];
-
-  for (const ref of referencedAssets) {
-    const displayName = ref.asset.display_name || ref.asset.name;
-    const isKeyframe = ref.asset.asset_category === "keyframe";
-
-    // 根据素材类型添加引用标记
-    if (isKeyframe) {
-      // 关键帧：[图1]关键帧描述
-      const desc = ref.asset.keyframe_description || "";
-      if (desc) {
-        textParts.push(`[图${ref.index}]${desc}@${displayName}`);
-      } else {
-        textParts.push(`[图${ref.index}]@${displayName}`);
-      }
-    } else {
-      // 参考图：[图1]"图片名"
-      textParts.push(`[图${ref.index}]"${displayName}"`);
-    }
-  }
-
-  // 添加每个提示词框的内容（按顺序）
-  for (const box of sortedBoxes) {
-    if (box.content.trim()) {
-      textParts.push(box.content.trim());
+  // 添加所有音频（使用 [音频N] 编号）
+  for (const audioName of audioRefParts) {
+    const audioAsset = audioAssets.find((a) => a.display_name === audioName || a.name === audioName);
+    if (audioAsset) {
+      content.push({
+        type: "audio_url",
+        audio_url: {
+          url: audioAsset.url,
+        },
+        role: "reference_audio",
+      });
     }
   }
 
@@ -181,25 +176,6 @@ function buildContent(
       type: "text",
       text: textParts.join("\n"),
     });
-  }
-
-  // 添加绑定的音频（如果有绑定的参考图）
-  const refImageAssets = referencedAssets.filter(
-    (ref) => ref.asset.asset_category !== "keyframe"
-  );
-
-  for (const ref of refImageAssets) {
-    if (ref.asset.bound_audio_id) {
-      const boundAudio = audioAssets.find((a) => a.id === ref.asset!.bound_audio_id);
-      if (boundAudio) {
-        const audioName = boundAudio.display_name || boundAudio.name;
-        // 在文本中添加音频引用
-        const lastText = content[content.length - 1];
-        if (lastText && lastText.type === "text") {
-          lastText.text += `\n[图${ref.index}]声线为@${audioName}`;
-        }
-      }
-    }
   }
 
   return content;
