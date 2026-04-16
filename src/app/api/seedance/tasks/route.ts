@@ -104,12 +104,12 @@ function buildContent(
       const displayName = activatedAsset.display_name || activatedAsset.name;
       
       if (isKeyframe) {
-        // 关键帧：添加关键帧描述
+        // 关键帧：关键帧描述@文件名
         const desc = box.keyframe_description || activatedAsset.keyframe_description || "";
         if (desc) {
-          textContent = `视频首帧@"${displayName}"，${desc}，${textContent}`;
+          textContent = `${desc}@${displayName}，${textContent}`;
         } else {
-          textContent = `视频首帧@"${displayName}"，${textContent}`;
+          textContent = `@${displayName}，${textContent}`;
         }
       } else {
         // 美术资产：添加声线描述

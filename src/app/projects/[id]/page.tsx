@@ -104,8 +104,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   };
 
   // 生成最终提示词
-  // 格式：第一行 "图片名"@这张图片，声线为@音频文件名，关键帧描述（如果有），提示词
-  //       后续行：提示词内容
+  // 格式：
+  //   - 美术资产：第一行 "图片名"@这张图片，声线为@音频文件名，提示词
+  //   - 关键帧：第一行 关键帧描述@文件名，提示词
+  //   后续行：提示词内容
   const generateFinalPrompt = useCallback(() => {
     const lines: string[] = [];
     const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
@@ -118,25 +120,27 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
     if (firstActivatedAsset) {
       const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
-      let header = `"${displayName}"@这张图片`;
-
-      // 根据素材类型决定显示内容
       const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
       
-      // 美术资产：添加声线描述
-      if (!isKeyframe && firstActivatedAsset.bound_audio_id) {
-        const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
-        if (boundAudio) {
-          const audioName = boundAudio.display_name || boundAudio.name;
-          header += `，声线为@${audioName}`;
-        }
-      }
-      
-      // 关键帧：添加关键帧描述
+      let header = "";
+
       if (isKeyframe) {
+        // 关键帧：关键帧描述@文件名
         const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
         if (keyframeDesc) {
-          header += `，${keyframeDesc}`;
+          header = `${keyframeDesc}@${displayName}`;
+        } else {
+          header = `@${displayName}`;
+        }
+      } else {
+        // 美术资产："图片名"@这张图片，声线为@音频文件名
+        header = `"${displayName}"@这张图片`;
+        if (firstActivatedAsset.bound_audio_id) {
+          const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+          if (boundAudio) {
+            const audioName = boundAudio.display_name || boundAudio.name;
+            header += `，声线为@${audioName}`;
+          }
         }
       }
 
@@ -258,25 +262,27 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
       if (firstActivatedAsset) {
         const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
-        let header = `"${displayName}"@这张图片`;
-
-        // 根据素材类型决定显示内容
         const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
         
-        // 美术资产：添加声线描述
-        if (!isKeyframe && firstActivatedAsset.bound_audio_id) {
-          const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
-          if (boundAudio) {
-            const audioName = boundAudio.display_name || boundAudio.name;
-            header += `，声线为@${audioName}`;
-          }
-        }
-        
-        // 关键帧：添加关键帧描述
+        let header = "";
+
         if (isKeyframe) {
+          // 关键帧：关键帧描述@文件名
           const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
           if (keyframeDesc) {
-            header += `，${keyframeDesc}`;
+            header = `${keyframeDesc}@${displayName}`;
+          } else {
+            header = `@${displayName}`;
+          }
+        } else {
+          // 美术资产："图片名"@这张图片，声线为@音频文件名
+          header = `"${displayName}"@这张图片`;
+          if (firstActivatedAsset.bound_audio_id) {
+            const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+            if (boundAudio) {
+              const audioName = boundAudio.display_name || boundAudio.name;
+              header += `，声线为@${audioName}`;
+            }
           }
         }
 

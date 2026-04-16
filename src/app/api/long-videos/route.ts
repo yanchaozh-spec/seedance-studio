@@ -52,12 +52,12 @@ function buildPrompt(
   const isKeyframe = asset.asset_category === "keyframe";
 
   if (isKeyframe) {
-    // 关键帧：添加关键帧描述
+    // 关键帧：关键帧描述@文件名
     const desc = keyframeDesc || asset.keyframe_description || "";
     if (desc) {
-      return `视频首帧@"${displayName}"，${desc}，${boxContent}`;
+      return `${desc}@${displayName}，${boxContent}`;
     }
-    return `视频首帧@"${displayName}"，${boxContent}`;
+    return `@${displayName}，${boxContent}`;
   }
 
   // 美术资产：添加声线描述
