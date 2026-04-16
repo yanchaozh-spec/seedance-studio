@@ -29,7 +29,7 @@ import {
   FolderOpen,
   Play,
 } from "lucide-react";
-import { Asset, getAssets, createAsset, deleteAsset, bindAudioToImage, unbindAudio } from "@/lib/assets";
+import { Asset, getAssets, createAssetFromUrl, deleteAsset, bindAudioToImage, unbindAudio } from "@/lib/assets";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -274,7 +274,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
         const result = await response.json();
         
         // 创建素材记录
-        await createAsset({
+        await createAssetFromUrl({
           project_id: resolvedParams.id,
           name: file.name,
           type: isImage ? "image" : "audio",
