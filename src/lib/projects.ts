@@ -49,6 +49,19 @@ export async function deleteProject(id: string): Promise<void> {
   }
 }
 
+// 重命名项目
+export async function renameProject(id: string, name: string): Promise<Project> {
+  const response = await fetch(`/api/projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to rename project");
+  }
+  return response.json();
+}
+
 // 获取项目任务数量
 export async function getProjectTaskCount(projectId: string): Promise<number> {
   const response = await fetch(`/api/projects/${projectId}/tasks`);

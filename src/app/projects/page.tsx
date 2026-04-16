@@ -38,8 +38,9 @@ import {
   Sparkles,
   Zap,
   Key,
+  Pencil,
 } from "lucide-react";
-import { getProjects, createProject, deleteProject, getProjectTaskCount, Project } from "@/lib/projects";
+import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
 import { formatDistanceToNow } from "date-fns";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
@@ -147,6 +148,10 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
+  const [renameProjectName, setRenameProjectName] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -194,6 +199,31 @@ export default function ProjectsPage() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleRename = async () => {
+    if (!renameProjectId || !renameProjectName.trim()) return;
+    try {
+      setRenaming(true);
+      await renameProject(renameProjectId, renameProjectName.trim());
+      setProjects(projects.map((p) => 
+        p.id === renameProjectId ? { ...p, name: renameProjectName.trim() } : p
+      ));
+      setRenameDialogOpen(false);
+      setRenameProjectId(null);
+      setRenameProjectName("");
+    } catch (error) {
+      console.error("重命名项目失败:", error);
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const openRenameDialog = (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenameProjectId(id);
+    setRenameProjectName(name);
+    setRenameDialogOpen(true);
   };
 
   const openProject = (id: string) => {
@@ -278,6 +308,12 @@ export default function ProjectsPage() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
+                      onClick={(e) => openRenameDialog(project.id, project.name, e)}
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      重命名
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       className="text-destructive gap-2"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -339,6 +375,32 @@ export default function ProjectsPage() {
             </Button>
             <Button onClick={handleCreate} disabled={creating || !newProjectName.trim()}>
               {creating ? "创建中..." : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 重命名项目对话框 */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>重命名项目</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="请输入新名称"
+              value={renameProjectName}
+              onChange={(e) => setRenameProjectName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleRename()}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleRename} disabled={renaming || !renameProjectName.trim()}>
+              {renaming ? "保存中..." : "保存"}
             </Button>
           </DialogFooter>
         </DialogContent>
