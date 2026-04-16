@@ -16,6 +16,7 @@ import { useProjectDetail } from "./layout";
 import { createTask } from "@/lib/tasks";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 
 // 选中的素材（带激活状态）
 export interface SelectedAsset extends Asset {
@@ -53,6 +54,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   });
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
   
   // 素材池拖放区域
   const { dropZoneProps: poolDropZoneProps } = useDropZone({
@@ -524,9 +526,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-20",
+                          "relative group bg-muted rounded-lg overflow-hidden w-20 cursor-pointer hover:ring-2 hover:ring-primary transition-all",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest('button')) return;
+                          setSelectedDetailAsset(asset);
+                        }}
                       >
                         <div className="aspect-video relative">
                           {asset.thumbnail_url || asset.url ? (
@@ -546,7 +552,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             </div>
                           )}
                           <button
-                            onClick={() => handleRemoveAsset(asset.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAsset(asset.id);
+                            }}
                             className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-2.5 h-2.5" />
@@ -565,7 +574,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           </div>
                           {/* 激活按钮 */}
                           <button
-                            onClick={() => toggleAssetActivation(asset.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAssetActivation(asset.id);
+                            }}
                             className={cn(
                               "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
                               asset.isActivated 
@@ -600,9 +612,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-20",
+                          "relative group bg-muted rounded-lg overflow-hidden w-20 cursor-pointer hover:ring-2 hover:ring-primary transition-all",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest('button')) return;
+                          setSelectedDetailAsset(asset);
+                        }}
                       >
                         <div className="aspect-video relative">
                           {asset.thumbnail_url ? (
@@ -622,7 +638,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             </div>
                           )}
                           <button
-                            onClick={() => handleRemoveAsset(asset.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAsset(asset.id);
+                            }}
                             className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-2.5 h-2.5" />
@@ -641,7 +660,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           </div>
                           {/* 激活按钮 */}
                           <button
-                            onClick={() => toggleAssetActivation(asset.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAssetActivation(asset.id);
+                            }}
                             className={cn(
                               "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
                               asset.isActivated 
@@ -743,6 +765,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       )}
+
+      {/* 素材详情对话框 */}
+      <AssetDetailDialog
+        asset={selectedDetailAsset}
+        allAssets={selectedAssets}
+        onClose={() => setSelectedDetailAsset(null)}
+        onUpdate={() => {
+          // 刷新素材池数据 - 由于使用的是本地状态，需要手动触发更新
+          // 这里可以添加额外的刷新逻辑
+        }}
+      />
     </div>
   );
 }

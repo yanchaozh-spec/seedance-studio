@@ -20,6 +20,7 @@ import { useSettingsStore } from "@/lib/settings";
 import { useDragStore } from "@/lib/drag-store";
 import { formatDistanceToNow } from "date-fns";
 import { SelectedAsset } from "./page";
+import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -49,13 +50,23 @@ interface DraggableAssetProps {
   asset: Asset;
   showRemove?: boolean;
   onRemove?: (assetId: string) => void;
+  onClick?: (asset: Asset) => void;
   size?: "small" | "large";
   hideLabel?: boolean;
 }
 
-function DraggableAsset({ asset, showRemove, onRemove, size = "small", hideLabel }: DraggableAssetProps) {
+function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", hideLabel }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
+
+  const handleClick = (e: React.MouseEvent) => {
+    // 阻止点击事件冒泡到拖拽
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClick && (asset.type === "image" || asset.type === "keyframe")) {
+      onClick(asset);
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent) => {
     // 开始拖拽时设置状态
@@ -123,10 +134,13 @@ function DraggableAsset({ asset, showRemove, onRemove, size = "small", hideLabel
     setDragging(false);
   };
 
-  // 阻止点击事件冒泡和默认行为，避免点击触发添加
-  const handleClick = (e: React.MouseEvent) => {
+  // 处理点击事件，用于打开详情对话框
+  const handleCardClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (onClick && (asset.type === "image" || asset.type === "keyframe")) {
+      onClick(asset);
+    }
   };
 
   return (
@@ -134,9 +148,10 @@ function DraggableAsset({ asset, showRemove, onRemove, size = "small", hideLabel
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onClick={handleClick}
+      onClick={handleCardClick}
       className={cn(
         "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
+        (asset.type === "image" || asset.type === "keyframe") && onClick && "cursor-pointer hover:ring-2 hover:ring-primary transition-all",
         size === "small" ? "w-24" : "w-full"
       )}
     >
@@ -328,6 +343,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [materials, setMaterials] = useState<Asset[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -551,6 +567,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             asset={asset}
                             size="small"
                             hideLabel
+                            onClick={setSelectedDetailAsset}
                           />
                         ))}
                       </div>
@@ -575,6 +592,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             asset={asset}
                             size="small"
                             hideLabel
+                            onClick={setSelectedDetailAsset}
                           />
                         ))}
                       </div>
@@ -679,6 +697,16 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
         {/* 设置弹窗 */}
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+        {/* 素材详情对话框 */}
+        <AssetDetailDialog
+          asset={selectedDetailAsset}
+          allAssets={materials}
+          onClose={() => setSelectedDetailAsset(null)}
+          onUpdate={() => {
+            loadProject();
+          }}
+        />
       </div>
     </ProjectDetailContext.Provider>
   );
