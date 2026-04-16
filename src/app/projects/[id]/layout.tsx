@@ -49,26 +49,26 @@ interface DraggableAssetProps {
 }
 
 function DraggableAsset({ asset, onDragStart, showRemove, onRemove }: DraggableAssetProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: asset.id,
-    data: asset,
-  });
+  const [isDragging, setIsDragging] = useState(false);
 
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: isDragging ? 50 : undefined,
-      }
-    : undefined;
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/json", JSON.stringify(asset));
+    e.dataTransfer.setData("text/plain", JSON.stringify(asset));
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       className={cn(
-        "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing",
+        "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
         isDragging && "opacity-50"
       )}
     >
@@ -415,9 +415,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                 <SheetTitle>
                   {activeTab === "materials" ? "素材库" : "任务管理"}
                 </SheetTitle>
-                <Button variant="ghost" size="sm" onClick={closeDrawer}>
-                  <X className="w-4 h-4" />
-                </Button>
+                {/* SheetContent 已有内置关闭按钮，无需重复添加 */}
               </div>
               {/* 标签页切换 */}
               <div className="flex gap-2 mt-3">

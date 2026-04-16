@@ -1,6 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { execSync } from 'child_process';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('dotenv').config();
+
 let envLoaded = false;
 
 interface SupabaseCredentials {
@@ -14,14 +17,10 @@ function loadEnv(): void {
   }
 
   try {
-    try {
-      require('dotenv').config();
-      if (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
-        envLoaded = true;
-        return;
-      }
-    } catch {
-      // dotenv not available
+    // dotenv 已在顶部加载
+    if (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
+      envLoaded = true;
+      return;
     }
 
     const pythonCode = `

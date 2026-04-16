@@ -125,7 +125,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         }
       }
 
-      finalPrompts.push(`${index + 1}. ${promptText}`);
+      finalPrompts.push(promptText);
     });
 
     return finalPrompts.join("\n");

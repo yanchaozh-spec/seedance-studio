@@ -44,6 +44,7 @@ import { getProjects, createProject, deleteProject, renameProject, getProjectTas
 import { formatDistanceToNow } from "date-fns";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
+import { toast } from "sonner";
 
 // 设置弹窗组件
 function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -129,6 +130,33 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                 onChange={(e) => setLocalApiKey(e.target.value)}
                 className="flex-1"
               />
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={async () => {
+                  if (!localApiKey.trim()) {
+                    alert("请输入 API Key");
+                    return;
+                  }
+                  try {
+                    const response = await fetch("/api/seedance/test", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ apiKey: localApiKey }),
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                      toast.success("连接成功！API Key 有效");
+                    } else {
+                      toast.error(data.error || "连接失败");
+                    }
+                  } catch {
+                    toast.error("连接测试失败");
+                  }
+                }}
+              >
+                测试
+              </Button>
               <Button size="sm" onClick={handleSaveApiKey} disabled={saving}>
                 {saving ? "已保存" : "保存"}
               </Button>

@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,8 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
   const [voiceDescription, setVoiceDescription] = useState("");
   const [keyframeDescription, setKeyframeDescription] = useState("");
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
   
   const audioAssets = allAssets.filter((a) => a.type === "audio" && a.id !== asset?.id);
   const boundAudio = asset?.bound_audio_id 
@@ -57,14 +60,33 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
       setVoiceDescription(asset.voice_description || "");
       setKeyframeDescription(asset.keyframe_description || "");
       setSelectedAudioId(asset.bound_audio_id || null);
+      setDisplayName(asset.display_name || asset.name);
     }
   }, [asset]);
+
+  const handleRename = async () => {
+    if (!asset || !displayName.trim()) return;
+    try {
+      setIsRenaming(true);
+      await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: displayName.trim() }),
+      });
+      toast.success("重命名成功");
+      onUpdate();
+    } catch {
+      toast.error("重命名失败");
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   const handleBindAudio = async () => {
     if (!asset || !selectedAudioId) return;
     try {
       setBinding(true);
-      await bindAudioToImage(asset.id, selectedAudioId, voiceDescription || undefined);
+      await bindAudioToImage(asset.id, selectedAudioId);
       toast.success("绑定成功");
       onUpdate();
       onClose();
@@ -130,6 +152,29 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
         </DialogHeader>
         
         <div className="space-y-4 py-4">
+          {/* 重命名 */}
+          <div className="space-y-2">
+            <Label>显示名称</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="输入显示名称"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleRename}
+                disabled={isRenaming || displayName === (asset?.display_name || asset?.name)}
+              >
+                保存
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              用于提示词中的引用，如：@&quot;显示名称&quot;
+            </p>
+          </div>
+
           {/* 预览 */}
           {(asset.type === "image" || asset.type === "keyframe") && (
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
@@ -210,12 +255,6 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
                       )}
                     </SelectContent>
                   </Select>
-                  
-                  <Input
-                    placeholder="声线描述（如：轻柔女声）"
-                    value={voiceDescription}
-                    onChange={(e) => setVoiceDescription(e.target.value)}
-                  />
                   
                   <Button 
                     onClick={handleBindAudio} 
