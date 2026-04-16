@@ -29,11 +29,17 @@ export function useDropZone({
     e.preventDefault();
     e.stopPropagation();
 
+    // 关键：必须设置 dropEffect 才能正常显示拖拽效果
+    e.dataTransfer.dropEffect = "move";
+
     // 检查是否包含我们需要的数据类型
     const hasValidData =
       e.dataTransfer.types.includes(dataType) ||
       e.dataTransfer.types.includes("text/plain");
-    if (!hasValidData) return;
+    
+    // 如果没有有效数据，也不阻止事件传播，只是视觉效果会显示禁止
+    // 但为了让拖拽正常工作，必须 preventDefault
+    // 实际上，即使没有有效数据也应该 preventDefault 避免意外行为
 
     dragCounterRef.current++;
     if (dragCounterRef.current === 1) {

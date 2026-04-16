@@ -9,7 +9,7 @@ export const healthCheck = pgTable("health_check", {
 });
 
 export const projects = pgTable("projects", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
 	name: varchar({ length: 255 }).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -18,7 +18,7 @@ export const projects = pgTable("projects", {
 ]);
 
 export const assets = pgTable("assets", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
 	projectId: varchar("project_id", { length: 36 }).notNull(),
 	name: varchar({ length: 255 }).notNull(),
 	displayName: varchar("display_name", { length: 100 }),

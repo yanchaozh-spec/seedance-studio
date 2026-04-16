@@ -22,6 +22,13 @@ interface CreateTaskRequest {
   };
 }
 
+// Content item 类型定义
+type ContentItem =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "video_url"; video_url: { url: string } }
+  | { type: "audio_url"; audio_url: { url: string } };
+
 // 构建符合 Seedance 2.0 格式的提示词
 function buildPrompt(
   boxContent: string,
@@ -88,16 +95,16 @@ export async function POST(request: NextRequest) {
     const audioAssets = (assets || []).filter((a) => a.type === "audio");
 
     // 构建 content 数组 - 严格按照 Seedance 2.0 格式
-    const content: Array<{
-      type: "text" | "image_url";
-      text?: string;
-      image_url?: { url: string };
-    }> = [];
+    // 使用 role 字段区分系统指令和用户内容
+    const content: ContentItem[] = [];
 
     // 按顺序处理每个提示词框
     const sortedBoxes = prompt_boxes
       .filter((box) => box.content.trim())
       .sort((a, b) => a.order - b.order);
+
+    // 第一个框作为主体
+    let isFirstBox = true;
 
     for (const box of sortedBoxes) {
       // 找到该提示词框激活的素材
@@ -130,20 +137,40 @@ export async function POST(request: NextRequest) {
         box.keyframe_description
       );
 
-      // 添加文本内容
-      content.push({
-        type: "text",
-        text: promptText,
-      });
-
-      // 如果有图片素材，添加图片 URL（每个提示词框只添加一次）
-      if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+      // 第一个框：添加文本内容
+      if (isFirstBox) {
         content.push({
-          type: "image_url",
-          image_url: {
-            url: activatedAsset.url,
-          },
+          type: "text",
+          text: promptText,
         });
+
+        // 第一个框如果有图片素材，添加图片 URL
+        if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+          content.push({
+            type: "image_url",
+            image_url: {
+              url: activatedAsset.url,
+            },
+          });
+        }
+
+        isFirstBox = false;
+      } else {
+        // 后续框作为参考
+        content.push({
+          type: "text",
+          text: promptText,
+        });
+
+        // 如果有图片素材，添加图片 URL
+        if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+          content.push({
+            type: "image_url",
+            image_url: {
+              url: activatedAsset.url,
+            },
+          });
+        }
       }
     }
 
@@ -151,8 +178,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });
     }
 
-    // 构建请求参数 - 修复 first_frame_image 位置问题
-    // 注意：Seedance 2.0 API 的 first_frame_image 应该放在首帧位置，不是单独的字段
+    // 构建请求参数 - 严格按照 Seedance 2.0 官方格式
     const requestBody: Record<string, unknown> = {
       model: MODEL_ID,
       content,
@@ -162,15 +188,17 @@ export async function POST(request: NextRequest) {
       watermark: false,
     };
 
-    // 处理首帧图片 - 如果有图片或关键帧，作为首帧处理
-    // 注意：首帧应该已经在 content 数组的第一或第二个位置处理
-    // 这里只处理额外的首帧描述（如果有的话）
+    // 处理首帧描述（如果有）
     const keyframeDesc = prompt_boxes.find((box) => box.keyframe_description)?.keyframe_description;
     if (keyframeDesc && keyframeAssets.length > 0) {
-      // 如果有关键帧描述，添加到 content 中
-      const firstKeyframe = keyframeAssets[0];
-      // 在 content 开头插入首帧描述
       requestBody.first_frame_description = keyframeDesc;
+    }
+
+    // 处理首帧图片（如果有关键帧）
+    if (keyframeAssets.length > 0 && keyframeAssets[0]) {
+      // 注意：首帧图片应该在 content 数组的第一个 image_url 中已经添加
+      // 如果 API 需要单独的首帧字段，可以在这里添加
+      requestBody.first_frame_image = keyframeAssets[0].url;
     }
 
     console.log("Seedance API Request:", JSON.stringify(requestBody, null, 2));

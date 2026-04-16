@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, createContext, useContext, ReactNode, use } from "react";
+import { useEffect, useState, createContext, useContext, ReactNode, use, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,7 @@ interface DraggableAssetProps {
 
 function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   const handleDragStart = (e: React.DragEvent) => {
     // 开始拖拽时设置状态
@@ -60,6 +61,59 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify(asset));
     e.dataTransfer.setData("text/plain", JSON.stringify(asset));
+
+    // 设置自定义拖拽图片（使用缩略图）
+    if (asset.thumbnail_url && imageRef.current) {
+      // 创建临时 canvas 来绘制缩略图
+      const canvas = document.createElement("canvas");
+      canvas.width = 80;
+      canvas.height = 80;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        // 绘制背景
+        ctx.fillStyle = "#1f2937";
+        ctx.fillRect(0, 0, 80, 80);
+        // 绘制图片（模拟）
+        ctx.drawImage(imageRef.current, 0, 0, 80, 80);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const img = document.createElement("img");
+            img.onload = () => {
+              e.dataTransfer.setDragImage(img, 40, 40);
+              URL.revokeObjectURL(url);
+            };
+            img.src = url;
+          }
+        });
+      }
+    } else if (asset.type === "audio") {
+      // 音频使用图标作为拖拽图片
+      const canvas = document.createElement("canvas");
+      canvas.width = 80;
+      canvas.height = 80;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#1f2937";
+        ctx.fillRect(0, 0, 80, 80);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "40px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🎵", 40, 40);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const img = document.createElement("img");
+            img.onload = () => {
+              e.dataTransfer.setDragImage(img, 40, 40);
+              URL.revokeObjectURL(url);
+            };
+            img.src = url;
+          }
+        });
+      }
+    }
   };
 
   const handleDragEnd = () => {
@@ -81,6 +135,16 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
       onClick={handleClick}
       className="relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none"
     >
+      {/* 隐藏的图片元素用于拖拽 */}
+      {asset.thumbnail_url && (
+        <img
+          ref={imageRef}
+          src={asset.thumbnail_url}
+          alt=""
+          className="hidden"
+          crossOrigin="anonymous"
+        />
+      )}
       {asset.type === "image" ? (
         <div className="w-20 h-20">
           {asset.thumbnail_url ? (
@@ -236,7 +300,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [activeTab, setActiveTab] = useState<"materials" | "tasks">("materials");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
+  const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
   const [materials, setMaterials] = useState<Asset[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
@@ -412,31 +476,15 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           </div>
         </aside>
 
-        {/* 主内容区 */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        {/* 主内容区 + 右侧常驻面板 */}
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 overflow-auto">{children}</main>
 
-        {/* 右侧抽屉悬浮按钮 */}
-        <button
-          onClick={() => openDrawer("materials")}
-          className={cn(
-            "fixed right-0 top-1/2 -translate-y-1/2 z-40 p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-transform hover:bg-primary/90"
-          )}
-        >
-          <PanelRightOpen className="w-5 h-5" />
-        </button>
-
-        {/* 合并的抽屉（素材库 + 任务管理） */}
-        <Sheet open={rightDrawerOpen} onOpenChange={setRightDrawerOpen}>
-          <SheetContent className="w-80 sm:max-w-[400px] p-0" side="right">
-            <SheetHeader className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <SheetTitle>
-                  {activeTab === "materials" ? "素材库" : "任务管理"}
-                </SheetTitle>
-                {/* SheetContent 已有内置关闭按钮，无需重复添加 */}
-              </div>
-              {/* 标签页切换 */}
-              <div className="flex gap-2 mt-3">
+          {/* 右侧常驻面板（素材库 + 任务管理） */}
+          <aside className="w-80 border-l bg-card flex flex-col">
+            {/* 标签页切换 */}
+            <div className="p-4 border-b">
+              <div className="flex gap-2">
                 <Button
                   variant={activeTab === "materials" ? "default" : "outline"}
                   size="sm"
@@ -459,7 +507,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   任务管理
                 </Button>
               </div>
-            </SheetHeader>
+            </div>
+            
             <div className="flex-1 overflow-auto p-4">
               {/* 素材库内容 */}
               {activeTab === "materials" && (
@@ -589,8 +638,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                 </>
               )}
             </div>
-          </SheetContent>
-        </Sheet>
+          </aside>
+        </div>
 
         {/* 设置弹窗 */}
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
