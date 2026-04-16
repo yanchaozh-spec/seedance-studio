@@ -119,17 +119,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
       let header = `"${displayName}"@这张图片`;
 
-      // 如果绑定了音频，添加声线描述
-      if (firstActivatedAsset.bound_audio_id) {
+      // 根据素材类型决定显示内容
+      const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
+      
+      // 美术资产：添加声线描述
+      if (!isKeyframe && firstActivatedAsset.bound_audio_id) {
         const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
         if (boundAudio) {
           const audioName = boundAudio.display_name || boundAudio.name;
           header += `，声线为@${audioName}`;
         }
       }
-
-      // 如果是关键帧，添加关键帧描述
-      if (firstActivatedAsset.type === "keyframe" || firstActivatedAsset.is_keyframe) {
+      
+      // 关键帧：添加关键帧描述
+      if (isKeyframe) {
         const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
         if (keyframeDesc) {
           header += `，${keyframeDesc}`;
@@ -256,17 +259,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
         let header = `"${displayName}"@这张图片`;
 
-        // 如果绑定了音频，添加声线描述
-        if (firstActivatedAsset.bound_audio_id) {
+        // 根据素材类型决定显示内容
+        const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
+        
+        // 美术资产：添加声线描述
+        if (!isKeyframe && firstActivatedAsset.bound_audio_id) {
           const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
           if (boundAudio) {
             const audioName = boundAudio.display_name || boundAudio.name;
             header += `，声线为@${audioName}`;
           }
         }
-
-        // 如果是关键帧，添加关键帧描述
-        if (firstActivatedAsset.type === "keyframe" || firstActivatedAsset.is_keyframe) {
+        
+        // 关键帧：添加关键帧描述
+        if (isKeyframe) {
           const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
           if (keyframeDesc) {
             header += `，${keyframeDesc}`;

@@ -276,8 +276,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 音频参考（仅图片和关键帧显示） */}
-          {(asset.type === "image" || asset.type === "keyframe") && (
+          {/* 音频参考（仅美术资产显示） */}
+          {assetCategory === "image" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">音频参考</label>
@@ -363,8 +363,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 关键帧描述编辑 */}
-          {(asset.type === "keyframe" || asset.type === "image") && (
+          {/* 关键帧描述编辑（仅关键帧类型显示） */}
+          {assetCategory === "keyframe" && (
             <div className="space-y-3">
               <label className="text-sm font-medium">关键帧描述</label>
               <Input
@@ -380,7 +380,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                 <Scissors className="w-4 h-4 mr-2" />
                 保存描述
               </Button>
-              {asset.asset_category === "keyframe" && asset.keyframe_source_task_id && (
+              {asset.keyframe_source_task_id && (
                 <p className="text-xs text-muted-foreground">
                   来源任务: {asset.keyframe_source_task_id.slice(0, 8)}...
                 </p>

@@ -96,13 +96,15 @@ function buildContent(
       activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
     }
 
-    // 构建文本内容（包含素材引用和声线描述）
+    // 构建文本内容
     let textContent = box.content.trim();
+    const isKeyframe = activatedAsset?.asset_category === "keyframe";
+    
     if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
       const displayName = activatedAsset.display_name || activatedAsset.name;
       
-      // 关键帧特殊处理
-      if (activatedAsset.type === "keyframe" || activatedAsset.is_keyframe) {
+      if (isKeyframe) {
+        // 关键帧：添加关键帧描述
         const desc = box.keyframe_description || activatedAsset.keyframe_description || "";
         if (desc) {
           textContent = `视频首帧@"${displayName}"，${desc}，${textContent}`;
@@ -110,10 +112,9 @@ function buildContent(
           textContent = `视频首帧@"${displayName}"，${textContent}`;
         }
       } else {
-        // 普通图片处理
+        // 美术资产：添加声线描述
         let referenceText = `"${displayName}"@这张图片`;
         
-        // 如果绑定了音频，添加声线描述
         if (activatedAsset.bound_audio_id) {
           const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
           if (boundAudio) {
@@ -137,7 +138,7 @@ function buildContent(
       
       // 根据素材类型设置 role
       let role: "first_frame" | "reference_image" | undefined;
-      if (activatedAsset.type === "keyframe" || activatedAsset.is_keyframe) {
+      if (isKeyframe) {
         role = "first_frame";
       } else {
         role = "reference_image";
@@ -152,8 +153,8 @@ function buildContent(
       });
     }
 
-    // 如果绑定了音频，添加音频参考
-    if (activatedAsset && activatedAsset.bound_audio_id) {
+    // 美术资产：如果绑定了音频，添加音频参考
+    if (activatedAsset && !isKeyframe && activatedAsset.bound_audio_id) {
       const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
       if (boundAudio) {
         content.push({

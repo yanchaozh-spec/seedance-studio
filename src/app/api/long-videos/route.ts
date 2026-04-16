@@ -39,6 +39,7 @@ function buildPrompt(
     display_name: string;
     name: string;
     type: string;
+    asset_category?: string;
     bound_audio_id?: string;
     keyframe_description?: string;
   } | null,
@@ -48,9 +49,10 @@ function buildPrompt(
   if (!asset) return boxContent;
 
   const displayName = asset.display_name || asset.name;
+  const isKeyframe = asset.asset_category === "keyframe";
 
-  // 关键帧特殊处理
-  if (asset.type === "keyframe") {
+  if (isKeyframe) {
+    // 关键帧：添加关键帧描述
     const desc = keyframeDesc || asset.keyframe_description || "";
     if (desc) {
       return `视频首帧@"${displayName}"，${desc}，${boxContent}`;
@@ -58,10 +60,9 @@ function buildPrompt(
     return `视频首帧@"${displayName}"，${boxContent}`;
   }
 
-  // 普通图片处理
+  // 美术资产：添加声线描述
   let referenceText = `"${displayName}"@这张图片`;
 
-  // 如果绑定了音频，添加声线描述
   if (asset.bound_audio_id && audioAssets) {
     const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
     if (boundAudio) {

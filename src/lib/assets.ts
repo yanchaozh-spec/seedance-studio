@@ -14,6 +14,7 @@ export interface Asset {
   asset_category?: AssetCategory; // 'keyframe' | 'image'
   keyframe_description?: string;
   keyframe_source_task_id?: string;
+  bound_audio_id?: string; // 绑定的音频素材ID
   url: string;
   thumbnail_url?: string;
   size?: number;
