@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { use } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useDropZone } from "@/hooks/use-draggable";
-import { Plus, X, Image, Music, Play, Trash2, Copy, Film, Scissors, Clock, Volume2 } from "lucide-react";
+import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
-import { Task, getTasks, TaskStatus } from "@/lib/tasks";
+import { Task } from "@/lib/tasks";
 import { useProjectDetail } from "./layout";
 import { createTask } from "@/lib/tasks";
 import { toast } from "sonner";
@@ -31,13 +30,6 @@ interface GeneratorParams {
   resolution: string;
 }
 
-const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
-  queued: { label: "排队中", color: "text-muted-foreground" },
-  running: { label: "生成中", color: "text-blue-500" },
-  succeeded: { label: "已完成", color: "text-green-500" },
-  failed: { label: "失败", color: "text-red-500" },
-};
-
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const { selectedAssets, addAssetToPool, removeAssetFromPool, clearPool } = useProjectDetail();
@@ -47,33 +39,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [params_, setParams] = useState<GeneratorParams>({
     duration: 5,
     ratio: "16:9",
-    resolution: "10800p",
+    resolution: "720p",
   });
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-  const [tasksDrawerOpen, setTasksDrawerOpen] = useState(false);
-  const [materialsDrawerOpen, setMaterialsDrawerOpen] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loadingTasks, setLoadingTasks] = useState(false);
-
-  // 加载任务列表
-  const loadTasks = async () => {
-    try {
-      setLoadingTasks(true);
-      const data = await getTasks(resolvedParams.id);
-      setTasks(data);
-    } catch (error) {
-      console.error("加载任务失败:", error);
-    } finally {
-      setLoadingTasks(false);
-    }
-  };
-
-  useEffect(() => {
-    if (tasksDrawerOpen) {
-      loadTasks();
-    }
-  }, [tasksDrawerOpen, resolvedParams.id]);
 
   // 素材池拖放区域
   const { dropRef: poolDropRef, isOver: isPoolOver, dropZoneProps: poolDropZoneProps } = useDropZone({
@@ -234,9 +203,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       });
 
       toast.success("抽帧成功，已添加到素材库", { id: "extract-frame" });
-      
-      // 关闭抽屉并刷新
-      setTasksDrawerOpen(false);
     } catch (error) {
       console.error("抽帧失败:", error);
       toast.error("抽帧失败", { id: "extract-frame" });
@@ -326,21 +292,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">视频生成</h1>
-          <p className="text-muted-foreground mt-1">输入提示词，选择素材，生成视频</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setMaterialsDrawerOpen(true)}>
-            <Image className="w-4 h-4 mr-2" />
-            素材库
-          </Button>
-          <Button variant="outline" onClick={() => setTasksDrawerOpen(true)}>
-            <Film className="w-4 h-4 mr-2" />
-            任务管理
-          </Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">视频生成</h1>
+        <p className="text-muted-foreground mt-1">输入提示词，选择素材，生成视频</p>
       </div>
 
       {/* 提示词区域 */}
@@ -584,7 +538,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               <SelectContent>
                 <SelectItem value="16:9">16:9 横屏</SelectItem>
                 <SelectItem value="9:16">9:16 竖屏</SelectItem>
-                <SelectItem value="21:9">21:9 电影</SelectItem>
+                <SelectItem value="adaptive">自适应</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -599,9 +553,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="480p">480p</SelectItem>
                 <SelectItem value="720p">720p</SelectItem>
-                <SelectItem value="1080p">1080p</SelectItem>
-                <SelectItem value="1080p_16_9_fhd">1080p FHD</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -648,68 +601,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       )}
-
-      {/* 任务管理抽屉 */}
-      <Sheet open={tasksDrawerOpen} onOpenChange={setTasksDrawerOpen}>
-        <SheetContent className="w-80 sm:max-w-[400px] p-0" side="right">
-          <SheetHeader className="p-4 border-b">
-            <SheetTitle>任务管理</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-auto p-4">
-            {loadingTasks ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
-              </div>
-            ) : tasks.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Film className="w-12 h-12 mx-auto mb-3" />
-                <p>暂无任务</p>
-                <p className="text-sm">开始生成视频后将显示在这里</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tasks.map((task) => (
-                  <div key={task.id} className="bg-muted rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {task.id.slice(0, 8)}...
-                      </span>
-                      <span className={cn("text-xs font-medium", statusConfig[task.status]?.color)}>
-                        {statusConfig[task.status]?.label}
-                      </span>
-                    </div>
-                    {task.result?.video_url && task.status === "succeeded" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2"
-                        onClick={() => extractFrame(task, 0)}
-                      >
-                        <Scissors className="w-4 h-4" />
-                        抽帧到素材库
-                      </Button>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* 素材库抽屉触发按钮 */}
-      <button
-        onClick={() => setMaterialsDrawerOpen(!materialsDrawerOpen)}
-        className={cn(
-          "fixed right-0 top-1/2 -translate-y-1/2 z-40 p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-transform hover:bg-primary/90",
-          materialsDrawerOpen && "translate-x-[380px]"
-        )}
-      >
-        <Image className="w-5 h-5" />
-      </button>
     </div>
   );
 }

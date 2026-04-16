@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use } from "
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Sparkles, Zap, Scissors } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Sparkles, Zap, Scissors, Image, Music } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -13,10 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Asset, getAssets } from "@/lib/assets";
-import { Image, Music } from "lucide-react";
+import { Task, getTasks, TaskStatus } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
+import { formatDistanceToNow } from "date-fns";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -222,11 +223,14 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [materialsDrawerOpen, setMaterialsDrawerOpen] = useState(false);
+  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"materials" | "tasks">("materials");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
   const [materials, setMaterials] = useState<Asset[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -247,6 +251,28 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       router.push("/projects");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 加载任务列表
+  const loadTasks = async () => {
+    try {
+      setLoadingTasks(true);
+      const data = await getTasks(resolvedParams.id);
+      setTasks(data);
+    } catch (error) {
+      console.error("加载任务失败:", error);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  // 打开右侧抽屉
+  const openDrawer = (tab: "materials" | "tasks") => {
+    setActiveTab(tab);
+    setRightDrawerOpen(true);
+    if (tab === "tasks") {
+      loadTasks();
     }
   };
 
@@ -366,97 +392,190 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         {/* 主内容区 */}
         <main className="flex-1 overflow-auto">{children}</main>
 
-        {/* 素材库抽屉触发按钮 */}
-        <button
-          onClick={() => setMaterialsDrawerOpen(!materialsDrawerOpen)}
-          className={cn(
-            "fixed right-0 top-1/2 -translate-y-1/2 z-40 p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-transform hover:bg-primary/90",
-            materialsDrawerOpen && "translate-x-[380px]"
-          )}
-        >
-          {materialsDrawerOpen ? (
-            <PanelRightClose className="w-5 h-5" />
-          ) : (
-            <PanelRightOpen className="w-5 h-5" />
-          )}
-        </button>
+        {/* 右侧抽屉悬浮按钮 */}
+        <div className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1">
+          <button
+            onClick={() => openDrawer("materials")}
+            className={cn(
+              "p-2 bg-primary text-primary-foreground rounded-l-lg shadow-lg transition-all hover:bg-primary/90",
+              rightDrawerOpen && activeTab === "materials" && "translate-x-[380px]"
+            )}
+          >
+            <Image className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => openDrawer("tasks")}
+            className={cn(
+              "p-2 bg-card border text-foreground rounded-l-lg shadow-lg transition-all hover:bg-accent",
+              rightDrawerOpen && activeTab === "tasks" && "translate-x-[380px]"
+            )}
+          >
+            <Video className="w-5 h-5" />
+          </button>
+        </div>
 
-        {/* 素材库抽屉 */}
-        <Sheet open={materialsDrawerOpen} onOpenChange={setMaterialsDrawerOpen}>
+        {/* 合并的抽屉（素材库 + 任务管理） */}
+        <Sheet open={rightDrawerOpen} onOpenChange={setRightDrawerOpen}>
           <SheetContent className="w-80 sm:max-w-[400px] p-0" side="right">
             <SheetHeader className="p-4 border-b">
               <div className="flex items-center justify-between">
-                <SheetTitle>素材库</SheetTitle>
+                <SheetTitle>素材库与任务</SheetTitle>
+              </div>
+              {/* 标签页切换 */}
+              <div className="flex gap-2 mt-3">
                 <Button
-                  variant="ghost"
+                  variant={activeTab === "materials" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => router.push(`/projects/${resolvedParams.id}/materials`)}
+                  className="flex-1 gap-1.5"
+                  onClick={() => setActiveTab("materials")}
                 >
-                  完整素材库 →
+                  <FolderOpen className="w-4 h-4" />
+                  素材库
+                </Button>
+                <Button
+                  variant={activeTab === "tasks" ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1 gap-1.5"
+                  onClick={() => {
+                    setActiveTab("tasks");
+                    loadTasks();
+                  }}
+                >
+                  <ListTodo className="w-4 h-4" />
+                  任务
                 </Button>
               </div>
             </SheetHeader>
             <div className="flex-1 overflow-auto p-4">
-              {imageMaterials.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <Image className="w-4 h-4" />
-                    图片素材 ({imageMaterials.length})
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {imageMaterials.map((asset) => (
-                      <DraggableAsset
-                        key={asset.id}
-                        asset={asset}
-                        onDragStart={() => addAssetToPool(asset)}
-                      />
-                    ))}
-                  </div>
-                </div>
+              {/* 素材库内容 */}
+              {activeTab === "materials" && (
+                <>
+                  {imageMaterials.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Image className="w-4 h-4" />
+                        图片素材 ({imageMaterials.length})
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {imageMaterials.map((asset) => (
+                          <DraggableAsset
+                            key={asset.id}
+                            asset={asset}
+                            onDragStart={() => addAssetToPool(asset)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {keyframeMaterials.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Scissors className="w-4 h-4" />
+                        关键帧 ({keyframeMaterials.length})
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {keyframeMaterials.map((asset) => (
+                          <DraggableAsset
+                            key={asset.id}
+                            asset={asset}
+                            onDragStart={() => addAssetToPool(asset)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {audioMaterials.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Music className="w-4 h-4" />
+                        音频素材 ({audioMaterials.length})
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {audioMaterials.map((asset) => (
+                          <DraggableAsset
+                            key={asset.id}
+                            asset={asset}
+                            onDragStart={() => addAssetToPool(asset)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {materials.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FolderOpen className="w-12 h-12 mx-auto mb-3" />
+                      <p>暂无素材</p>
+                      <p className="text-sm">请先上传素材</p>
+                    </div>
+                  )}
+                </>
               )}
 
-              {keyframeMaterials.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <Scissors className="w-4 h-4" />
-                    关键帧 ({keyframeMaterials.length})
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {keyframeMaterials.map((asset) => (
-                      <DraggableAsset
-                        key={asset.id}
-                        asset={asset}
-                        onDragStart={() => addAssetToPool(asset)}
-                      />
-                    ))}
+              {/* 任务管理内容 */}
+              {activeTab === "tasks" && (
+                <>
+                  <div className="mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
+                    >
+                      完整任务管理 →
+                    </Button>
                   </div>
-                </div>
-              )}
-
-              {audioMaterials.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <Music className="w-4 h-4" />
-                    音频素材 ({audioMaterials.length})
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {audioMaterials.map((asset) => (
-                      <DraggableAsset
-                        key={asset.id}
-                        asset={asset}
-                        onDragStart={() => addAssetToPool(asset)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {materials.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FolderOpen className="w-12 h-12 mx-auto mb-3" />
-                  <p>暂无素材</p>
-                  <p className="text-sm">请先上传素材</p>
-                </div>
+                  {loadingTasks ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+                    </div>
+                  ) : tasks.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Video className="w-12 h-12 mx-auto mb-3" />
+                      <p>暂无任务</p>
+                      <p className="text-sm">开始生成视频后将显示在这里</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {tasks.slice(0, 10).map((task) => (
+                        <div key={task.id} className="bg-muted rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {task.id.slice(0, 8)}...
+                            </span>
+                            <span className={cn("text-xs font-medium", 
+                              task.status === "succeeded" ? "text-green-500" :
+                              task.status === "running" ? "text-blue-500" :
+                              task.status === "failed" ? "text-red-500" : "text-muted-foreground"
+                            )}>
+                              {task.status === "succeeded" ? "已完成" :
+                               task.status === "running" ? "生成中" :
+                               task.status === "failed" ? "失败" : "排队中"}
+                            </span>
+                          </div>
+                          {task.result?.video_url && task.status === "succeeded" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full gap-2"
+                              onClick={() => {
+                                // 抽帧功能由视频生成页面处理
+                              }}
+                            >
+                              <Scissors className="w-4 h-4" />
+                              抽帧
+                            </Button>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </SheetContent>
