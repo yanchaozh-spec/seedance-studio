@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
     const body: CreateTaskRequest = await request.json();
     const { project_id, prompt_boxes, selected_assets, params } = body;
 
-    // 获取 ARK API Key
-    const apiKey = process.env.ARK_API_KEY;
+    // 获取 ARK API Key - 优先从请求头获取，其次从环境变量获取
+    const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "ARK API Key not configured" }, { status: 500 });
     }

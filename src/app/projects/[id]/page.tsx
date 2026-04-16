@@ -14,6 +14,7 @@ import { Asset } from "@/lib/assets";
 import { Task } from "@/lib/tasks";
 import { useProjectDetail } from "./layout";
 import { createTask } from "@/lib/tasks";
+import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
@@ -43,6 +44,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const isDragging = useIsDragging();
   const setOverDropZone = useDragStore((state) => state.setOverDropZone);
   const isOverDropZone = useDragStore((state) => state.isOverDropZone);
+  const { arkApiKey } = useSettingsStore();
   const poolDropRef = useRef<HTMLDivElement>(null);
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
@@ -328,7 +330,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         })),
         selected_assets: selectedAssets.map((a) => a.id),
         params: params_,
-      });
+      }, arkApiKey);
 
       toast.success("任务已创建");
       clearPool();

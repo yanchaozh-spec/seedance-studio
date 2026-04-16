@@ -61,10 +61,15 @@ export async function createTask(task: {
   prompt_boxes: PromptBox[];
   selected_assets: string[];
   params: TaskParams;
-}): Promise<{ id: string }> {
+}, apiKey?: string): Promise<{ id: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-ark-api-key"] = apiKey;
+  }
+  
   const response = await fetch("/api/seedance/tasks", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(task),
   });
   if (!response.ok) {
