@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDropZone } from "@/hooks/use-draggable";
+import { useIsDragging } from "@/lib/drag-store";
 import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
@@ -33,6 +34,7 @@ interface GeneratorParams {
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const { selectedAssets, addAssetToPool, removeAssetFromPool, clearPool } = useProjectDetail();
+  const isDragging = useIsDragging();
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
   ]);
@@ -348,9 +350,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* 素材池 */}
-      <div className="bg-card border rounded-lg p-5 mb-6">
+      <div className={cn(
+        "bg-card border rounded-lg p-5 mb-6 transition-all duration-200",
+        isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+      )}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">素材池</h2>
+          <h2 className="text-lg font-medium flex items-center gap-2">
+            素材池
+            {isDragging && (
+              <span className="text-xs text-primary animate-pulse">拖拽中...</span>
+            )}
+          </h2>
           {selectedAssets.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearPool}>
               <Trash2 className="w-4 h-4 mr-2" />
@@ -364,7 +374,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           {...poolDropZoneProps}
           className={cn(
             "min-h-[100px] border-2 border-dashed rounded-lg p-4 transition-colors",
-            isPoolOver ? "border-primary bg-primary/5" : "border-muted-foreground/20"
+            isPoolOver || isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/20"
           )}
         >
           {selectedAssets.length === 0 ? (

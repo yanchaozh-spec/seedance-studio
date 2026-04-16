@@ -17,6 +17,7 @@ import { Task, getTasks, TaskStatus } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
+import { useDragStore } from "@/lib/drag-store";
 import { formatDistanceToNow } from "date-fns";
 
 interface ProjectDetailContextType {
@@ -44,22 +45,25 @@ export const useProjectDetail = () => useContext(ProjectDetailContext);
 interface DraggableAssetProps {
   asset: Asset;
   onDragStart?: (asset: Asset) => void;
+  onDragStarted?: () => void;
   showRemove?: boolean;
   onRemove?: (assetId: string) => void;
 }
 
-function DraggableAsset({ asset, onDragStart, showRemove, onRemove }: DraggableAssetProps) {
-  const [isDragging, setIsDragging] = useState(false);
+function DraggableAsset({ asset, onDragStart, onDragStarted, showRemove, onRemove }: DraggableAssetProps) {
+  const setDragging = useDragStore((state) => state.setDragging);
 
   const handleDragStart = (e: React.DragEvent) => {
-    setIsDragging(true);
+    setDragging(true, asset.id);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify(asset));
     e.dataTransfer.setData("text/plain", JSON.stringify(asset));
+    onDragStart?.(asset);
+    onDragStarted?.();
   };
 
   const handleDragEnd = () => {
-    setIsDragging(false);
+    setDragging(false);
   };
 
   return (
@@ -67,10 +71,7 @@ function DraggableAsset({ asset, onDragStart, showRemove, onRemove }: DraggableA
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      className={cn(
-        "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
-        isDragging && "opacity-50"
-      )}
+      className="relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none"
     >
       {asset.type === "image" ? (
         <div className="w-20 h-20">
@@ -458,6 +459,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             key={asset.id}
                             asset={asset}
                             onDragStart={() => addAssetToPool(asset)}
+                            onDragStarted={closeDrawer}
                           />
                         ))}
                       </div>
@@ -476,6 +478,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             key={asset.id}
                             asset={asset}
                             onDragStart={() => addAssetToPool(asset)}
+                            onDragStarted={closeDrawer}
                           />
                         ))}
                       </div>
@@ -494,6 +497,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             key={asset.id}
                             asset={asset}
                             onDragStart={() => addAssetToPool(asset)}
+                            onDragStarted={closeDrawer}
                           />
                         ))}
                       </div>
