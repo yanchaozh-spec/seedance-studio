@@ -1,4 +1,4 @@
-import { pgTable, serial, timestamp, index, varchar, foreignKey, text, integer, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, serial, timestamp, index, varchar, foreignKey, text, integer, jsonb, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -101,8 +101,17 @@ export const videoSegments = pgTable("video_segments", {
 	status: varchar({ length: 20 }).default('pending').notNull(),
 	videoUrl: text("video_url"),
 	lastFrameUrl: text("last_frame_url"),
+	// 每段独立的提示词
 	promptContent: jsonb("prompt_content"),
+	// 每段独立的生成参数
+	segmentDuration: integer("segment_duration").default(5),
+	segmentRatio: varchar("segment_ratio", { length: 10 }).default("16:9"),
+	segmentResolution: varchar("segment_resolution", { length: 10 }).default("720p"),
+	segmentGenerateAudio: boolean("segment_generate_audio").default(true),
+	// 首帧 URL（由上一段尾帧传入）
 	firstFrameUrl: text("first_frame_url"),
+	// 关联的素材 ID
+	assetIds: jsonb("asset_ids").default([]),
 	errorMessage: text("error_message"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),

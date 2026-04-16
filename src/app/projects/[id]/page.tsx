@@ -439,10 +439,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         progress: 0,
         total_segments: result.total_segments,
         completed_segments: 0,
-        target_duration: result.target_duration,
-        prompts: [],
-        selected_assets: [],
-        params: { ratio: params_.ratio, resolution: params_.resolution, generate_audio: true },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -452,11 +448,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // 开始轮询
       longVideoRef.current = setInterval(async () => {
         try {
-          const video = await getLongVideo(result.id);
-          if (video) {
+          const videoData = await getLongVideo(result.id);
+          if (videoData) {
+            const video = { ...videoData.long_video, segments: videoData.segments };
             setActiveLongVideo(video);
 
-            if (video.status === "succeeded") {
+            if (video.status === "completed") {
               toast.success("长视频生成完成！");
               setLongVideoPolling(false);
               if (longVideoRef.current) {
@@ -735,7 +732,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 {activeLongVideo.status === "pending" && "等待开始..."}
                 {activeLongVideo.status === "generating" && "正在生成视频段..."}
                 {activeLongVideo.status === "merging" && "正在拼接视频..."}
-                {activeLongVideo.status === "succeeded" && "生成完成！"}
+                {activeLongVideo.status === "completed" && "生成完成！"}
                 {activeLongVideo.status === "failed" && `失败: ${activeLongVideo.error_message}`}
               </span>
               <span className="font-medium">{activeLongVideo.progress}%</span>
@@ -758,7 +755,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 key={segment.id}
                 className={cn(
                   "text-xs p-2 rounded border text-center",
-                  segment.status === "succeeded" && "bg-green-100 border-green-300 text-green-700",
+                  (segment.status === "confirmed" || segment.status === "waiting_confirm") && "bg-green-100 border-green-300 text-green-700",
                   segment.status === "running" && "bg-blue-100 border-blue-300 text-blue-700 animate-pulse",
                   segment.status === "queued" && "bg-yellow-100 border-yellow-300 text-yellow-700",
                   segment.status === "pending" && "bg-gray-100 border-gray-300 text-gray-500",
@@ -768,7 +765,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 段 {segment.segment_index + 1}
                 <br />
                 <span className="text-[10px]">
-                  {segment.status === "succeeded" && "完成"}
+                  {(segment.status === "confirmed" || segment.status === "waiting_confirm") && "完成"}
                   {segment.status === "running" && "生成中"}
                   {segment.status === "queued" && "排队"}
                   {segment.status === "pending" && "等待"}
@@ -779,7 +776,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* 最终视频预览 */}
-          {activeLongVideo.status === "succeeded" && activeLongVideo.final_video_url && (
+          {activeLongVideo.status === "completed" && activeLongVideo.final_video_url && (
             <div className="mt-4 pt-4 border-t">
               <h3 className="text-sm font-medium mb-2">最终视频</h3>
               <video
