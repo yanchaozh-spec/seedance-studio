@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     // 更新长视频进度
     const progress = totalSegments > 0 ? Math.round((newCompletedSegments / totalSegments) * 100) : 0;
-    let updateData: Record<string, unknown> = {
+    const updateData: Record<string, unknown> = {
       completed_segments: newCompletedSegments,
       progress,
       updated_at: new Date().toISOString(),

@@ -1,6 +1,7 @@
 // 任务相关的 API 调用
 
-export type TaskStatus = "queued" | "running" | "succeeded" | "failed";
+// 任务状态类型（包含 pending 状态）
+export type TaskStatus = "pending" | "queued" | "running" | "succeeded" | "failed";
 
 export interface PromptBox {
   id: string;
@@ -20,6 +21,7 @@ export interface TaskResult {
   video_url: string;
   resolution: string;
   duration: number;
+  last_frame_url?: string;
 }
 
 export interface Task {
@@ -32,6 +34,15 @@ export interface Task {
   params: TaskParams;
   result?: TaskResult;
   error_message?: string;
+  // 新增字段：任务追踪和统计
+  task_id_external?: string; // 外部任务ID（用于轮询）
+  completion_tokens?: number; // 消耗的 Token 数
+  total_tokens?: number; // 总 Token 数
+  queued_at?: string; // 进入队列时间
+  started_at?: string; // 开始执行时间
+  completed_at?: string; // 完成时间
+  queue_duration?: number; // 排队时长（秒）
+  generation_duration?: number; // 生成时长（秒）
   created_at: string;
   updated_at: string;
 }

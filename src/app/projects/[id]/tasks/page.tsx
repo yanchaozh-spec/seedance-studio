@@ -37,15 +37,24 @@ import {
   Image as ImageIcon,
   Music,
   AlertCircle,
+  Coins,
+  Sparkles,
+  Play,
 } from "lucide-react";
 import { Task, getTasks, deleteTask, TaskStatus } from "@/lib/tasks";
 import { getAssets, Asset } from "@/lib/assets";
-import { formatDistanceToNow } from "date-fns";
+import { TaskCard, TaskList } from "@/components/tasks/TaskCard";
+import { formatDistanceToNow, formatDuration } from "date-fns";
+import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatSeconds } from "@/components/tasks/TaskCard";
+
+// 格式化时长
 
 const statusConfig: Record<TaskStatus, { icon: React.ElementType; label: string; color: string }> = {
-  queued: { icon: Clock, label: "排队中", color: "text-muted-foreground" },
+  pending: { icon: Clock, label: "等待中", color: "text-gray-500" },
+  queued: { icon: Loader2, label: "排队中", color: "text-yellow-500" },
   running: { icon: Loader2, label: "生成中", color: "text-blue-500" },
   succeeded: { icon: CheckCircle, label: "已完成", color: "text-green-500" },
   failed: { icon: XCircle, label: "失败", color: "text-red-500" },
@@ -118,7 +127,7 @@ function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDe
             <div className={cn("flex items-center gap-2", statusConfig[task.status].color)}>
               {(() => {
                 const Icon = statusConfig[task.status].icon;
-                return task.status === "running" ? (
+                return task.status === "running" || task.status === "queued" ? (
                   <Icon className="w-5 h-5 animate-spin" />
                 ) : (
                   <Icon className="w-5 h-5" />
@@ -127,9 +136,70 @@ function TaskDetailSheet({ task, assets, onClose, onRollback, onDelete }: TaskDe
               <span className="font-medium">{statusConfig[task.status].label}</span>
             </div>
             <span className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+              {formatDistanceToNow(new Date(task.created_at), { addSuffix: true, locale: zhCN })}
             </span>
           </div>
+
+          {/* Token 消耗信息 */}
+          {(task.completion_tokens || task.total_tokens) && (
+            <div className="flex items-center gap-4 p-3 bg-yellow-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-yellow-600" />
+                <span className="text-sm font-medium">Token 消耗</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                {task.completion_tokens && (
+                  <div className="flex items-center gap-1">
+                    <Coins className="w-4 h-4 text-yellow-500" />
+                    <span className="text-yellow-700 font-medium">
+                      {task.completion_tokens.toLocaleString()}
+                    </span>
+                    <span className="text-yellow-600">tokens</span>
+                  </div>
+                )}
+                {task.total_tokens && (
+                  <span className="text-yellow-600">
+                    总计: {task.total_tokens.toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 耗时统计 */}
+          {(task.queue_duration || task.generation_duration) && (
+            <div className="grid grid-cols-3 gap-3">
+              {task.queue_duration && (
+                <div className="bg-muted rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-yellow-600 mb-1">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-xs">排队时长</span>
+                  </div>
+                  <p className="font-medium">{formatSeconds(task.queue_duration)}</p>
+                </div>
+              )}
+              {task.generation_duration && (
+                <div className="bg-muted rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
+                    <Play className="w-4 h-4" />
+                    <span className="text-xs">生成时长</span>
+                  </div>
+                  <p className="font-medium">{formatSeconds(task.generation_duration)}</p>
+                </div>
+              )}
+              {(task.queue_duration || task.generation_duration) && (
+                <div className="bg-muted rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-green-600 mb-1">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-xs">总计</span>
+                  </div>
+                  <p className="font-medium">
+                    {formatSeconds((task.queue_duration || 0) + (task.generation_duration || 0))}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 视频播放器 */}
           {task.status === "succeeded" && task.result?.video_url && (
@@ -292,6 +362,37 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     loadData();
   }, [resolvedParams.id]);
 
+  // 轮询运行中的任务状态
+  useEffect(() => {
+    const runningTasks = tasks.filter(
+      (t) => t.status === "pending" || t.status === "queued" || t.status === "running"
+    );
+    
+    if (runningTasks.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      for (const task of runningTasks) {
+        try {
+          const response = await fetch(`/api/tasks/${task.id}/poll`);
+          if (response.ok) {
+            const updatedTask = await response.json();
+            setTasks((prev) =>
+              prev.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
+            );
+            // 如果选中任务的详情也需要更新
+            if (selectedTask?.id === task.id) {
+              setSelectedTask((prev) => (prev ? { ...prev, ...updatedTask } : null));
+            }
+          }
+        } catch (error) {
+          console.error(`轮询任务 ${task.id} 失败:`, error);
+        }
+      }
+    }, 3000); // 每3秒轮询一次
+
+    return () => clearInterval(pollInterval);
+  }, [tasks, selectedTask]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -359,6 +460,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="pending">等待中</SelectItem>
               <SelectItem value="queued">排队中</SelectItem>
               <SelectItem value="running">生成中</SelectItem>
               <SelectItem value="succeeded">已完成</SelectItem>
@@ -383,61 +485,79 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             <p className="text-muted-foreground">在视频生成页面创建任务</p>
           </div>
         ) : (
-          <div className="bg-card border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr className="text-left text-sm">
-                  <th className="px-4 py-3 font-medium">任务ID</th>
-                  <th className="px-4 py-3 font-medium">状态</th>
-                  <th className="px-4 py-3 font-medium">进度</th>
-                  <th className="px-4 py-3 font-medium">时间</th>
-                  <th className="px-4 py-3 font-medium w-12"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredTasks.map((task) => (
-                  <tr
-                    key={task.id}
-                    className="hover:bg-muted/30 cursor-pointer transition-colors"
-                    onClick={() => setSelectedTask(task)}
-                  >
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm">{task.id.slice(0, 20)}...</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className={cn("flex items-center gap-2", statusConfig[task.status].color)}>
-                        {(() => {
-                          const Icon = statusConfig[task.status].icon;
-                          return task.status === "running" ? (
-                            <Icon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Icon className="w-4 h-4" />
-                          );
-                        })()}
-                        <span className="text-sm">{statusConfig[task.status].label}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {task.status === "running" ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-500 transition-all"
-                              style={{ width: `${task.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-muted-foreground">{task.progress}%</span>
+          <div className="space-y-4">
+            {filteredTasks.map((task) => (
+              <div key={task.id} className="bg-card border rounded-lg overflow-hidden">
+                <div
+                  className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => setSelectedTask(task)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-mono text-sm">{task.id.slice(0, 20)}...</span>
+                        <div className={cn("flex items-center gap-1", statusConfig[task.status].color)}>
+                          {(() => {
+                            const Icon = statusConfig[task.status].icon;
+                            return task.status === "running" ? (
+                              <Icon className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Icon className="w-4 h-4" />
+                            );
+                          })()}
+                          <span className="text-sm">{statusConfig[task.status].label}</span>
                         </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
+                        {/* Token 消耗 */}
+                        {task.completion_tokens && (
+                          <div className="flex items-center gap-1 text-xs text-yellow-600">
+                            <Sparkles className="w-3 h-3" />
+                            <span>{task.completion_tokens.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {/* 耗时 */}
+                        {(task.queue_duration || task.generation_duration) && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {task.queue_duration && (
+                              <>
+                                <Clock className="w-3 h-3" />
+                                <span>排队 {formatSeconds(task.queue_duration)}</span>
+                              </>
+                            )}
+                            {task.generation_duration && (
+                              <>
+                                <Play className="w-3 h-3" />
+                                <span>生成 {formatSeconds(task.generation_duration)}</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>
+                          创建: {formatDistanceToNow(new Date(task.created_at), { addSuffix: true, locale: zhCN })}
+                        </span>
+                        {task.completed_at && (
+                          <span>
+                            完成: {formatDistanceToNow(new Date(task.completed_at), { addSuffix: true, locale: zhCN })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* 操作菜单 */}
+                    <div className="flex items-center gap-1">
+                      {task.status === "succeeded" && task.result?.video_url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTask(task);
+                          }}
+                        >
+                          <Play className="w-4 h-4" />
+                        </Button>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon">
@@ -465,11 +585,33 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                  {/* 进度条 */}
+                  {task.status === "running" && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">生成进度</span>
+                        <span>{task.progress || 0}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 transition-all"
+                          style={{ width: `${task.progress || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {/* 错误信息 */}
+                  {task.status === "failed" && task.error_message && (
+                    <div className="mt-2 flex items-start gap-2 text-xs text-red-600 bg-red-50 rounded p-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{task.error_message}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

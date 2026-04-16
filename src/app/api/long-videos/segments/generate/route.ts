@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 如果有上一段尾帧，设置为当前段的首帧
-    let firstFrame = first_frame_url || segment.first_frame_url;
+    const firstFrame = first_frame_url || segment.first_frame_url;
 
     // 构建 content 数组
     const content: ContentItem[] = [];
