@@ -674,7 +674,18 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           asset={selectedDetailAsset}
           allAssets={materials}
           onClose={() => setSelectedDetailAsset(null)}
-          onUpdate={() => {
+          onUpdate={(updatedAsset) => {
+            if (updatedAsset) {
+              // 更新 materials 中的素材
+              setMaterials((prev) =>
+                prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
+              );
+              // 更新 selectedAssets 中的素材
+              setSelectedAssets((prev) =>
+                prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
+              );
+            }
+            // 同时刷新项目数据确保同步
             loadProject();
           }}
         />

@@ -728,9 +728,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         asset={selectedDetailAsset}
         allAssets={selectedAssets}
         onClose={() => setSelectedDetailAsset(null)}
-        onUpdate={() => {
-          // 刷新素材池数据 - 由于使用的是本地状态，需要手动触发更新
-          // 这里可以添加额外的刷新逻辑
+        onUpdate={(updatedAsset) => {
+          if (updatedAsset) {
+            setSelectedAssets((prev) =>
+              prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
+            );
+          }
         }}
       />
     </div>

@@ -291,7 +291,15 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
         asset={selectedAsset}
         allAssets={assets}
         onClose={() => setSelectedAsset(null)}
-        onUpdate={loadAssets}
+        onUpdate={(updatedAsset) => {
+          if (updatedAsset) {
+            setAssets((prev) =>
+              prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
+            );
+          }
+          // 同时刷新确保同步
+          loadAssets();
+        }}
       />
     </div>
   );

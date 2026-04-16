@@ -27,7 +27,7 @@ interface AssetDetailDialogProps {
   asset: Asset | null;
   allAssets: Asset[];
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate: (updatedAsset?: Asset) => void;
 }
 
 export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: AssetDetailDialogProps) {
@@ -37,13 +37,15 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
   const [displayName, setDisplayName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [assetCategory, setAssetCategory] = useState<"keyframe" | "image">("image");
+  const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
 
-  const boundAudio = asset?.bound_audio_id 
-    ? allAssets.find((a) => a.id === asset.bound_audio_id) 
+  const boundAudio = currentAsset?.bound_audio_id 
+    ? allAssets.find((a) => a.id === currentAsset.bound_audio_id) 
     : null;
 
   useEffect(() => {
     if (asset) {
+      setCurrentAsset(asset);
       setKeyframeDescription(asset.keyframe_description || "");
       setDisplayName(asset.display_name || asset.name);
       setAssetCategory(asset.asset_category || "image");
@@ -108,10 +110,19 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       if (!createResponse.ok) throw new Error("创建素材失败");
       const audioAsset = await createResponse.json();
 
-      await bindAudioToImage(asset.id, audioAsset.id);
+      // 绑定音频并获取更新后的素材
+      const bindResponse = await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bound_audio_id: audioAsset.id }),
+      });
+      
+      if (!bindResponse.ok) throw new Error("绑定失败");
+      const updatedAsset = await bindResponse.json();
       
       toast.success("音频上传并绑定成功");
-      onUpdate();
+      onUpdate(updatedAsset);
+      setCurrentAsset(updatedAsset);
       onClose();
     } catch {
       toast.error("上传失败");
@@ -160,9 +171,18 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
     if (!asset) return;
     try {
       setBinding(true);
-      await unbindAudio(asset.id);
+      const response = await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bound_audio_id: null }),
+      });
+      
+      if (!response.ok) throw new Error("解除绑定失败");
+      const updatedAsset = await response.json();
+      
       toast.success("已解除绑定");
-      onUpdate();
+      onUpdate(updatedAsset);
+      setCurrentAsset(updatedAsset);
       onClose();
     } catch {
       toast.error("解除绑定失败");
