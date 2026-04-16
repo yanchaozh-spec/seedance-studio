@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -541,14 +541,14 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {/* 任务管理内容 */}
               {activeTab === "tasks" && (
                 <>
-                  <div className="mb-4">
+                  <div className="mb-4 flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full"
+                      className="flex-1"
                       onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
                     >
-                      完整任务管理 →
+                      完整任务管理
                     </Button>
                   </div>
                   {loadingTasks ? (
@@ -579,24 +579,82 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                task.status === "failed" ? "失败" : "排队中"}
                             </span>
                           </div>
-                          {task.result?.video_url && task.status === "succeeded" && (
+                          
+                          {/* 操作按钮 */}
+                          {task.status === "succeeded" && task.result?.video_url && (
+                            <div className="flex gap-2 mb-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 gap-1 text-xs h-7"
+                                onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
+                              >
+                                <Eye className="w-3 h-3" />
+                                预览
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 gap-1 text-xs h-7"
+                                onClick={() => {
+                                  // 打开新标签页下载
+                                  const a = document.createElement("a");
+                                  a.href = task.result?.video_url || "";
+                                  a.download = `video-${task.id}.mp4`;
+                                  a.click();
+                                }}
+                              >
+                                <Download className="w-3 h-3" />
+                                下载
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {/* 抽帧按钮 */}
+                          {task.status === "succeeded" && task.result?.video_url && (
                             <Button
-                              variant="outline"
+                              variant="secondary"
                               size="sm"
-                              className="w-full gap-2"
-                              onClick={() => {
-                                // 抽帧功能由视频生成页面处理
-                              }}
+                              className="w-full gap-1 text-xs h-7"
+                              onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
                             >
-                              <Scissors className="w-4 h-4" />
-                              抽帧
+                              <Camera className="w-3 h-3" />
+                              抽帧保存
                             </Button>
                           )}
+                          
+                          {/* 生成中/失败状态 */}
+                          {task.status === "running" && (
+                            <div className="w-full h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-blue-500 transition-all"
+                                style={{ width: `${task.progress || 0}%` }}
+                              />
+                            </div>
+                          )}
+                          
+                          {task.status === "failed" && task.error_message && (
+                            <p className="text-xs text-red-500 mt-1 truncate">
+                              {task.error_message}
+                            </p>
+                          )}
+                          
                           <p className="text-xs text-muted-foreground mt-2">
                             {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
                           </p>
                         </div>
                       ))}
+                      
+                      {tasks.length > 10 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
+                        >
+                          查看全部 {tasks.length} 个任务 →
+                        </Button>
+                      )}
                     </div>
                   )}
                 </>

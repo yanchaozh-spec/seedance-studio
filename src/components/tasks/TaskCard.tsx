@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Play, Pause, RotateCcw, Trash2, Eye, Download, AlertCircle,
-  Clock, CheckCircle, XCircle, Loader2, Coins, Sparkles
+  Clock, CheckCircle, XCircle, Loader2, Coins, Sparkles, Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Task, TaskStatus } from "@/lib/tasks";
@@ -71,6 +71,7 @@ interface TaskCardProps {
   task: Task;
   onPreview?: (task: Task) => void;
   onDownload?: (task: Task) => void;
+  onExtractFrame?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onRegenerate?: (task: Task) => void;
   showDetails?: boolean;
@@ -82,6 +83,7 @@ export function TaskCard({
   task,
   onPreview,
   onDownload,
+  onExtractFrame,
   onDelete,
   onRegenerate,
   showDetails = true,
@@ -132,6 +134,7 @@ export function TaskCard({
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => onPreview(task)}
+                    title="预览"
                   >
                     <Eye className="w-4 h-4" />
                   </Button>
@@ -142,8 +145,20 @@ export function TaskCard({
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => onDownload(task)}
+                    title="下载"
                   >
                     <Download className="w-4 h-4" />
+                  </Button>
+                )}
+                {onExtractFrame && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onExtractFrame(task)}
+                    title="抽帧保存到素材库"
+                  >
+                    <Camera className="w-4 h-4" />
                   </Button>
                 )}
               </>
