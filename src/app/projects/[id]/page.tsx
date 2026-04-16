@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDropZone } from "@/hooks/use-draggable";
-import { useIsDragging } from "@/lib/drag-store";
+import { useDragStore, useIsDragging } from "@/lib/drag-store";
 import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
@@ -40,6 +40,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const resolvedParams = use(params);
   const { selectedAssets, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation } = useProjectDetail();
   const isDragging = useIsDragging();
+  const setOverDropZone = useDragStore((state) => state.setOverDropZone);
+  const isOverDropZone = useDragStore((state) => state.isOverDropZone);
+  const poolDropRef = useRef<HTMLDivElement>(null);
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
   ]);
@@ -50,17 +53,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   });
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-
+  
   // 素材池拖放区域
-  const { dropRef: poolDropRef, isOver: isPoolOver, dropZoneProps: poolDropZoneProps } = useDropZone({
+  const { dropZoneProps: poolDropZoneProps } = useDropZone({
     onDrop: (data) => {
-      if (data && typeof data === "object" && "type" in data) {
+      // 只有在 drop 时才添加素材
+      if (data && typeof data === "object" && "id" in data && "type" in data) {
         addAssetToPool(data as Asset);
       }
     },
-    onDragStateChange: (isDragging) => {
-      // 通过 dropZone 来控制拖拽状态
-      // 这里主要依赖 drag-store，但如果需要额外的控制可以在这里处理
+    onDragEnter: () => {
+      setOverDropZone(true);
+    },
+    onDragLeave: () => {
+      setOverDropZone(false);
     },
   });
 
@@ -408,8 +414,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium flex items-center gap-2">
             素材池
-            {isDragging && (
-              <span className="text-xs text-primary animate-pulse">拖拽中...</span>
+            {isOverDropZone && (
+              <span className="text-xs text-primary animate-pulse">释放添加</span>
             )}
           </h2>
           {selectedAssets.length > 0 && (
@@ -425,7 +431,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           {...poolDropZoneProps}
           className={cn(
             "min-h-[100px] border-2 border-dashed rounded-lg p-4 transition-colors",
-            isPoolOver || isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/20"
+            isOverDropZone ? "border-primary bg-primary/10" : "border-muted-foreground/20"
           )}
         >
           {selectedAssets.length === 0 ? (

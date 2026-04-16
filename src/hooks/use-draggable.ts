@@ -1,165 +1,56 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef } from "react";
 
-interface DraggableOptions {
-  id: string;
-  data?: unknown;
-}
-
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface UseDraggableReturn {
-  setNodeRef: (node: HTMLElement | null) => void;
-  transform: Position | null;
-  isDragging: boolean;
-  listeners: {
-    onPointerDown: (e: React.PointerEvent) => void;
-    onPointerMove: (e: React.PointerEvent) => void;
-    onPointerUp: (e: React.PointerEvent) => void;
-  };
-  attributes: Record<string, unknown>;
-}
-
-export function useDraggable({ id, data }: DraggableOptions): UseDraggableReturn {
-  const [isDragging, setIsDragging] = useState(false);
-  const [transform, setTransform] = useState<Position | null>(null);
-  const nodeRef = useRef<HTMLElement | null>(null);
-  const startPos = useRef<Position>({ x: 0, y: 0 });
-  const currentPos = useRef<Position>({ x: 0, y: 0 });
-
-  const setNodeRef = useCallback((node: HTMLElement | null) => {
-    nodeRef.current = node;
-  }, []);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    startPos.current = { x: e.clientX, y: e.clientY };
-    currentPos.current = { x: 0, y: 0 };
-    
-    // 设置拖拽数据
-    if (data && e.currentTarget) {
-      (e.currentTarget as HTMLElement).dataset.dragData = JSON.stringify(data);
-    }
-  }, [data]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
-    
-    const dx = e.clientX - startPos.current.x;
-    const dy = e.clientY - startPos.current.y;
-    currentPos.current = { x: dx, y: dy };
-    setTransform({ x: dx, y: dy });
-  }, [isDragging]);
-
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
-    setTransform(null);
-  }, []);
-
-  // 触摸事件处理
-  useEffect(() => {
-    const node = nodeRef.current;
-    if (!node) return;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        setIsDragging(true);
-        startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        currentPos.current = { x: 0, y: 0 };
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isDragging || e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - startPos.current.x;
-      const dy = e.touches[0].clientY - startPos.current.y;
-      currentPos.current = { x: dx, y: dy };
-      setTransform({ x: dx, y: dy });
-    };
-
-    const handleTouchEnd = () => {
-      setIsDragging(false);
-      setTransform(null);
-    };
-
-    node.addEventListener("touchstart", handleTouchStart, { passive: true });
-    node.addEventListener("touchmove", handleTouchMove, { passive: true });
-    node.addEventListener("touchend", handleTouchEnd);
-
-    return () => {
-      node.removeEventListener("touchstart", handleTouchStart);
-      node.removeEventListener("touchmove", handleTouchMove);
-      node.removeEventListener("touchend", handleTouchEnd);
-    };
-  }, [isDragging]);
-
-  return {
-    setNodeRef,
-    transform,
-    isDragging,
-    listeners: {
-      onPointerDown: handlePointerDown,
-      onPointerMove: handlePointerMove,
-      onPointerUp: handlePointerUp,
-    },
-    attributes: {
-      draggable: true,
-      role: "button",
-      "aria-label": `draggable-${id}`,
-    },
-  };
-}
-
-// 拖拽放置区域 hook
+// 拖拽放置区域 hook - 使用原生 HTML5 拖拽 API
 interface UseDropZoneOptions {
   onDrop?: (data: unknown) => void;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragEnter?: () => void;
+  onDragLeave?: () => void;
+  // 数据类型标识，用于校验
+  dataType?: string;
 }
 
-export function useDropZone({ onDrop, onDragStateChange }: UseDropZoneOptions = {}) {
-  const [isOver, setIsOver] = useState(false);
-  const dropRef = useRef<HTMLElement | null>(null);
+export function useDropZone({ 
+  onDrop, 
+  onDragEnter, 
+  onDragLeave,
+  dataType = "application/json" 
+}: UseDropZoneOptions = {}) {
   const dragCounter = useRef(0);
-
-  const setDropRef = useCallback((node: HTMLElement | null) => {
-    dropRef.current = node;
-  }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     dragCounter.current++;
-    setIsOver(true);
-    onDragStateChange?.(true);
-  }, [onDragStateChange]);
+    if (dragCounter.current === 1) {
+      onDragEnter?.();
+    }
+  }, [onDragEnter]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
-    setIsOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     dragCounter.current--;
     if (dragCounter.current === 0) {
-      setIsOver(false);
-      onDragStateChange?.(false);
+      onDragLeave?.();
     }
-  }, [onDragStateChange]);
+  }, [onDragLeave]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     dragCounter.current = 0;
-    setIsOver(false);
-    onDragStateChange?.(false);
+    onDragLeave?.();
     
     try {
-      const jsonData = e.dataTransfer.getData("application/json");
+      const jsonData = e.dataTransfer.getData(dataType);
       if (jsonData) {
         const data = JSON.parse(jsonData);
         onDrop?.(data);
@@ -167,16 +58,40 @@ export function useDropZone({ onDrop, onDragStateChange }: UseDropZoneOptions = 
     } catch (err) {
       console.error("Failed to parse drop data:", err);
     }
-  }, [onDrop, onDragStateChange]);
+  }, [dataType, onDrop, onDragLeave]);
 
   return {
-    dropRef: setDropRef,
-    isOver,
     dropZoneProps: {
       onDragEnter: handleDragEnter,
       onDragOver: handleDragOver,
       onDragLeave: handleDragLeave,
       onDrop: handleDrop,
     },
+  };
+}
+
+// 拖拽源 hook - 设置拖拽数据
+interface UseDraggableOptions {
+  data: unknown;
+  onDragStarted?: () => void;
+  dataType?: string;
+}
+
+export function useDraggable({ 
+  data, 
+  onDragStarted,
+  dataType = "application/json" 
+}: UseDraggableOptions) {
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(dataType, JSON.stringify(data));
+    // 同时设置 text/plain 作为备用
+    e.dataTransfer.setData("text/plain", JSON.stringify(data));
+    onDragStarted?.();
+  }, [data, dataType, onDragStarted]);
+
+  return {
+    draggable: true,
+    onDragStart: handleDragStart,
   };
 }

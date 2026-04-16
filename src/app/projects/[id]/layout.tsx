@@ -47,38 +47,24 @@ export const useProjectDetail = () => useContext(ProjectDetailContext);
 
 interface DraggableAssetProps {
   asset: Asset;
-  onDragStart?: (asset: Asset) => void;
-  onDragStarted?: () => void;
   showRemove?: boolean;
   onRemove?: (assetId: string) => void;
 }
 
-function DraggableAsset({ asset, onDragStart, onDragStarted, showRemove, onRemove }: DraggableAssetProps) {
-  const { isDragging, setDragging } = useDragStore();
-
-  useEffect(() => {
-    // 监听整个文档的 dragend 事件作为保底
-    const handleGlobalDragEnd = () => {
-      setDragging(false);
-      document.body.classList.remove('dragging');
-    };
-    document.addEventListener('dragend', handleGlobalDragEnd);
-    return () => document.removeEventListener('dragend', handleGlobalDragEnd);
-  }, [setDragging]);
+function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
+  const setDragging = useDragStore((state) => state.setDragging);
 
   const handleDragStart = (e: React.DragEvent) => {
+    // 开始拖拽时设置状态
     setDragging(true, asset.id);
-    document.body.classList.add('dragging');
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify(asset));
     e.dataTransfer.setData("text/plain", JSON.stringify(asset));
-    // 不在这里调用 onDragStart，只设置拖拽状态
-    // 素材会在 drop 到素材池时才添加
   };
 
   const handleDragEnd = () => {
+    // 拖拽结束时重置状态
     setDragging(false);
-    document.body.classList.remove('dragging');
   };
 
   return (
@@ -482,8 +468,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
-                            onDragStart={() => addAssetToPool(asset)}
-                            onDragStarted={closeDrawer}
                           />
                         ))}
                       </div>
@@ -501,8 +485,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
-                            onDragStart={() => addAssetToPool(asset)}
-                            onDragStarted={closeDrawer}
                           />
                         ))}
                       </div>
@@ -520,8 +502,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
-                            onDragStart={() => addAssetToPool(asset)}
-                            onDragStarted={closeDrawer}
                           />
                         ))}
                       </div>
