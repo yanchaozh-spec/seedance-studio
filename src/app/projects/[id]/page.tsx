@@ -524,11 +524,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-16",
+                          "relative group bg-muted rounded-lg overflow-hidden w-20",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
                       >
-                        <div className="aspect-square relative">
+                        <div className="aspect-video relative">
                           {asset.thumbnail_url || asset.url ? (
                             <img
                               src={asset.thumbnail_url || asset.url}
@@ -537,7 +537,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Scissors className="w-5 h-5 text-primary" />
+                              <Scissors className="w-6 h-6 text-primary" />
                             </div>
                           )}
                           {asset.bound_audio_id && (
@@ -552,8 +552,31 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        <div className="p-1">
+                        <div className="p-1 space-y-0.5">
                           <span className="text-[10px] truncate block">{asset.display_name || asset.name}</span>
+                          {/* 声音状态 */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
+                            asset.bound_audio_id 
+                              ? "bg-primary/20 text-primary" 
+                              : "bg-muted-foreground/10 text-muted-foreground"
+                          )}>
+                            <Music className="w-2.5 h-2.5" />
+                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
+                          </div>
+                          {/* 激活按钮 */}
+                          <button
+                            onClick={() => toggleAssetActivation(asset.id)}
+                            className={cn(
+                              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
+                              asset.isActivated 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
+                            )}
+                          >
+                            <span>激活</span>
+                            {asset.isActivated && <Check className="w-2.5 h-2.5" />}
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -578,11 +601,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden w-16",
+                          "relative group bg-muted rounded-lg overflow-hidden w-20",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
                       >
-                        <div className="aspect-square relative">
+                        <div className="aspect-video relative">
                           {asset.thumbnail_url ? (
                             <img
                               src={asset.thumbnail_url}
@@ -591,7 +614,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Image className="w-5 h-5 text-muted-foreground" />
+                              <Image className="w-6 h-6 text-muted-foreground" />
                             </div>
                           )}
                           {asset.bound_audio_id && (
@@ -606,8 +629,31 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        <div className="p-1">
+                        <div className="p-1 space-y-0.5">
                           <span className="text-[10px] truncate block">{asset.display_name || asset.name}</span>
+                          {/* 声音状态 */}
+                          <div className={cn(
+                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
+                            asset.bound_audio_id 
+                              ? "bg-primary/20 text-primary" 
+                              : "bg-muted-foreground/10 text-muted-foreground"
+                          )}>
+                            <Music className="w-2.5 h-2.5" />
+                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
+                          </div>
+                          {/* 激活按钮 */}
+                          <button
+                            onClick={() => toggleAssetActivation(asset.id)}
+                            className={cn(
+                              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
+                              asset.isActivated 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
+                            )}
+                          >
+                            <span>激活</span>
+                            {asset.isActivated && <Check className="w-2.5 h-2.5" />}
+                          </button>
                         </div>
                       </div>
                     ))}
