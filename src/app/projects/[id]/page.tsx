@@ -304,7 +304,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   const boundAudio = selectedAssets.find((a) => a.id === activatedAsset.bound_audio_id);
                   if (boundAudio) {
                     const audioName = boundAudio.display_name || boundAudio.name;
-                    ref += `，声线：@${audioName}`;
+                    ref += `，声线为@${audioName}`;
                   }
                 }
                 
