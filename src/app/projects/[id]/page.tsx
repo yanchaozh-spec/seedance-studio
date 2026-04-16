@@ -102,97 +102,57 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     );
   };
 
-  // 生成最终提示词（包含关键帧描述）
+  // 生成最终提示词
+  // 格式：第一行 "图片名"@这张图片，声线为@音频文件名，关键帧描述（如果有），提示词
+  //       后续行：提示词内容
   const generateFinalPrompt = useCallback(() => {
-    const finalPrompts: string[] = [];
+    const lines: string[] = [];
+    const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
 
-    // 收集所有提示词框中实际引用的素材
-    const referencedAssetIds = new Set<string>();
-    const referencedAssets: SelectedAsset[] = [];
+    if (nonEmptyBoxes.length === 0) return "";
 
-    promptBoxes.forEach((box) => {
-      if (box.isActivated && box.activatedAssetId) {
-        referencedAssetIds.add(box.activatedAssetId);
-      }
-    });
+    // 找到第一个有激活素材的提示词框
+    const firstBoxWithAsset = nonEmptyBoxes.find((box) => box.isActivated && box.activatedAssetId);
+    const firstActivatedAsset = firstBoxWithAsset
+      ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
+      : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
 
-    // 如果没有显式引用，则使用第一个激活的素材
-    if (referencedAssetIds.size === 0) {
-      const firstActivated = selectedAssets.find(
-        (a) => (a.type === "image" || a.type === "keyframe") && a.isActivated
-      );
-      if (firstActivated) {
-        referencedAssetIds.add(firstActivated.id);
-      }
-    }
+    if (firstActivatedAsset) {
+      const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
+      let header = `"${displayName}"@这张图片`;
 
-    // 从 selectedAssets 中找出被引用的素材
-    referencedAssetIds.forEach((id) => {
-      const asset = selectedAssets.find((a) => a.id === id);
-      if (asset && (asset.type === "image" || asset.type === "keyframe") && asset.isActivated) {
-        referencedAssets.push(asset);
-      }
-    });
-
-    // 首先添加素材引用行
-    if (referencedAssets.length > 0) {
-      const assetRefs: string[] = [];
-      
-      // 图片素材引用，格式：图片名：@图片文件
-      referencedAssets.forEach((asset) => {
-        const displayName = asset.display_name || asset.name;
-        const fileName = asset.name;
-        assetRefs.push(`${displayName}：@${fileName}`);
-      });
-      
-      finalPrompts.push(assetRefs.join("|"));
-    }
-
-    promptBoxes.forEach((box, index) => {
-      if (!box.content.trim()) return;
-
-      let promptText = box.content.trim();
-
-      // 如果激活了素材引用
-      if (box.isActivated) {
-        const activatedAsset = selectedAssets.find(
-          (a) => (a.type === "image" || a.type === "keyframe") && a.id === box.activatedAssetId && a.isActivated
-        ) || selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
-
-        if (activatedAsset) {
-          const displayName = activatedAsset.display_name || activatedAsset.name;
-          
-          // 关键帧特殊处理
-          if (activatedAsset.type === "keyframe") {
-            const desc = activatedAsset.keyframe_description || box.keyframeDescription || "";
-            if (desc) {
-              promptText = `视频首帧@"${displayName}"，${desc}，${promptText}`;
-            } else {
-              promptText = `视频首帧@"${displayName}"，${promptText}`;
-            }
-          } else {
-            let referenceText = `"${displayName}"@这张图片`;
-            
-            // 如果绑定了音频，添加声线描述
-            if (activatedAsset.bound_audio_id) {
-              const boundAudio = selectedAssets.find(
-                (a) => a.id === activatedAsset.bound_audio_id
-              );
-              if (boundAudio) {
-                const audioName = boundAudio.display_name || boundAudio.name;
-                referenceText += `，声线为@${audioName}`;
-              }
-            }
-            
-            promptText = `${referenceText}，${promptText}`;
-          }
+      // 如果绑定了音频，添加声线描述
+      if (firstActivatedAsset.bound_audio_id) {
+        const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+        if (boundAudio) {
+          const audioName = boundAudio.display_name || boundAudio.name;
+          header += `，声线为@${audioName}`;
         }
       }
 
-      finalPrompts.push(promptText);
-    });
+      // 如果是关键帧，添加关键帧描述
+      if (firstActivatedAsset.type === "keyframe" || firstActivatedAsset.is_keyframe) {
+        const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
+        if (keyframeDesc) {
+          header += `，${keyframeDesc}`;
+        }
+      }
 
-    return finalPrompts.join("\n");
+      // 第一行：素材信息 + 第一个提示词
+      lines.push(`${header}，${nonEmptyBoxes[0].content.trim()}`);
+
+      // 后续行：仅提示词内容
+      for (let i = 1; i < nonEmptyBoxes.length; i++) {
+        lines.push(nonEmptyBoxes[i].content.trim());
+      }
+    } else {
+      // 没有激活素材时，直接输出提示词
+      nonEmptyBoxes.forEach((box) => {
+        lines.push(box.content.trim());
+      });
+    }
+
+    return lines.join("\n");
   }, [promptBoxes, selectedAssets]);
 
   // 抽帧功能
@@ -278,43 +238,52 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     try {
       setGenerating(true);
       
-      const finalPrompt = promptBoxes
-        .filter((box) => box.content.trim())
-        .map((box) => {
-          let text = box.content.trim();
-          if (box.isActivated) {
-            const imageAssets = selectedAssets.filter((a) => a.type === "image" || a.type === "keyframe");
-            if (imageAssets.length > 0) {
-              const activatedAsset = imageAssets.find((a) => a.id === box.activatedAssetId) || imageAssets[0];
-              const displayName = activatedAsset.display_name || activatedAsset.name;
-              
-              // 关键帧特殊处理
-              if (activatedAsset.type === "keyframe") {
-                const desc = activatedAsset.keyframe_description || box.keyframeDescription || "";
-                if (desc) {
-                  text = `视频首帧@"${displayName}"，${desc}，${text}`;
-                } else {
-                  text = `视频首帧@"${displayName}"，${text}`;
-                }
-              } else {
-                let ref = `"${displayName}"@这张图片`;
-                
-                // 如果绑定了音频，添加声线描述
-                if (activatedAsset.bound_audio_id) {
-                  const boundAudio = selectedAssets.find((a) => a.id === activatedAsset.bound_audio_id);
-                  if (boundAudio) {
-                    const audioName = boundAudio.display_name || boundAudio.name;
-                    ref += `，声线为@${audioName}`;
-                  }
-                }
-                
-                text = `${ref}，${text}`;
-              }
-            }
+      // 构建提示词：第一行包含素材引用，后续行仅提示词内容
+      const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
+      const promptLines: string[] = [];
+
+      // 找到第一个激活的素材
+      const firstBoxWithAsset = nonEmptyBoxes.find((box) => box.isActivated && box.activatedAssetId);
+      const firstActivatedAsset = firstBoxWithAsset
+        ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
+        : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
+
+      if (firstActivatedAsset) {
+        const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
+        let header = `"${displayName}"@这张图片`;
+
+        // 如果绑定了音频，添加声线描述
+        if (firstActivatedAsset.bound_audio_id) {
+          const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+          if (boundAudio) {
+            const audioName = boundAudio.display_name || boundAudio.name;
+            header += `，声线为@${audioName}`;
           }
-          return text;
-        })
-        .join("\n");
+        }
+
+        // 如果是关键帧，添加关键帧描述
+        if (firstActivatedAsset.type === "keyframe" || firstActivatedAsset.is_keyframe) {
+          const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
+          if (keyframeDesc) {
+            header += `，${keyframeDesc}`;
+          }
+        }
+
+        // 第一行：素材信息 + 第一个提示词
+        promptLines.push(`${header}，${nonEmptyBoxes[0].content.trim()}`);
+
+        // 后续行：仅提示词内容
+        for (let i = 1; i < nonEmptyBoxes.length; i++) {
+          promptLines.push(nonEmptyBoxes[i].content.trim());
+        }
+      } else {
+        // 没有激活素材时，直接输出提示词
+        nonEmptyBoxes.forEach((box) => {
+          promptLines.push(box.content.trim());
+        });
+      }
+
+      const finalPrompt = promptLines.join("\n");
 
       if (!finalPrompt.trim()) {
         toast.error("请输入提示词");
