@@ -166,10 +166,28 @@ async function processLongVideo(longVideoId: string): Promise<void> {
       return;
     }
 
+    // 如果有图片绑定了音频，也需要获取这些音频素材
+    let allAssets = assets || [];
+    const boundAudioIds = (assets || [])
+      .filter((a) => (a.type === "image" || a.type === "keyframe") && a.bound_audio_id)
+      .map((a) => a.bound_audio_id)
+      .filter((id): id is string => !!id) || [];
+
+    if (boundAudioIds.length > 0) {
+      const { data: boundAudios } = await client
+        .from("assets")
+        .select("*")
+        .in("id", boundAudioIds);
+      
+      if (boundAudios && boundAudios.length > 0) {
+        allAssets = [...allAssets, ...boundAudios.filter(b => !allAssets.some(a => a.id === b.id))];
+      }
+    }
+
     // 分类素材
-    const imageAssets = (assets || []).filter((a) => a.type === "image");
-    const keyframeAssets = (assets || []).filter((a) => a.type === "keyframe" || a.is_keyframe);
-    const audioAssets = (assets || []).filter((a) => a.type === "audio");
+    const imageAssets = allAssets.filter((a) => a.type === "image");
+    const keyframeAssets = allAssets.filter((a) => a.type === "keyframe" || a.is_keyframe);
+    const audioAssets = allAssets.filter((a) => a.type === "audio");
 
     // 获取所有分段
     const { data: segments, error: segmentsError } = await client
@@ -220,7 +238,7 @@ async function processLongVideo(longVideoId: string): Promise<void> {
       // 找到激活的素材
       let activatedAsset = null;
       if (prompt.activated_asset_id) {
-        activatedAsset = (assets || []).find((a) => a.id === prompt.activated_asset_id);
+        activatedAsset = allAssets.find((a) => a.id === prompt.activated_asset_id);
       }
 
       // 如果没有指定，使用第一个可用的图片或关键帧

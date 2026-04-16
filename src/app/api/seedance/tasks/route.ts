@@ -66,6 +66,7 @@ function buildContent(
     type: string;
     display_name?: string;
     name: string;
+    asset_category?: string;
     bound_audio_id?: string;
     voice_description?: string;
     keyframe_description?: string;
@@ -183,6 +184,8 @@ export async function POST(request: NextRequest) {
 
     // 获取选中的素材
     const client = getSupabaseClient();
+    
+    // 先获取选中的素材
     const { data: assets, error: assetsError } = await client
       .from("assets")
       .select("*")
@@ -192,8 +195,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch assets" }, { status: 500 });
     }
 
+    // 如果有图片绑定了音频，也需要获取这些音频素材
+    let allAssets = assets || [];
+    const boundAudioIds = assets
+      ?.filter((a) => (a.type === "image" || a.type === "keyframe") && a.bound_audio_id)
+      .map((a) => a.bound_audio_id)
+      .filter((id): id is string => !!id) || [];
+
+    if (boundAudioIds.length > 0) {
+      const { data: boundAudios } = await client
+        .from("assets")
+        .select("*")
+        .in("id", boundAudioIds);
+      
+      if (boundAudios && boundAudios.length > 0) {
+        allAssets = [...allAssets, ...boundAudios.filter(b => !allAssets.some(a => a.id === b.id))];
+      }
+    }
+
     // 构建 content 数组
-    const content = buildContent(prompt_boxes, assets || []);
+    const content = buildContent(prompt_boxes, allAssets);
 
     if (content.length === 0) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });

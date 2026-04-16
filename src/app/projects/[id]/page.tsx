@@ -135,7 +135,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         // 美术资产："图片名"@这张图片，声线为@音频文件名
         assetLine = `"${displayName}"@这张图片`;
         if (firstActivatedAsset.bound_audio_id) {
-          const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+          // 从 selectedAssets 和 materials 中查找绑定的音频
+          const allAssets = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
+          const boundAudio = allAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
           if (boundAudio) {
             const audioName = boundAudio.display_name || boundAudio.name;
             assetLine += `，声线为@${audioName}`;
@@ -158,7 +160,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
 
     return lines.join("\n");
-  }, [promptBoxes, selectedAssets]);
+  }, [promptBoxes, selectedAssets, materials]);
 
   // 抽帧功能
   const extractFrame = async (task: Task, time: number = 0) => {
@@ -271,7 +273,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           // 美术资产："图片名"@这张图片，声线为@音频文件名
           assetLine = `"${displayName}"@这张图片`;
           if (firstActivatedAsset.bound_audio_id) {
-            const boundAudio = selectedAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+            // 从 selectedAssets 和 materials 中查找绑定的音频
+            const allAssets = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
+            const boundAudio = allAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
             if (boundAudio) {
               const audioName = boundAudio.display_name || boundAudio.name;
               assetLine += `，声线为@${audioName}`;
