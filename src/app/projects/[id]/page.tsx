@@ -87,6 +87,28 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const generateFinalPrompt = useCallback(() => {
     const finalPrompts: string[] = [];
 
+    // 首先添加素材引用行（图片在最前面）
+    const imageAssets = selectedAssets.filter((a) => a.type === "image");
+    const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
+    
+    if (imageAssets.length > 0 || keyframeAssets.length > 0) {
+      const assetRefs: string[] = [];
+      
+      // 图片素材引用
+      imageAssets.forEach((asset) => {
+        const displayName = asset.display_name || asset.name;
+        assetRefs.push(`@"${displayName}"`);
+      });
+      
+      // 关键帧素材引用
+      keyframeAssets.forEach((asset) => {
+        const displayName = asset.display_name || asset.name;
+        assetRefs.push(`@"${displayName}"`);
+      });
+      
+      finalPrompts.push(assetRefs.join(" "));
+    }
+
     promptBoxes.forEach((box, index) => {
       if (!box.content.trim()) return;
 
