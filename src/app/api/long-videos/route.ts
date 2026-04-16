@@ -3,7 +3,7 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 import { mergeVideos } from "@/lib/merge-videos";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
-const MODEL_ID = "doubao-seedance-2-0-260128";
+const MODEL_ID = "ep-m-20260417004442-42dzs";
 const SEGMENT_DURATION = 15; // 每段最大时长（秒）
 
 interface CreateLongVideoRequest {
@@ -33,7 +33,6 @@ type ContentItem =
   | { type: "audio_url"; audio_url: { url: string }; role?: string };
 
 // 构建符合 Seedance 2.0 格式的提示词
-// 格式：第一行素材引用，第二行提示词内容
 function buildPrompt(
   boxContent: string,
   asset: {
@@ -43,42 +42,50 @@ function buildPrompt(
     asset_category?: string;
     bound_audio_id?: string;
     keyframe_description?: string;
+    url: string;
   } | null,
   keyframeDesc?: string,
-  audioAssets?: Array<{ id: string; name: string; display_name?: string }>
-): string {
-  if (!asset) return boxContent;
+  audioAssets?: Array<{ id: string; name: string; display_name?: string; url: string }>
+): ContentItem[] {
+  if (!asset) return [];
 
   const displayName = asset.display_name || asset.name;
   const isKeyframe = asset.asset_category === "keyframe";
-  let assetLine = "";
+  const contentItems: ContentItem[] = [];
 
+  // 添加图片
   if (isKeyframe) {
-    // 关键帧：关键帧描述@文件名
-    const desc = keyframeDesc || asset.keyframe_description || "";
-    if (desc) {
-      assetLine = `${desc}@${displayName}`;
-    } else {
-      assetLine = `@${displayName}`;
-    }
+    contentItems.push({
+      type: "image_url",
+      image_url: { url: asset.url },
+      role: "first_frame",
+    });
   } else {
-    // 美术资产："图片名"@这张图片，声线为@音频文件名
-    assetLine = `"${displayName}"@这张图片`;
+    contentItems.push({
+      type: "image_url",
+      image_url: { url: asset.url },
+      role: "reference_image",
+    });
+  }
 
-    if (asset.bound_audio_id && audioAssets) {
-      const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-      if (boundAudio) {
-        const audioName = boundAudio.display_name || boundAudio.name;
-        assetLine += `，声线为@${audioName}`;
-      }
+  // 添加提示词
+  if (boxContent) {
+    contentItems.push({ type: "text", text: boxContent });
+  }
+
+  // 添加绑定的音频
+  if (!isKeyframe && asset.bound_audio_id && audioAssets) {
+    const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
+    if (boundAudio) {
+      contentItems.push({
+        type: "audio_url",
+        audio_url: { url: boundAudio.url },
+        role: "reference_audio",
+      });
     }
   }
 
-  // 第一行素材引用，第二行提示词内容
-  if (boxContent) {
-    return `${assetLine}\n${boxContent}`;
-  }
-  return assetLine;
+  return contentItems;
 }
 
 // 计算需要多少段
@@ -264,18 +271,16 @@ async function processLongVideo(longVideoId: string): Promise<void> {
         });
       }
 
-      // 构建提示词文本
-      const promptText = buildPrompt(
+      // 构建符合 Seedance 2.0 格式的提示词
+      const promptContent = buildPrompt(
         prompt.content.trim(),
         activatedAsset || null,
         prompt.keyframe_description,
         audioAssets
       );
 
-      content.push({
-        type: "text",
-        text: promptText,
-      });
+      // 将构建好的内容添加到 content 数组
+      content.push(...promptContent);
 
       // 调用 Seedance API
       const requestBody = {

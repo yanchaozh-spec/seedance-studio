@@ -103,12 +103,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     );
   };
 
-  // 生成最终提示词
-  // 格式：
-  //   - 第一行：素材引用信息
-  //   - 第二行开始：提示词内容
+  // 生成最终提示词预览（显示实际 API 调用格式）
   const generateFinalPrompt = useCallback(() => {
-    const lines: string[] = [];
     const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
 
     // 找到第一个激活的素材
@@ -117,50 +113,53 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
       : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
 
+    const contentItems: Array<Record<string, unknown>> = [];
+
     if (firstActivatedAsset) {
-      const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
       const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
       
-      let assetLine = "";
+      // 添加图片 URL（对应 @文件名）
+      contentItems.push({
+        type: "image_url",
+        image_url: { url: firstActivatedAsset.url },
+        role: isKeyframe ? "first_frame" : "reference_image",
+      });
 
-      if (isKeyframe) {
-        // 关键帧：关键帧描述@文件名
-        const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
-        if (keyframeDesc) {
-          assetLine = `${keyframeDesc}@${displayName}`;
-        } else {
-          assetLine = `@${displayName}`;
-        }
-      } else {
-        // 美术资产："图片名"@这张图片，声线为@音频文件名
-        assetLine = `"${displayName}"@这张图片`;
-        if (firstActivatedAsset.bound_audio_id) {
-          // 从 selectedAssets 和 materials 中查找绑定的音频
-          const allAssets = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
-          const boundAudio = allAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
-          if (boundAudio) {
-            const audioName = boundAudio.display_name || boundAudio.name;
-            assetLine += `，声线为@${audioName}`;
-          }
-        }
-      }
-
-      // 第一行：素材信息
-      lines.push(assetLine);
-
-      // 后续行：提示词内容
+      // 添加提示词文本
       nonEmptyBoxes.forEach((box) => {
-        lines.push(box.content.trim());
+        if (box.content.trim()) {
+          contentItems.push({
+            type: "text",
+            text: box.content.trim(),
+          });
+        }
       });
     } else if (nonEmptyBoxes.length > 0) {
       // 没有激活素材时，直接输出提示词
       nonEmptyBoxes.forEach((box) => {
-        lines.push(box.content.trim());
+        if (box.content.trim()) {
+          contentItems.push({
+            type: "text",
+            text: box.content.trim(),
+          });
+        }
       });
     }
 
-    return lines.join("\n");
-  }, [promptBoxes, selectedAssets, materials]);
+    // 返回 JSON 格式预览
+    const requestBody = {
+      model: "ep-m-20260417004442-42dzs",
+      content: contentItems,
+      generate_audio: true,
+      ratio: params_.ratio,
+      duration: params_.duration,
+      resolution: params_.resolution,
+      watermark: false,
+      return_last_frame: true,
+    };
+
+    return JSON.stringify(requestBody, null, 2);
+  }, [promptBoxes, selectedAssets, params_]);
 
   // 抽帧功能
   const extractFrame = async (task: Task, time: number = 0) => {

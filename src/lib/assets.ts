@@ -18,6 +18,7 @@ export interface Asset {
   url: string;
   thumbnail_url?: string;
   size?: number;
+  duration?: number; // 音频时长（秒）
   created_at: string;
 }
 

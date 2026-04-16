@@ -97,47 +97,11 @@ function buildContent(
       activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
     }
 
-    // 构建文本内容
-    // 格式：第一行素材引用，后续行提示词内容
-    const isKeyframe = activatedAsset?.asset_category === "keyframe";
-    
-    if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
-      const displayName = activatedAsset.display_name || activatedAsset.name;
-      
-      if (isKeyframe) {
-        // 关键帧：关键帧描述@文件名
-        const desc = box.keyframe_description || activatedAsset.keyframe_description || "";
-        if (desc) {
-          content.push({ type: "text", text: `${desc}@${displayName}` });
-        } else {
-          content.push({ type: "text", text: `@${displayName}` });
-        }
-      } else {
-        // 美术资产："图片名"@这张图片，声线为@音频文件名
-        let referenceText = `"${displayName}"@这张图片`;
-        
-        if (activatedAsset.bound_audio_id) {
-          const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
-          if (boundAudio) {
-            const audioName = boundAudio.display_name || boundAudio.name;
-            referenceText += `，声线为@${audioName}`;
-          }
-        }
-        
-        content.push({ type: "text", text: referenceText });
-      }
-    }
-
-    // 添加提示词内容
-    if (box.content.trim()) {
-      content.push({ type: "text", text: box.content.trim() });
-    }
-
     // 添加图片内容（如果有）
     if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
       // 根据素材类型设置 role
       let role: "first_frame" | "reference_image" | undefined;
-      if (isKeyframe) {
+      if (activatedAsset.asset_category === "keyframe") {
         role = "first_frame";
       } else {
         role = "reference_image";
@@ -152,8 +116,13 @@ function buildContent(
       });
     }
 
+    // 添加提示词内容
+    if (box.content.trim()) {
+      content.push({ type: "text", text: box.content.trim() });
+    }
+
     // 美术资产：如果绑定了音频，添加音频参考
-    if (activatedAsset && !isKeyframe && activatedAsset.bound_audio_id) {
+    if (activatedAsset && activatedAsset.asset_category !== "keyframe" && activatedAsset.bound_audio_id) {
       const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
       if (boundAudio) {
         content.push({
@@ -222,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     // 构建请求参数 - 严格按照 API 文档格式
     const requestBody: Record<string, unknown> = {
-      model: modelId,
+      model: MODEL_ID,
       content,
       generate_audio: true,
       ratio: params.ratio,
@@ -289,7 +258,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         id: taskId,
         status: "queued",
-        model: modelId,
+        model: MODEL_ID,
       });
     } catch (apiError) {
       // API 调用失败，更新任务状态为失败
