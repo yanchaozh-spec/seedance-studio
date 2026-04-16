@@ -190,9 +190,6 @@ function DraggableAsset({ asset, showRemove, onRemove, size = "small", hideLabel
           {/* 底部信息 - 非隐藏时显示 */}
           {!hideLabel && (
             <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
-              <span className={cn("truncate block", size === "small" ? "text-[10px]" : "text-xs")}>
-                {asset.display_name || asset.name}
-              </span>
               {/* 音频参考按钮 */}
               <div className={cn(
                 "flex items-center justify-center gap-1 rounded text-xs",
