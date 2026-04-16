@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useIsDragging } from "@/lib/drag-store";
-import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2 } from "lucide-react";
+import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task } from "@/lib/tasks";
@@ -16,6 +16,11 @@ import { useProjectDetail } from "./layout";
 import { createTask } from "@/lib/tasks";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+
+// 选中的素材（带激活状态）
+export interface SelectedAsset extends Asset {
+  isActivated: boolean;
+}
 
 interface PromptBox {
   id: string;
@@ -33,7 +38,7 @@ interface GeneratorParams {
 
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { selectedAssets, addAssetToPool, removeAssetFromPool, clearPool } = useProjectDetail();
+  const { selectedAssets, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation } = useProjectDetail();
   const isDragging = useIsDragging();
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
@@ -87,26 +92,29 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const generateFinalPrompt = useCallback(() => {
     const finalPrompts: string[] = [];
 
-    // 首先添加素材引用行（图片在最前面）
-    const imageAssets = selectedAssets.filter((a) => a.type === "image");
-    const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
+    // 首先添加素材引用行（仅包含激活的素材）
+    const activatedImageAssets = selectedAssets.filter((a) => a.type === "image" && a.isActivated);
+    const activatedKeyframeAssets = selectedAssets.filter((a) => a.type === "keyframe" && a.isActivated);
     
-    if (imageAssets.length > 0 || keyframeAssets.length > 0) {
+    if (activatedImageAssets.length > 0 || activatedKeyframeAssets.length > 0) {
       const assetRefs: string[] = [];
       
-      // 图片素材引用
-      imageAssets.forEach((asset) => {
+      // 图片素材引用，格式：图片名：@图片文件
+      activatedImageAssets.forEach((asset) => {
         const displayName = asset.display_name || asset.name;
-        assetRefs.push(`@"${displayName}"`);
+        // 使用实际文件名（从 URL 中提取或使用 name）
+        const fileName = asset.name;
+        assetRefs.push(`${displayName}：@${fileName}`);
       });
       
       // 关键帧素材引用
-      keyframeAssets.forEach((asset) => {
+      activatedKeyframeAssets.forEach((asset) => {
         const displayName = asset.display_name || asset.name;
-        assetRefs.push(`@"${displayName}"`);
+        const fileName = asset.name;
+        assetRefs.push(`${displayName}：@${fileName}`);
       });
       
-      finalPrompts.push(assetRefs.join(" "));
+      finalPrompts.push(assetRefs.join("|"));
     }
 
     promptBoxes.forEach((box, index) => {
@@ -117,8 +125,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // 如果激活了素材引用
       if (box.isActivated) {
         const activatedAsset = selectedAssets.find(
-          (a) => (a.type === "image" || a.type === "keyframe") && a.id === box.activatedAssetId
-        ) || selectedAssets.find((a) => a.type === "image" || a.type === "keyframe");
+          (a) => (a.type === "image" || a.type === "keyframe") && a.id === box.activatedAssetId && a.isActivated
+        ) || selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
 
         if (activatedAsset) {
           const displayName = activatedAsset.display_name || activatedAsset.name;
@@ -417,7 +425,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     {keyframeAssets.map((asset) => (
                       <div
                         key={asset.id}
-                        className="relative group bg-muted rounded-lg overflow-hidden border-2 border-primary/30"
+                        className={cn(
+                          "relative group bg-muted rounded-lg overflow-hidden",
+                          asset.isActivated ? "ring-2 ring-primary" : "opacity-60"
+                        )}
                       >
                         <div className="w-20 h-20">
                           {asset.thumbnail_url || asset.url ? (
@@ -437,6 +448,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             {asset.display_name || asset.name}
                           </span>
                         </div>
+                        {/* 激活按钮 */}
+                        <button
+                          onClick={() => toggleAssetActivation(asset.id)}
+                          className={cn(
+                            "absolute top-1 right-1 rounded-full p-1 transition-all",
+                            asset.isActivated 
+                              ? "bg-primary text-primary-foreground opacity-100" 
+                              : "bg-muted text-muted-foreground opacity-0 group-hover:opacity-100"
+                          )}
+                          title={asset.isActivated ? "已激活，点击取消" : "点击激活"}
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                        {/* 删除按钮 */}
                         <button
                           onClick={() => handleRemoveAsset(asset.id)}
                           className="absolute top-1 left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -460,7 +485,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     {imageAssets.map((asset) => (
                       <div
                         key={asset.id}
-                        className="relative group bg-muted rounded-lg overflow-hidden"
+                        className={cn(
+                          "relative group bg-muted rounded-lg overflow-hidden",
+                          asset.isActivated && "ring-2 ring-primary"
+                        )}
                       >
                         <div className="w-20 h-20">
                           {asset.thumbnail_url ? (
@@ -485,6 +513,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             {asset.display_name || asset.name}
                           </span>
                         </div>
+                        {/* 激活按钮 */}
+                        <button
+                          onClick={() => toggleAssetActivation(asset.id)}
+                          className={cn(
+                            "absolute top-1 right-1 rounded-full p-1 transition-all",
+                            asset.isActivated 
+                              ? "bg-primary text-primary-foreground opacity-100" 
+                              : "bg-muted text-muted-foreground opacity-0 group-hover:opacity-100"
+                          )}
+                          title={asset.isActivated ? "已激活，点击取消" : "点击激活"}
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                        {/* 删除按钮 */}
                         <button
                           onClick={() => handleRemoveAsset(asset.id)}
                           className="absolute top-1 left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"

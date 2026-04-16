@@ -19,15 +19,17 @@ import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
 import { useDragStore } from "@/lib/drag-store";
 import { formatDistanceToNow } from "date-fns";
+import { SelectedAsset } from "./page";
 
 interface ProjectDetailContextType {
   project: Project | null;
   loading: boolean;
-  selectedAssets: Asset[];
-  setSelectedAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
+  selectedAssets: SelectedAsset[];
+  setSelectedAssets: React.Dispatch<React.SetStateAction<SelectedAsset[]>>;
   addAssetToPool: (asset: Asset) => void;
   removeAssetFromPool: (assetId: string) => void;
   clearPool: () => void;
+  toggleAssetActivation: (assetId: string) => void;
 }
 
 const ProjectDetailContext = createContext<ProjectDetailContextType>({
@@ -38,6 +40,7 @@ const ProjectDetailContext = createContext<ProjectDetailContextType>({
   addAssetToPool: () => {},
   removeAssetFromPool: () => {},
   clearPool: () => {},
+  toggleAssetActivation: () => {},
 });
 
 export const useProjectDetail = () => useContext(ProjectDetailContext);
@@ -290,7 +293,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       if (asset.type === "audio") prefix = "音频";
       else if (asset.type === "keyframe") prefix = "关键帧";
       const displayName = `${prefix}${sameType.length + 1}`;
-      return [...prev, { ...asset, display_name: displayName }];
+      // 图片和关键帧默认激活，音频不激活
+      const isActivated = asset.type !== "audio";
+      return [...prev, { ...asset, display_name: displayName, isActivated }];
     });
   };
 
@@ -300,6 +305,12 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
   const clearPool = () => {
     setSelectedAssets([]);
+  };
+
+  const toggleAssetActivation = (assetId: string) => {
+    setSelectedAssets((prev) =>
+      prev.map((a) => (a.id === assetId ? { ...a, isActivated: !a.isActivated } : a))
+    );
   };
 
   const navItems = [
@@ -327,6 +338,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         addAssetToPool,
         removeAssetFromPool,
         clearPool,
+        toggleAssetActivation,
       }}
     >
       <div className="flex h-screen bg-background">
