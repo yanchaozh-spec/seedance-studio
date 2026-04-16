@@ -72,8 +72,8 @@ function DraggableAsset({ asset, onDragStart, onDragStarted, showRemove, onRemov
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("application/json", JSON.stringify(asset));
     e.dataTransfer.setData("text/plain", JSON.stringify(asset));
-    onDragStart?.(asset);
-    onDragStarted?.();
+    // 不在这里调用 onDragStart，只设置拖拽状态
+    // 素材会在 drop 到素材池时才添加
   };
 
   const handleDragEnd = () => {

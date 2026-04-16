@@ -58,6 +58,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         addAssetToPool(data as Asset);
       }
     },
+    onDragStateChange: (isDragging) => {
+      // 通过 dropZone 来控制拖拽状态
+      // 这里主要依赖 drag-store，但如果需要额外的控制可以在这里处理
+    },
   });
 
   // 添加提示词框
@@ -92,23 +96,40 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const generateFinalPrompt = useCallback(() => {
     const finalPrompts: string[] = [];
 
-    // 首先添加素材引用行（仅包含激活的素材）
-    const activatedImageAssets = selectedAssets.filter((a) => a.type === "image" && a.isActivated);
-    const activatedKeyframeAssets = selectedAssets.filter((a) => a.type === "keyframe" && a.isActivated);
-    
-    if (activatedImageAssets.length > 0 || activatedKeyframeAssets.length > 0) {
+    // 收集所有提示词框中实际引用的素材
+    const referencedAssetIds = new Set<string>();
+    const referencedAssets: SelectedAsset[] = [];
+
+    promptBoxes.forEach((box) => {
+      if (box.isActivated && box.activatedAssetId) {
+        referencedAssetIds.add(box.activatedAssetId);
+      }
+    });
+
+    // 如果没有显式引用，则使用第一个激活的素材
+    if (referencedAssetIds.size === 0) {
+      const firstActivated = selectedAssets.find(
+        (a) => (a.type === "image" || a.type === "keyframe") && a.isActivated
+      );
+      if (firstActivated) {
+        referencedAssetIds.add(firstActivated.id);
+      }
+    }
+
+    // 从 selectedAssets 中找出被引用的素材
+    referencedAssetIds.forEach((id) => {
+      const asset = selectedAssets.find((a) => a.id === id);
+      if (asset && (asset.type === "image" || asset.type === "keyframe") && asset.isActivated) {
+        referencedAssets.push(asset);
+      }
+    });
+
+    // 首先添加素材引用行
+    if (referencedAssets.length > 0) {
       const assetRefs: string[] = [];
       
       // 图片素材引用，格式：图片名：@图片文件
-      activatedImageAssets.forEach((asset) => {
-        const displayName = asset.display_name || asset.name;
-        // 使用实际文件名（从 URL 中提取或使用 name）
-        const fileName = asset.name;
-        assetRefs.push(`${displayName}：@${fileName}`);
-      });
-      
-      // 关键帧素材引用
-      activatedKeyframeAssets.forEach((asset) => {
+      referencedAssets.forEach((asset) => {
         const displayName = asset.display_name || asset.name;
         const fileName = asset.name;
         assetRefs.push(`${displayName}：@${fileName}`);

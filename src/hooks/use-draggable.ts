@@ -118,15 +118,24 @@ export function useDraggable({ id, data }: DraggableOptions): UseDraggableReturn
 // 拖拽放置区域 hook
 interface UseDropZoneOptions {
   onDrop?: (data: unknown) => void;
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
-export function useDropZone({ onDrop }: UseDropZoneOptions = {}) {
+export function useDropZone({ onDrop, onDragStateChange }: UseDropZoneOptions = {}) {
   const [isOver, setIsOver] = useState(false);
   const dropRef = useRef<HTMLElement | null>(null);
+  const dragCounter = useRef(0);
 
   const setDropRef = useCallback((node: HTMLElement | null) => {
     dropRef.current = node;
   }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+    setIsOver(true);
+    onDragStateChange?.(true);
+  }, [onDragStateChange]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -136,12 +145,18 @@ export function useDropZone({ onDrop }: UseDropZoneOptions = {}) {
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsOver(false);
-  }, []);
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsOver(false);
+      onDragStateChange?.(false);
+    }
+  }, [onDragStateChange]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    dragCounter.current = 0;
     setIsOver(false);
+    onDragStateChange?.(false);
     
     try {
       const jsonData = e.dataTransfer.getData("application/json");
@@ -152,12 +167,13 @@ export function useDropZone({ onDrop }: UseDropZoneOptions = {}) {
     } catch (err) {
       console.error("Failed to parse drop data:", err);
     }
-  }, [onDrop]);
+  }, [onDrop, onDragStateChange]);
 
   return {
     dropRef: setDropRef,
     isOver,
     dropZoneProps: {
+      onDragEnter: handleDragEnter,
       onDragOver: handleDragOver,
       onDragLeave: handleDragLeave,
       onDrop: handleDrop,
