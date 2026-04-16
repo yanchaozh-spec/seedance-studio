@@ -697,10 +697,11 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           <div className="space-y-4">
             {filteredTasks.map((task) => (
               <div key={task.id} className="bg-card border rounded-lg overflow-hidden">
-                {/* 视频播放器区域 */}
+                {/* 视频播放器区域 - 水平布局 */}
                 {task.status === "succeeded" && task.result?.video_url && (
-                  <div className="flex gap-3 p-3 bg-black/5" onClick={(e) => e.stopPropagation()}>
-                    <div className="relative w-48 h-28 bg-black rounded overflow-hidden flex-shrink-0">
+                  <div className="flex gap-4 p-4 bg-black/5">
+                    {/* 左侧视频 */}
+                    <div className="relative w-56 h-32 bg-black rounded overflow-hidden flex-shrink-0">
                       <video
                         ref={(el) => {
                           if (el) videoRefs.current.set(task.id, el);
@@ -711,167 +712,152 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         preload="metadata"
                       />
                     </div>
-                    <div className="flex flex-col justify-center gap-2 flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                    
+                    {/* 右侧信息 */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      {/* 状态和ID */}
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-sm text-muted-foreground">{task.id.slice(0, 20)}...</span>
+                        <div className="flex items-center gap-2">
+                          {task.completion_tokens && (
+                            <span className="text-xs text-yellow-600">
+                              {task.completion_tokens.toLocaleString()} tokens
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-sm font-medium text-green-500">
+                            {(() => {
+                              const Icon = statusConfig[task.status].icon;
+                              return <Icon className="w-4 h-4" />;
+                            })()}
+                            {statusConfig[task.status].label}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* 时间信息 */}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>
+                          提交: {new Date(task.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {task.completed_at && (
+                          <span>
+                            完成: {new Date(task.completed_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                        {task.generation_duration && (
+                          <span>耗时: {formatSeconds(task.generation_duration)}</span>
+                        )}
+                      </div>
+                      
+                      {/* 操作按钮 */}
+                      <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-1 text-xs h-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExtractFrame(task);
-                          }}
+                          className="gap-1.5 text-xs h-8"
+                          onClick={() => setSelectedTask(task)}
                         >
-                          <Camera className="w-3 h-3" />
+                          <Eye className="w-3.5 h-3.5" />
+                          详情
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-8"
+                          onClick={() => handleExtractFrame(task)}
+                        >
+                          <Camera className="w-3.5 h-3.5" />
                           抽帧
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-1 text-xs h-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload(task);
-                          }}
+                          className="gap-1.5 text-xs h-8"
+                          onClick={() => handleDownload(task)}
                         >
-                          <Download className="w-3 h-3" />
+                          <Download className="w-3.5 h-3.5" />
                           下载
                         </Button>
                       </div>
-                      {task.completion_tokens && (
-                        <div className="flex items-center gap-1 text-xs text-yellow-600">
-                          <Sparkles className="w-3 h-3" />
-                          <span>{task.completion_tokens.toLocaleString()} tokens</span>
-                        </div>
-                      )}
-                      {task.generation_duration && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="w-3 h-3" />
-                          <span>生成耗时 {formatSeconds(task.generation_duration)}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
-                <div
-                  className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => task.status === "running" ? null : setSelectedTask(task)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-mono text-sm">{task.id.slice(0, 20)}...</span>
-                        <div className={cn("flex items-center gap-1", statusConfig[task.status].color)}>
+                
+                {/* 非成功状态的任务 */}
+                {task.status !== "succeeded" && (
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-mono text-sm text-muted-foreground">{task.id.slice(0, 20)}...</span>
+                      <div className="flex items-center gap-2">
+                        {task.completion_tokens && (
+                          <span className="text-xs text-yellow-600">
+                            {task.completion_tokens.toLocaleString()} tokens
+                          </span>
+                        )}
+                        <span className={cn("flex items-center gap-1 text-sm font-medium", 
+                          task.status === "running" ? "text-blue-500" :
+                          task.status === "failed" ? "text-red-500" : "text-muted-foreground"
+                        )}>
                           {(() => {
                             const Icon = statusConfig[task.status].icon;
-                            return task.status === "running" ? (
+                            return task.status === "running" || task.status === "queued" || task.status === "pending" ? (
                               <Icon className="w-4 h-4 animate-spin" />
                             ) : (
                               <Icon className="w-4 h-4" />
                             );
                           })()}
-                          <span className="text-sm">{statusConfig[task.status].label}</span>
-                        </div>
-                        {/* Token 消耗 */}
-                        {task.completion_tokens && (
-                          <div className="flex items-center gap-1 text-xs text-yellow-600">
-                            <Sparkles className="w-3 h-3" />
-                            <span>{task.completion_tokens.toLocaleString()}</span>
-                          </div>
-                        )}
-                        {/* 耗时 */}
-                        {(task.queue_duration || task.generation_duration) && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {task.queue_duration && (
-                              <>
-                                <Clock className="w-3 h-3" />
-                                <span>排队 {formatSeconds(task.queue_duration)}</span>
-                              </>
-                            )}
-                            {task.generation_duration && (
-                              <>
-                                <Play className="w-3 h-3" />
-                                <span>生成 {formatSeconds(task.generation_duration)}</span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>
-                          创建: {formatDistanceToNow(new Date(task.created_at), { addSuffix: true, locale: zhCN })}
+                          {statusConfig[task.status].label}
                         </span>
-                        {task.completed_at && (
-                          <span>
-                            完成: {formatDistanceToNow(new Date(task.completed_at), { addSuffix: true, locale: zhCN })}
-                          </span>
-                        )}
                       </div>
                     </div>
-                    {/* 更多操作菜单 */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {task.status === "succeeded" && (
-                          <>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownload(task); }}>
-                              <Download className="w-4 h-4 mr-2" />
-                              下载视频
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExtractFrame(task); }}>
-                              <Camera className="w-4 h-4 mr-2" />
-                              抽帧保存
-                            </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRollback(task); }}>
-                                <RotateCcw className="w-4 h-4 mr-2" />
-                                回滚
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {task.status === "failed" && (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRollback(task); }}>
-                              <RotateCcw className="w-4 h-4 mr-2" />
-                              重新生成
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={(e) => { e.stopPropagation(); handleDelete(task.id); }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            删除
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    
+                    {/* 进度条 */}
+                    {task.status === "running" && (
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">生成进度</span>
+                          <span>{task.progress || 0}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 transition-all"
+                            style={{ width: `${task.progress || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 错误信息 */}
+                    {task.status === "failed" && task.error_message && (
+                      <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 rounded p-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>{task.error_message}</span>
+                      </div>
+                    )}
+                    
+                    {/* 操作按钮 */}
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs h-8"
+                        onClick={() => setSelectedTask(task)}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        详情
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs h-8 text-destructive"
+                        onClick={() => handleDelete(task.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        删除
+                      </Button>
+                    </div>
                   </div>
-                  {/* 进度条 */}
-                  {task.status === "running" && (
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">生成进度</span>
-                        <span>{task.progress || 0}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500 transition-all"
-                          style={{ width: `${task.progress || 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {/* 错误信息 */}
-                  {task.status === "failed" && task.error_message && (
-                    <div className="mt-2 flex items-start gap-2 text-xs text-red-600 bg-red-50 rounded p-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>{task.error_message}</span>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             ))}
           </div>
