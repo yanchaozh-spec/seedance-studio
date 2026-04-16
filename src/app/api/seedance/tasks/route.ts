@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
-import { getAsset } from "@/lib/assets";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const MODEL_ID = "doubao-seedance-2-0-260128";
@@ -21,6 +20,43 @@ interface CreateTaskRequest {
     ratio: string;
     resolution: string;
   };
+}
+
+// 构建符合 Seedance 2.0 格式的提示词
+function buildPrompt(
+  boxContent: string,
+  asset: {
+    display_name: string;
+    name: string;
+    type: string;
+    bound_audio_id?: string;
+    voice_description?: string;
+    keyframe_description?: string;
+  } | null,
+  keyframeDesc?: string
+): string {
+  if (!asset) return boxContent;
+
+  const displayName = asset.display_name || asset.name;
+
+  // 关键帧特殊处理
+  if (asset.type === "keyframe") {
+    const desc = keyframeDesc || asset.keyframe_description || "";
+    if (desc) {
+      return `视频首帧@"${displayName}"，${desc}，${boxContent}`;
+    }
+    return `视频首帧@"${displayName}"，${boxContent}`;
+  }
+
+  // 普通图片处理
+  let referenceText = `"${displayName}"@这张图片`;
+
+  // 如果绑定了音频，添加声线描述
+  if (asset.voice_description) {
+    referenceText += `，声线为"${asset.voice_description}"`;
+  }
+
+  return `${referenceText}，${boxContent}`;
 }
 
 // 创建视频生成任务
@@ -46,66 +82,77 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch assets" }, { status: 500 });
     }
 
-    // 构建 content 数组
+    // 分类素材
+    const imageAssets = (assets || []).filter((a) => a.type === "image");
+    const keyframeAssets = (assets || []).filter((a) => a.type === "keyframe" || a.is_keyframe);
+    const audioAssets = (assets || []).filter((a) => a.type === "audio");
+
+    // 构建 content 数组 - 严格按照 Seedance 2.0 格式
     const content: Array<{
       type: "text" | "image_url";
       text?: string;
       image_url?: { url: string };
     }> = [];
 
-    // 按顺序添加提示词和素材
-    const imageAssets = (assets || []).filter((a: { type: string }) => a.type === "image");
-    
-    prompt_boxes
-      .sort((a, b) => a.order - b.order)
-      .forEach((box) => {
-        if (!box.content.trim()) return;
+    // 按顺序处理每个提示词框
+    const sortedBoxes = prompt_boxes
+      .filter((box) => box.content.trim())
+      .sort((a, b) => a.order - b.order);
 
-        let text = box.content.trim();
+    for (const box of sortedBoxes) {
+      // 找到该提示词框激活的素材
+      let activatedAsset = null;
+      if (box.is_activated && box.activated_asset_id) {
+        activatedAsset = (assets || []).find((a) => a.id === box.activated_asset_id);
+      }
 
-        // 如果激活了素材引用
-        if (box.is_activated && imageAssets.length > 0) {
-          const imageAsset = imageAssets[0];
-          const displayName = imageAsset.display_name || "图1";
-          
-          let referenceText = `"${displayName}"@这张图片`;
-          
-          // 如果绑定了音频，添加声线描述
-          if (imageAsset.bound_audio_id) {
-            const audioAsset = (assets || []).find(
-              (a: { id: string }) => a.id === imageAsset.bound_audio_id
-            );
-            if (audioAsset?.voice_description) {
-              referenceText += `，声线为"${audioAsset.voice_description}"`;
+      // 如果没有指定，使用第一个可用的图片或关键帧
+      if (!activatedAsset) {
+        activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
+      }
+
+      // 获取该素材绑定的音频信息
+      let voiceDesc: string | undefined;
+      if (activatedAsset?.bound_audio_id) {
+        const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
+        voiceDesc = boundAudio?.voice_description;
+      }
+
+      // 构建提示词文本
+      const promptText = buildPrompt(
+        box.content.trim(),
+        activatedAsset
+          ? {
+              ...activatedAsset,
+              voice_description: voiceDesc,
             }
-          }
-          
-          text = `${referenceText}，${text}`;
-        }
+          : null,
+        box.keyframe_description
+      );
 
-        content.push({
-          type: "text",
-          text,
-        });
-
-        // 如果有图片素材，作为首帧添加到最后一个文本内容后面
-        if (box.is_activated && imageAssets.length > 0) {
-          const imageAsset = imageAssets[0];
-          content.push({
-            type: "image_url",
-            image_url: {
-              url: imageAsset.url,
-            },
-          });
-        }
+      // 添加文本内容
+      content.push({
+        type: "text",
+        text: promptText,
       });
+
+      // 如果有图片素材，添加图片 URL（每个提示词框只添加一次）
+      if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+        content.push({
+          type: "image_url",
+          image_url: {
+            url: activatedAsset.url,
+          },
+        });
+      }
+    }
 
     if (content.length === 0) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });
     }
 
-    // 调用 ARK API 创建任务
-    // 构建请求参数
+    // 构建请求参数 - 修复 first_frame_image 位置问题
+    // 注意：Seedance 2.0 API 的 first_frame_image 应该放在首帧位置，不是单独的字段
     const requestBody: Record<string, unknown> = {
       model: MODEL_ID,
       content,
@@ -115,70 +162,77 @@ export async function POST(request: NextRequest) {
       watermark: false,
     };
 
-    // 处理关键帧 - 如果有关键帧素材，需要调整 content 结构
-    const keyframeAssets = (assets || []).filter((a: { type: string; is_keyframe?: boolean }) => a.type === "keyframe" || a.is_keyframe);
-    
-    // 如果有图片或关键帧，添加到 content 中
-    if (imageAssets.length > 0) {
-      const firstImage = imageAssets[0];
-      requestBody.first_frame_image = {
-        url: firstImage.url,
-      };
-      
-      // 如果有关键帧描述
-      const keyframeDesc = prompt_boxes.find((box) => box.keyframe_description)?.keyframe_description;
-      if (keyframeDesc) {
-        requestBody.first_frame_description = keyframeDesc;
-      }
+    // 处理首帧图片 - 如果有图片或关键帧，作为首帧处理
+    // 注意：首帧应该已经在 content 数组的第一或第二个位置处理
+    // 这里只处理额外的首帧描述（如果有的话）
+    const keyframeDesc = prompt_boxes.find((box) => box.keyframe_description)?.keyframe_description;
+    if (keyframeDesc && keyframeAssets.length > 0) {
+      // 如果有关键帧描述，添加到 content 中
+      const firstKeyframe = keyframeAssets[0];
+      // 在 content 开头插入首帧描述
+      requestBody.first_frame_description = keyframeDesc;
     }
 
-    const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    console.log("Seedance API Request:", JSON.stringify(requestBody, null, 2));
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      // 保存失败任务到数据库
-      await client.from("tasks").insert({
-        project_id,
-        id: `failed-${Date.now()}`,
-        status: "failed",
-        progress: 0,
-        prompt_boxes,
-        selected_assets,
-        params,
-        error_message: data.error?.message || JSON.stringify(data),
-      });
-
-      return NextResponse.json({ error: data.error || "API request failed" }, { status: response.status });
-    }
-
-    // 保存任务到数据库
-    const taskId = data.id;
-    const { error: insertError } = await client.from("tasks").insert({
+    // 先保存任务到数据库（状态为 pending）
+    const tempTaskId = `temp-${Date.now()}`;
+    const { error: tempInsertError } = await client.from("tasks").insert({
       project_id,
-      id: taskId,
-      status: "queued",
+      id: tempTaskId,
+      status: "pending",
       progress: 0,
       prompt_boxes,
       selected_assets,
       params,
     });
 
-    if (insertError) {
-      console.error("Failed to save task:", insertError);
+    if (tempInsertError) {
+      console.error("Failed to create temp task:", tempInsertError);
     }
 
-    return NextResponse.json({
-      id: taskId,
-      status: "queued",
-    });
+    try {
+      const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // 更新失败任务状态
+        await client.from("tasks").update({
+          status: "failed",
+          error_message: data.error?.message || JSON.stringify(data),
+        }).eq("id", tempTaskId);
+
+        return NextResponse.json({ error: data.error || "API request failed" }, { status: response.status });
+      }
+
+      // 更新任务 ID 为真实的 API 返回 ID
+      const taskId = data.id;
+      await client.from("tasks").update({
+        id: taskId,
+        status: "queued",
+      }).eq("id", tempTaskId);
+
+      return NextResponse.json({
+        id: taskId,
+        status: "queued",
+      });
+    } catch (apiError) {
+      // API 调用失败，更新任务状态为失败
+      await client.from("tasks").update({
+        status: "failed",
+        error_message: apiError instanceof Error ? apiError.message : String(apiError),
+      }).eq("id", tempTaskId);
+
+      throw apiError;
+    }
   } catch (error) {
     console.error("Create task error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -216,7 +270,7 @@ export async function GET(request: NextRequest) {
     // 更新数据库中的任务状态
     const client = getSupabaseClient();
     const status = data.status === "succeeded" ? "succeeded" : data.status === "failed" ? "failed" : data.status;
-    
+
     const updateData: Record<string, unknown> = {
       status,
       progress: data.status === "running" ? 50 : data.status === "succeeded" ? 100 : 0,

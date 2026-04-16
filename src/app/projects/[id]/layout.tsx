@@ -67,11 +67,18 @@ function DraggableAsset({ asset, showRemove, onRemove }: DraggableAssetProps) {
     setDragging(false);
   };
 
+  // 阻止点击事件冒泡和默认行为，避免点击触发添加
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <div
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onClick={handleClick}
       className="relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none"
     >
       {asset.type === "image" ? (

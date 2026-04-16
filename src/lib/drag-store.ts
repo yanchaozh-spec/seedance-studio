@@ -1,6 +1,6 @@
 "use client";
 
-import { create } from 'zustand';
+import { create } from "zustand";
 
 interface DragState {
   isDragging: boolean;
@@ -11,39 +11,37 @@ interface DragState {
   reset: () => void;
 }
 
-export const useDragStore = create<DragState>((set, get) => ({
+export const useDragStore = create<DragState>((set) => ({
   isDragging: false,
   draggedAssetId: null,
   isOverDropZone: false,
-  
+
   setDragging: (isDragging, assetId) => {
-    // 只有在当前没有其他拖拽，或者正在开始的拖拽ID匹配时才更新
-    const current = get();
     if (!isDragging) {
       // 重置时清空所有状态
-      set({ 
-        isDragging: false, 
+      set({
+        isDragging: false,
         draggedAssetId: null,
-        isOverDropZone: false 
+        isOverDropZone: false,
       });
     } else if (assetId) {
       // 开始拖拽
-      set({ 
-        isDragging: true, 
-        draggedAssetId: assetId 
+      set({
+        isDragging: true,
+        draggedAssetId: assetId,
       });
     }
   },
-  
+
   setOverDropZone: (isOver) => {
     set({ isOverDropZone: isOver });
   },
-  
+
   reset: () => {
-    set({ 
-      isDragging: false, 
+    set({
+      isDragging: false,
       draggedAssetId: null,
-      isOverDropZone: false 
+      isOverDropZone: false,
     });
   },
 }));
