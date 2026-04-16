@@ -413,15 +413,15 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               <p className="text-sm">从右侧素材库拖拽素材到这里</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-6">
               {/* 关键帧 */}
               {keyframeAssets.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <Scissors className="w-4 h-4" />
                     关键帧 ({keyframeAssets.length})
                   </h3>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {keyframeAssets.map((asset) => (
                       <div
                         key={asset.id}
@@ -430,7 +430,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           asset.isActivated ? "ring-2 ring-primary" : "opacity-60"
                         )}
                       >
-                        <div className="w-20 h-20">
+                        {/* 16:9 缩略图 */}
+                        <div className="aspect-video">
                           {asset.thumbnail_url || asset.url ? (
                             <img
                               src={asset.thumbnail_url || asset.url}
@@ -439,11 +440,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Scissors className="w-8 h-8 text-primary" />
+                              <Scissors className="w-10 h-10 text-primary" />
                             </div>
                           )}
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1">
+                        {/* 底部信息 */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2">
                           <span className="text-xs text-white truncate block">
                             {asset.display_name || asset.name}
                           </span>
@@ -452,21 +454,21 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                         <button
                           onClick={() => toggleAssetActivation(asset.id)}
                           className={cn(
-                            "absolute top-1 right-1 rounded-full p-1 transition-all",
+                            "absolute top-2 right-2 rounded-full p-1.5 transition-all shadow-md",
                             asset.isActivated 
                               ? "bg-primary text-primary-foreground opacity-100" 
-                              : "bg-muted text-muted-foreground opacity-0 group-hover:opacity-100"
+                              : "bg-white/90 text-muted-foreground opacity-0 group-hover:opacity-100"
                           )}
                           title={asset.isActivated ? "已激活，点击取消" : "点击激活"}
                         >
-                          <Check className="w-3 h-3" />
+                          <Check className="w-4 h-4" />
                         </button>
                         {/* 删除按钮 */}
                         <button
                           onClick={() => handleRemoveAsset(asset.id)}
-                          className="absolute top-1 left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 left-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -477,11 +479,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               {/* 图片 */}
               {imageAssets.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <Image className="w-4 h-4" />
                     图片 ({imageAssets.length})
                   </h3>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {imageAssets.map((asset) => (
                       <div
                         key={asset.id}
@@ -490,7 +492,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           asset.isActivated && "ring-2 ring-primary"
                         )}
                       >
-                        <div className="w-20 h-20">
+                        {/* 16:9 缩略图 */}
+                        <div className="aspect-video">
                           {asset.thumbnail_url ? (
                             <img
                               src={asset.thumbnail_url}
@@ -499,16 +502,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Image className="w-8 h-8 text-muted-foreground" />
+                              <Image className="w-10 h-10 text-muted-foreground" />
                             </div>
                           )}
                           {asset.bound_audio_id && (
-                            <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs px-1 rounded">
+                            <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
                               <Music className="w-3 h-3" />
                             </div>
                           )}
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1">
+                        {/* 底部信息 */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2">
                           <span className="text-xs text-white truncate block">
                             {asset.display_name || asset.name}
                           </span>
@@ -517,21 +521,21 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                         <button
                           onClick={() => toggleAssetActivation(asset.id)}
                           className={cn(
-                            "absolute top-1 right-1 rounded-full p-1 transition-all",
+                            "absolute top-2 right-2 rounded-full p-1.5 transition-all shadow-md",
                             asset.isActivated 
                               ? "bg-primary text-primary-foreground opacity-100" 
-                              : "bg-muted text-muted-foreground opacity-0 group-hover:opacity-100"
+                              : "bg-white/90 text-muted-foreground opacity-0 group-hover:opacity-100"
                           )}
                           title={asset.isActivated ? "已激活，点击取消" : "点击激活"}
                         >
-                          <Check className="w-3 h-3" />
+                          <Check className="w-4 h-4" />
                         </button>
                         {/* 删除按钮 */}
                         <button
                           onClick={() => handleRemoveAsset(asset.id)}
-                          className="absolute top-1 left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 left-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -542,7 +546,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               {/* 音频 */}
               {audioAssets.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <Music className="w-4 h-4" />
                     音频 ({audioAssets.length})
                   </h3>
