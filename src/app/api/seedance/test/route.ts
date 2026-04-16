@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey } = await request.json();
+    const { apiKey, modelId } = await request.json();
     
     if (!apiKey) {
       return NextResponse.json({ error: "API Key 不能为空" }, { status: 400 });
     }
+    
+    // 使用传入的 modelId 或默认的接入点 ID
+    const testModelId = modelId || "ep-20260416124751-x4tfn";
     
     // 调用 Seedance API 测试连通性
     const response = await fetch("https://ark.cn-beijing.volces.com/api/v3/chat/completions", {
@@ -16,7 +19,7 @@ export async function POST(request: NextRequest) {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "ep-20250416153929-9r28j",
+        model: testModelId,
         messages: [
           {
             role: "user",

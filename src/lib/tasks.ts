@@ -57,8 +57,13 @@ export async function getTasks(projectId: string): Promise<Task[]> {
 }
 
 // 获取单个任务
-export async function getTask(id: string): Promise<Task | null> {
-  const response = await fetch(`/api/tasks/${id}`);
+export async function getTask(id: string, apiKey?: string): Promise<Task | null> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-ark-api-key"] = apiKey;
+  }
+  
+  const response = await fetch(`/api/tasks/${id}`, { headers });
   if (!response.ok) {
     throw new Error("Failed to fetch task");
   }
@@ -106,14 +111,15 @@ export async function pollTaskStatus(
   id: string,
   callback?: (task: Task) => void,
   interval = 3000,
-  maxAttempts = 200
+  maxAttempts = 200,
+  apiKey?: string
 ): Promise<Task> {
   let attempts = 0;
 
   return new Promise((resolve, reject) => {
     const poll = async () => {
       try {
-        const task = await getTask(id);
+        const task = await getTask(id, apiKey);
         if (!task) {
           reject(new Error("任务不存在"));
           return;
