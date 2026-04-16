@@ -39,13 +39,15 @@ import { toast } from "sonner";
 
 // 设置弹窗组件
 function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { arkApiKey, setArkApiKey } = useSettingsStore();
+  const { arkApiKey, setArkApiKey, modelId, setModelId } = useSettingsStore();
   const { theme, setTheme } = useTheme();
   const [localApiKey, setLocalApiKey] = useState(arkApiKey);
+  const [localModelId, setLocalModelId] = useState(modelId);
   const [saving, setSaving] = useState(false);
 
   const handleSaveApiKey = () => {
     setArkApiKey(localApiKey);
+    setModelId(localModelId);
     setSaving(true);
     setTimeout(() => setSaving(false), 1500);
   };
@@ -86,48 +88,66 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
             </div>
           </div>
 
-          {/* API Key */}
-          <div className="space-y-3">
+          {/* API 配置 */}
+          <div className="space-y-4">
             <Label className="text-sm font-medium">API 配置</Label>
-            <div className="flex gap-2">
+            
+            {/* 接入点 ID */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">接入点 ID</Label>
               <Input
-                type="password"
-                placeholder="ARK API Key"
-                value={localApiKey}
-                onChange={(e) => setLocalApiKey(e.target.value)}
-                className="flex-1"
+                placeholder="ep-20260416124751-x4tfn"
+                value={localModelId}
+                onChange={(e) => setLocalModelId(e.target.value)}
+                className="text-sm"
               />
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={async () => {
-                  if (!localApiKey.trim()) {
-                    alert("请输入 API Key");
-                    return;
-                  }
-                  try {
-                    const response = await fetch("/api/seedance/test", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ apiKey: localApiKey }),
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      toast.success("连接成功！API Key 有效");
-                    } else {
-                      toast.error(data.error || "连接失败");
-                    }
-                  } catch {
-                    toast.error("连接测试失败");
-                  }
-                }}
-              >
-                测试
-              </Button>
-              <Button size="sm" onClick={handleSaveApiKey} disabled={saving}>
-                {saving ? "已保存" : "保存"}
-              </Button>
             </div>
+            
+            {/* API Key */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">API Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder="ARK API Key"
+                  value={localApiKey}
+                  onChange={(e) => setLocalApiKey(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    if (!localApiKey.trim()) {
+                      alert("请输入 API Key");
+                      return;
+                    }
+                    try {
+                      const response = await fetch("/api/seedance/test", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ apiKey: localApiKey }),
+                      });
+                      const data = await response.json();
+                      if (data.success) {
+                        toast.success("连接成功！API Key 有效");
+                      } else {
+                        toast.error(data.error || "连接失败");
+                      }
+                    } catch {
+                      toast.error("连接测试失败");
+                    }
+                  }}
+                >
+                  测试
+                </Button>
+              </div>
+            </div>
+            
+            {/* 保存按钮 */}
+            <Button size="sm" onClick={handleSaveApiKey} disabled={saving} className="w-full">
+              {saving ? "已保存" : "保存设置"}
+            </Button>
           </div>
         </div>
       </DialogContent>

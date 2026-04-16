@@ -3,8 +3,8 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 
-// 固定使用自定义推理节点接入点 ID
-const MODEL_ID = "ep-20260416124751-x4tfn";
+// 默认接入点 ID
+const DEFAULT_MODEL_ID = "ep-20260416124751-x4tfn";
 
 // 请求体类型
 interface CreateTaskRequest {
@@ -23,6 +23,7 @@ interface CreateTaskRequest {
     ratio: string;
     resolution: string;
   };
+  model_id?: string; // 可选，由前端传入
 }
 
 // Content Item 类型定义 - 严格按照 API 文档格式
@@ -217,9 +218,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });
     }
 
+    // 使用前端传入的 model_id 或默认值
+    const modelId = body.model_id || DEFAULT_MODEL_ID;
+
     // 构建请求参数 - 严格按照 API 文档格式
     const requestBody: Record<string, unknown> = {
-      model: MODEL_ID,
+      model: modelId,
       content,
       generate_audio: true,
       ratio: params.ratio,
@@ -261,7 +265,7 @@ export async function POST(request: NextRequest) {
         task_id_external: taskId,
         status: "queued",
         model_mode: "standard",
-        model_id: MODEL_ID,
+        model_id: modelId,
         progress: 0,
         prompt_boxes,
         selected_assets,
@@ -279,7 +283,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         id: taskId,
         status: "queued",
-        model: MODEL_ID,
+        model: modelId,
       });
     } catch (apiError) {
       console.error("API call failed:", apiError);

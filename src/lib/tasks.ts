@@ -72,6 +72,7 @@ export async function createTask(task: {
   prompt_boxes: PromptBox[];
   selected_assets: string[];
   params: TaskParams;
+  model_id?: string;
 }, apiKey?: string): Promise<{ id: string; model?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) {

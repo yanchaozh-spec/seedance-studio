@@ -45,7 +45,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const isDragging = useIsDragging();
   const setOverDropZone = useDragStore((state) => state.setOverDropZone);
   const isOverDropZone = useDragStore((state) => state.isOverDropZone);
-  const { arkApiKey } = useSettingsStore();
+  const { arkApiKey, modelId } = useSettingsStore();
   const poolDropRef = useRef<HTMLDivElement>(null);
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
@@ -360,6 +360,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         })),
         selected_assets: selectedAssets.map((a) => a.id),
         params: params_,
+        model_id: modelId,
       }, arkApiKey);
 
       toast.success("任务已创建");
