@@ -18,6 +18,7 @@ import { useSettingsStore } from "@/lib/settings";
 import { useDragStore } from "@/lib/drag-store";
 import { formatDistanceToNow } from "date-fns";
 import { SelectedAsset } from "./page";
+import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
@@ -273,6 +274,16 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       router.push("/projects");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 加载素材列表
+  const loadMaterials = async () => {
+    try {
+      const assets = await getAssets(resolvedParams.id);
+      setMaterials(assets);
+    } catch (error) {
+      console.error("加载素材失败:", error);
     }
   };
 
@@ -635,19 +646,74 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               {/* 底部操作按钮 */}
                               <div className="flex gap-2">
                                 <Button
-                                  variant="secondary"
+                                  variant="outline"
                                   size="sm"
                                   className="flex-1 gap-1 text-xs h-7"
-                                  onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
+                                  onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
                                 >
-                                  <Eye className="w-3 h-3" />
-                                  查看详情
+                                  <Film className="w-3 h-3" />
+                                  完整管理
                                 </Button>
                                 <Button
-                                  variant="secondary"
+                                  variant="default"
                                   size="sm"
                                   className="flex-1 gap-1 text-xs h-7"
-                                  onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
+                                  onClick={() => {
+                                    // 直接在页面顶部添加一个临时视频元素进行抽帧
+                                    const video = document.createElement("video");
+                                    video.src = task.result?.video_url || "";
+                                    video.crossOrigin = "anonymous";
+                                    video.muted = true;
+                                    video.preload = "metadata";
+                                    
+                                    video.onloadedmetadata = async () => {
+                                      video.currentTime = 0;
+                                    };
+                                    
+                                    video.onseeked = async () => {
+                                      try {
+                                        const canvas = document.createElement("canvas");
+                                        canvas.width = video.videoWidth;
+                                        canvas.height = video.videoHeight;
+                                        const ctx = canvas.getContext("2d");
+                                        if (ctx) {
+                                          ctx.drawImage(video, 0, 0);
+                                          canvas.toBlob(async (blob) => {
+                                            if (blob) {
+                                              const formData = new FormData();
+                                              formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+                                              formData.append("projectId", resolvedParams.id);
+                                              formData.append("taskId", task.id);
+                                              formData.append("timestamp", "0");
+                                              formData.append("assetCategory", "keyframe");
+                                              formData.append("name", `关键帧_${Date.now()}`);
+                                              
+                                              const res = await fetch("/api/assets/extract-frame", {
+                                                method: "POST",
+                                                body: formData,
+                                              });
+                                              
+                                              if (res.ok) {
+                                                toast.success("已保存为关键帧");
+                                                loadMaterials?.();
+                                              } else {
+                                                toast.error("保存失败");
+                                              }
+                                            }
+                                            video.remove();
+                                          }, "image/png");
+                                        }
+                                      } catch (e) {
+                                        toast.error("抽帧失败");
+                                        video.remove();
+                                      }
+                                    };
+                                    
+                                    video.onerror = () => {
+                                      toast.error("视频加载失败");
+                                      video.remove();
+                                    };
+                                  }}
                                 >
                                   <Camera className="w-3 h-3" />
                                   抽帧

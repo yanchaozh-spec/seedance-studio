@@ -545,6 +545,43 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
+  // 抽帧处理函数
+  const handleExtractFrame = async (task: Task) => {
+    if (!task.result || !task.result.video_url) return;
+    
+    toast.promise(
+      async () => {
+        const response = await fetch("/api/assets/extract-frame", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            video_url: task.result!.video_url,
+            project_id: resolvedParams.id,
+            task_id: task.id,
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "抽帧失败");
+        }
+        
+        const result = await response.json();
+        return result;
+      },
+      {
+        loading: "正在抽帧...",
+        success: (data) => {
+          setSelectedTask(null); // 关闭抽帧对话框
+          return `已保存为关键帧: ${data.asset.name}`;
+        },
+        error: (err) => err.message || "抽帧失败",
+      }
+    );
+  };
+
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch = task.id.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || task.status === statusFilter;
@@ -608,9 +645,46 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           <div className="space-y-4">
             {filteredTasks.map((task) => (
               <div key={task.id} className="bg-card border rounded-lg overflow-hidden">
+                {/* 视频播放器区域 */}
+                {task.status === "succeeded" && task.result?.video_url && (
+                  <div className="relative bg-black aspect-video" onClick={(e) => e.stopPropagation()}>
+                    <video
+                      src={task.result.video_url}
+                      controls
+                      className="w-full h-full object-contain"
+                      muted
+                    />
+                    <div className="absolute bottom-2 right-2 flex gap-1">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-8 w-8 bg-black/50 hover:bg-black/70 border-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(task);
+                        }}
+                        title="下载"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-8 w-8 bg-black/50 hover:bg-black/70 border-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExtractFrame(task);
+                        }}
+                        title="抽帧"
+                      >
+                        <Camera className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <div
                   className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => task.status === "running" ? null : setSelectedTask(task)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -663,66 +737,24 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         )}
                       </div>
                     </div>
-                    {/* 操作菜单 */}
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      {task.status === "succeeded" && task.result?.video_url && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`)}
-                            title="查看详情"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownload(task);
-                            }}
-                            title="下载"
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTask(task);
-                            }}
-                            title="抽帧"
-                          >
-                            <Camera className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {task.status === "succeeded" && (
-                            <>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/projects/${resolvedParams.id}/tasks/${task.id}`); }}>
-                                <Eye className="w-4 h-4 mr-2" />
-                                查看详情
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownload(task); }}>
-                                <Download className="w-4 h-4 mr-2" />
-                                下载视频
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedTask(task); }}>
-                                <Camera className="w-4 h-4 mr-2" />
-                                抽帧保存
-                              </DropdownMenuItem>
+                    {/* 更多操作菜单 */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {task.status === "succeeded" && (
+                          <>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownload(task); }}>
+                              <Download className="w-4 h-4 mr-2" />
+                              下载视频
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExtractFrame(task); }}>
+                              <Camera className="w-4 h-4 mr-2" />
+                              抽帧保存
+                            </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRollback(task); }}>
                                 <RotateCcw className="w-4 h-4 mr-2" />
@@ -745,7 +777,6 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
                   </div>
                   {/* 进度条 */}
                   {task.status === "running" && (
