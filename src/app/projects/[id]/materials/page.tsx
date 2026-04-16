@@ -297,7 +297,7 @@ function MaterialDetailDialog({ asset, allAssets, onClose, onUpdate }: MaterialD
                     type="file"
                     accept="audio/*"
                     className="hidden"
-                    onChange={handleUploadAudio}
+                    onChange={(e) => handleUploadAudio(e.target.files)}
                     disabled={uploadingAudio}
                   />
                   <p className="text-xs text-muted-foreground text-center">

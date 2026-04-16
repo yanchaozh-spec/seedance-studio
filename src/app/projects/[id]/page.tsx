@@ -349,70 +349,136 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const audioAssets = selectedAssets.filter((a) => a.type === "audio");
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto">
       {/* 页面标题 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">视频生成</h1>
-        <p className="text-muted-foreground mt-1">输入提示词，选择素材，生成视频</p>
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold">视频生成</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">输入提示词，选择素材，生成视频</p>
       </div>
 
       {/* 提示词区域 */}
-      <div className="bg-card border rounded-lg p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">提示词</h2>
+      <div className="bg-card border rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-medium">提示词</h2>
           <Button variant="outline" size="sm" onClick={() => setPreviewDialogOpen(true)}>
-            <Copy className="w-4 h-4 mr-2" />
-            预览最终提示词
+            <Copy className="w-3 h-3 mr-1.5" />
+            预览
           </Button>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-2">
           {promptBoxes.map((box, index) => (
-            <div key={box.id} className="space-y-2">
+            <div key={box.id} className="space-y-1.5">
               <div className="flex gap-2">
                 <Textarea
                   placeholder={`提示词 ${index + 1}...`}
                   value={box.content}
                   onChange={(e) => updatePromptBox(box.id, e.target.value)}
-                  className="min-h-[60px] resize-none"
+                  className="min-h-[48px] resize-none text-sm"
                 />
                 {promptBoxes.length > 1 && (
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => removePromptBox(box.id)}
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 h-8 w-8"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3 h-3" />
                   </Button>
                 )}
               </div>
               {/* 关键帧描述输入框 */}
               {keyframeAssets.length > 0 && (
                 <Input
-                  placeholder="输入关键帧描述（如：视频首帧），将整合到提示词中"
+                  placeholder="输入关键帧描述"
                   value={box.keyframeDescription || ""}
                   onChange={(e) => updateKeyframeDescription(box.id, e.target.value)}
-                  className="text-sm"
+                  className="text-xs h-7"
                 />
               )}
             </div>
           ))}
         </div>
         
-        <Button variant="outline" className="mt-3" onClick={addPromptBox}>
-          <Plus className="w-4 h-4 mr-2" />
+        <Button variant="outline" size="sm" className="mt-2" onClick={addPromptBox}>
+          <Plus className="w-3 h-3 mr-1.5" />
           添加提示词
         </Button>
       </div>
 
+      {/* 参数设置 + 生成按钮 */}
+      <div className="bg-card border rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-medium">生成参数</h2>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                时长
+              </label>
+              <Select
+                value={params_.duration.toString()}
+                onValueChange={(v) => setParams({ ...params_, duration: parseInt(v) })}
+              >
+                <SelectTrigger className="w-20 h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((d) => (
+                    <SelectItem key={d} value={d.toString()}>{d}秒</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">画幅</label>
+              <Select
+                value={params_.ratio}
+                onValueChange={(v) => setParams({ ...params_, ratio: v })}
+              >
+                <SelectTrigger className="w-24 h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="16:9">16:9</SelectItem>
+                  <SelectItem value="9:16">9:16</SelectItem>
+                  <SelectItem value="adaptive">自适应</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">分辨率</label>
+              <Select
+                value={params_.resolution}
+                onValueChange={(v) => setParams({ ...params_, resolution: v })}
+              >
+                <SelectTrigger className="w-20 h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="480p">480p</SelectItem>
+                  <SelectItem value="720p">720p</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button size="sm" onClick={handleGenerate} disabled={generating} className="ml-2">
+              <Play className="w-3 h-3 mr-1.5" />
+              {generating ? "生成中..." : "开始生成"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* 素材池 */}
       <div className={cn(
-        "bg-card border rounded-lg p-5 mb-6 transition-all duration-200",
+        "bg-card border rounded-lg p-4 transition-all duration-200",
         isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background"
       )}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium flex items-center gap-2">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-medium flex items-center gap-2">
             素材池
             {isOverDropZone && (
               <span className="text-xs text-primary animate-pulse">释放添加</span>
@@ -420,7 +486,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           </h2>
           {selectedAssets.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearPool}>
-              <Trash2 className="w-4 h-4 mr-2" />
+              <Trash2 className="w-3 h-3 mr-1" />
               清空
             </Button>
           )}
@@ -430,22 +496,22 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           ref={poolDropRef}
           {...poolDropZoneProps}
           className={cn(
-            "min-h-[100px] border-2 border-dashed rounded-lg p-4 transition-colors",
+            "min-h-[80px] border-2 border-dashed rounded-lg p-3 transition-colors",
             isOverDropZone ? "border-primary bg-primary/10" : "border-muted-foreground/20"
           )}
         >
           {selectedAssets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-              <Image className="w-8 h-8 mb-2" />
-              <p className="text-sm">从右侧素材库拖拽素材到这里</p>
+            <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
+              <Image className="w-6 h-6 mb-1" />
+              <p className="text-xs">从右侧素材库拖拽素材到这里</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
               {/* 关键帧 */}
               {keyframeAssets.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <Scissors className="w-4 h-4" />
+                  <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                    <Scissors className="w-3 h-3" />
                     {keyframeAssets.map((asset, idx) => (
                       <span key={asset.id}>
                         {asset.display_name || asset.name}
@@ -453,17 +519,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       </span>
                     ))}
                   </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="flex flex-wrap gap-2">
                     {keyframeAssets.map((asset) => (
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden",
+                          "relative group bg-muted rounded-lg overflow-hidden w-16",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
                       >
-                        {/* 16:9 缩略图 */}
-                        <div className="aspect-video relative">
+                        <div className="aspect-square relative">
                           {asset.thumbnail_url || asset.url ? (
                             <img
                               src={asset.thumbnail_url || asset.url}
@@ -472,50 +537,23 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Scissors className="w-10 h-10 text-primary" />
+                              <Scissors className="w-5 h-5 text-primary" />
                             </div>
                           )}
                           {asset.bound_audio_id && (
-                            <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <Music className="w-3 h-3" />
+                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] px-1 rounded flex items-center gap-0.5">
+                              <Music className="w-2.5 h-2.5" />
                             </div>
                           )}
-                          {/* 删除按钮 */}
                           <button
                             onClick={() => handleRemoveAsset(asset.id)}
-                            className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        {/* 底部信息 */}
-                        <div className="p-2 space-y-1">
-                          <span className="text-xs truncate block">
-                            {asset.display_name || asset.name}
-                          </span>
-                          {/* 音频参考按钮 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-1 py-1 rounded text-xs",
-                            asset.bound_audio_id 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-muted-foreground/20 text-muted-foreground"
-                          )}>
-                            <Music className="w-3 h-3" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
-                          </div>
-                          {/* 激活按钮 */}
-                          <button
-                            onClick={() => toggleAssetActivation(asset.id)}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-1 py-1 rounded text-xs transition-all",
-                              asset.isActivated 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
-                            )}
-                          >
-                            <span>激活</span>
-                            {asset.isActivated && <Check className="w-3 h-3" />}
-                          </button>
+                        <div className="p-1">
+                          <span className="text-[10px] truncate block">{asset.display_name || asset.name}</span>
                         </div>
                       </div>
                     ))}
@@ -526,8 +564,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               {/* 图片 */}
               {imageAssets.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <Image className="w-4 h-4" />
+                  <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                    <Image className="w-3 h-3" />
                     {imageAssets.map((asset, idx) => (
                       <span key={asset.id}>
                         {asset.display_name || asset.name}
@@ -535,17 +573,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       </span>
                     ))}
                   </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="flex flex-wrap gap-2">
                     {imageAssets.map((asset) => (
                       <div
                         key={asset.id}
                         className={cn(
-                          "relative group bg-muted rounded-lg overflow-hidden",
+                          "relative group bg-muted rounded-lg overflow-hidden w-16",
                           !asset.isActivated && "opacity-50 grayscale"
                         )}
                       >
-                        {/* 16:9 缩略图 */}
-                        <div className="aspect-video relative">
+                        <div className="aspect-square relative">
                           {asset.thumbnail_url ? (
                             <img
                               src={asset.thumbnail_url}
@@ -554,50 +591,23 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <Image className="w-10 h-10 text-muted-foreground" />
+                              <Image className="w-5 h-5 text-muted-foreground" />
                             </div>
                           )}
                           {asset.bound_audio_id && (
-                            <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <Music className="w-3 h-3" />
+                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] px-1 rounded flex items-center gap-0.5">
+                              <Music className="w-2.5 h-2.5" />
                             </div>
                           )}
-                          {/* 删除按钮 */}
                           <button
                             onClick={() => handleRemoveAsset(asset.id)}
-                            className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        {/* 底部信息 */}
-                        <div className="p-2 space-y-1">
-                          <span className="text-xs truncate block">
-                            {asset.display_name || asset.name}
-                          </span>
-                          {/* 音频参考按钮 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-1 py-1 rounded text-xs",
-                            asset.bound_audio_id 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-muted-foreground/20 text-muted-foreground"
-                          )}>
-                            <Music className="w-3 h-3" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
-                          </div>
-                          {/* 激活按钮 */}
-                          <button
-                            onClick={() => toggleAssetActivation(asset.id)}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-1 py-1 rounded text-xs transition-all",
-                              asset.isActivated 
-                                ? "bg-primary text-primary-foreground" 
-                                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
-                            )}
-                          >
-                            <span>激活</span>
-                            {asset.isActivated && <Check className="w-3 h-3" />}
-                          </button>
+                        <div className="p-1">
+                          <span className="text-[10px] truncate block">{asset.display_name || asset.name}</span>
                         </div>
                       </div>
                     ))}
@@ -608,29 +618,22 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               {/* 音频 */}
               {audioAssets.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <Music className="w-4 h-4" />
+                  <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                    <Music className="w-3 h-3" />
                     音频 ({audioAssets.length})
                   </h3>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2">
                     {audioAssets.map((asset) => (
                       <div
                         key={asset.id}
-                        className="relative group bg-muted rounded-lg overflow-hidden"
+                        className="relative group bg-muted rounded-lg overflow-hidden w-16 h-16 flex items-center justify-center"
                       >
-                        <div className="w-20 h-20 flex flex-col items-center justify-center">
-                          <Music className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1">
-                          <span className="text-xs text-white truncate block">
-                            {asset.display_name || asset.name}
-                          </span>
-                        </div>
+                        <Music className="w-6 h-6 text-muted-foreground" />
                         <button
                           onClick={() => handleRemoveAsset(asset.id)}
-                          className="absolute top-1 left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-2.5 h-2.5" />
                         </button>
                       </div>
                     ))}
@@ -640,73 +643,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             </div>
           )}
         </div>
-      </div>
-
-      {/* 参数设置 */}
-      <div className="bg-card border rounded-lg p-5 mb-6">
-        <h2 className="text-lg font-medium mb-4">生成参数</h2>
-        <div className="flex flex-wrap gap-6">
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-muted-foreground flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              时长
-            </label>
-            <Select
-              value={params_.duration.toString()}
-              onValueChange={(v) => setParams({ ...params_, duration: parseInt(v) })}
-            >
-              <SelectTrigger className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((d) => (
-                  <SelectItem key={d} value={d.toString()}>{d}秒</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-muted-foreground">画幅</label>
-            <Select
-              value={params_.ratio}
-              onValueChange={(v) => setParams({ ...params_, ratio: v })}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="16:9">16:9 横屏</SelectItem>
-                <SelectItem value="9:16">9:16 竖屏</SelectItem>
-                <SelectItem value="adaptive">自适应</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-muted-foreground">分辨率</label>
-            <Select
-              value={params_.resolution}
-              onValueChange={(v) => setParams({ ...params_, resolution: v })}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="480p">480p</SelectItem>
-                <SelectItem value="720p">720p</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* 生成按钮 */}
-      <div className="flex justify-end">
-        <Button size="lg" onClick={handleGenerate} disabled={generating}>
-          <Play className="w-4 h-4 mr-2" />
-          {generating ? "生成中..." : "开始生成"}
-        </Button>
       </div>
 
       {/* 预览提示词对话框 */}
