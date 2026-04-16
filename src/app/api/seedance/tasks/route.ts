@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
-const MODEL_ID = "doubao-seedance-2-0-260128";
 
+// 模型 ID 映射
+const MODEL_IDS = {
+  standard: "doubao-seedance-2-0-260128",   // seedance 2.0 标准版
+  fast: "doubao-seedance-2-0-fast-260128",   // seedance 2.0 fast 版
+} as const;
+
+type ModelMode = keyof typeof MODEL_IDS;
+
+// 请求体类型
 interface CreateTaskRequest {
   project_id: string;
+  model_mode?: ModelMode;  // 可选，默认 standard
   prompt_boxes: Array<{
     id: string;
     content: string;
@@ -22,55 +31,119 @@ interface CreateTaskRequest {
   };
 }
 
-// Content item 类型定义
-type ContentItem =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } }
-  | { type: "video_url"; video_url: { url: string } }
-  | { type: "audio_url"; audio_url: { url: string } };
+// Content Item 类型定义 - 严格按照 API 文档格式
+interface TextContent {
+  type: "text";
+  text: string;
+}
 
-// 构建符合 Seedance 2.0 格式的提示词
-function buildPrompt(
-  boxContent: string,
-  asset: {
-    display_name: string;
-    name: string;
+interface ImageContent {
+  type: "image_url";
+  image_url: {
+    url: string;
+  };
+  role?: "first_frame" | "last_frame" | "reference_image";
+}
+
+interface VideoContent {
+  type: "video_url";
+  video_url: {
+    url: string;
+  };
+  role: "reference_video";
+}
+
+interface AudioContent {
+  type: "audio_url";
+  audio_url: {
+    url: string;
+  };
+  role: "reference_audio";
+}
+
+type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
+
+// 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
+function buildContent(
+  promptBoxes: CreateTaskRequest["prompt_boxes"],
+  assets: Array<{
+    id: string;
+    url: string;
     type: string;
+    display_name?: string;
+    name: string;
     bound_audio_id?: string;
     voice_description?: string;
     keyframe_description?: string;
-  } | null,
-  keyframeDesc?: string
-): string {
-  if (!asset) return boxContent;
+    is_keyframe?: boolean;
+  }>
+): ContentItem[] {
+  const content: ContentItem[] = [];
+  
+  // 分类素材
+  const imageAssets = assets.filter((a) => a.type === "image");
+  const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.is_keyframe);
+  
+  // 按顺序处理每个提示词框
+  const sortedBoxes = promptBoxes
+    .filter((box) => box.content.trim())
+    .sort((a, b) => a.order - b.order);
 
-  const displayName = asset.display_name || asset.name;
-
-  // 关键帧特殊处理
-  if (asset.type === "keyframe") {
-    const desc = keyframeDesc || asset.keyframe_description || "";
-    if (desc) {
-      return `视频首帧@"${displayName}"，${desc}，${boxContent}`;
+  for (const box of sortedBoxes) {
+    // 找到该提示词框激活的素材
+    let activatedAsset = null;
+    if (box.is_activated && box.activated_asset_id) {
+      activatedAsset = assets.find((a) => a.id === box.activated_asset_id);
     }
-    return `视频首帧@"${displayName}"，${boxContent}`;
+
+    // 如果没有指定，使用第一个可用的图片或关键帧
+    if (!activatedAsset) {
+      activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
+    }
+
+    // 添加文本内容
+    const textContent = box.content.trim();
+    if (textContent) {
+      content.push({
+        type: "text",
+        text: textContent,
+      });
+    }
+
+    // 添加图片内容（如果有）
+    if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+      const displayName = activatedAsset.display_name || activatedAsset.name;
+      
+      // 根据素材类型设置 role
+      let role: "first_frame" | "reference_image" | undefined;
+      if (activatedAsset.type === "keyframe" || activatedAsset.is_keyframe) {
+        role = "first_frame";
+      } else {
+        role = "reference_image";
+      }
+
+      content.push({
+        type: "image_url",
+        image_url: {
+          url: activatedAsset.url,
+        },
+        role,
+      });
+    }
   }
 
-  // 普通图片处理
-  let referenceText = `"${displayName}"@这张图片`;
-
-  // 如果绑定了音频，添加声线描述
-  if (asset.voice_description) {
-    referenceText += `，声线为"${asset.voice_description}"`;
-  }
-
-  return `${referenceText}，${boxContent}`;
+  return content;
 }
 
 // 创建视频生成任务
 export async function POST(request: NextRequest) {
   try {
     const body: CreateTaskRequest = await request.json();
-    const { project_id, prompt_boxes, selected_assets, params } = body;
+    const { project_id, model_mode, prompt_boxes, selected_assets, params } = body;
+
+    // 确定使用的模型
+    const mode: ModelMode = model_mode || "standard";
+    const modelId = MODEL_IDS[mode];
 
     // 获取 ARK API Key - 优先从请求头获取，其次从环境变量获取
     const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
@@ -89,117 +162,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch assets" }, { status: 500 });
     }
 
-    // 分类素材
-    const imageAssets = (assets || []).filter((a) => a.type === "image");
-    const keyframeAssets = (assets || []).filter((a) => a.type === "keyframe" || a.is_keyframe);
-    const audioAssets = (assets || []).filter((a) => a.type === "audio");
-
-    // 构建 content 数组 - 严格按照 Seedance 2.0 格式
-    // 使用 role 字段区分系统指令和用户内容
-    const content: ContentItem[] = [];
-
-    // 按顺序处理每个提示词框
-    const sortedBoxes = prompt_boxes
-      .filter((box) => box.content.trim())
-      .sort((a, b) => a.order - b.order);
-
-    // 第一个框作为主体
-    let isFirstBox = true;
-
-    for (const box of sortedBoxes) {
-      // 找到该提示词框激活的素材
-      let activatedAsset = null;
-      if (box.is_activated && box.activated_asset_id) {
-        activatedAsset = (assets || []).find((a) => a.id === box.activated_asset_id);
-      }
-
-      // 如果没有指定，使用第一个可用的图片或关键帧
-      if (!activatedAsset) {
-        activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
-      }
-
-      // 获取该素材绑定的音频信息
-      let voiceDesc: string | undefined;
-      if (activatedAsset?.bound_audio_id) {
-        const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
-        voiceDesc = boundAudio?.voice_description;
-      }
-
-      // 构建提示词文本
-      const promptText = buildPrompt(
-        box.content.trim(),
-        activatedAsset
-          ? {
-              ...activatedAsset,
-              voice_description: voiceDesc,
-            }
-          : null,
-        box.keyframe_description
-      );
-
-      // 第一个框：添加文本内容
-      if (isFirstBox) {
-        content.push({
-          type: "text",
-          text: promptText,
-        });
-
-        // 第一个框如果有图片素材，添加图片 URL
-        if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
-          content.push({
-            type: "image_url",
-            image_url: {
-              url: activatedAsset.url,
-            },
-          });
-        }
-
-        isFirstBox = false;
-      } else {
-        // 后续框作为参考
-        content.push({
-          type: "text",
-          text: promptText,
-        });
-
-        // 如果有图片素材，添加图片 URL
-        if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
-          content.push({
-            type: "image_url",
-            image_url: {
-              url: activatedAsset.url,
-            },
-          });
-        }
-      }
-    }
+    // 构建 content 数组
+    const content = buildContent(prompt_boxes, assets || []);
 
     if (content.length === 0) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });
     }
 
-    // 构建请求参数 - 严格按照 Seedance 2.0 官方格式
+    // 构建请求参数 - 严格按照 API 文档格式
     const requestBody: Record<string, unknown> = {
-      model: MODEL_ID,
+      model: modelId,
       content,
       generate_audio: true,
       ratio: params.ratio,
       duration: params.duration,
+      resolution: params.resolution,
       watermark: false,
+      return_last_frame: true,  // 请求返回尾帧
     };
-
-    // 处理首帧描述（如果有）
-    const keyframeDesc = prompt_boxes.find((box) => box.keyframe_description)?.keyframe_description;
-    if (keyframeDesc && keyframeAssets.length > 0) {
-      requestBody.first_frame_description = keyframeDesc;
-    }
-
-    // 处理首帧图片（如果有关键帧）
-    if (keyframeAssets.length > 0 && keyframeAssets[0]) {
-      // 注意：首帧图片应该在 content 数组的第一个 image_url 中已经添加
-      // 如果 API 需要单独的首帧字段，可以在这里添加
-      requestBody.first_frame_image = keyframeAssets[0].url;
-    }
 
     console.log("Seedance API Request:", JSON.stringify(requestBody, null, 2));
 
@@ -209,10 +189,13 @@ export async function POST(request: NextRequest) {
       project_id,
       id: tempTaskId,
       status: "pending",
+      model_mode: mode,
+      model_id: modelId,
       progress: 0,
       prompt_boxes,
       selected_assets,
       params,
+      queued_at: new Date().toISOString(),
     });
 
     if (tempInsertError) {
@@ -238,19 +221,24 @@ export async function POST(request: NextRequest) {
           error_message: data.error?.message || JSON.stringify(data),
         }).eq("id", tempTaskId);
 
-        return NextResponse.json({ error: data.error || "API request failed" }, { status: response.status });
+        return NextResponse.json({ 
+          error: data.error?.message || data.error?.code || "API request failed" 
+        }, { status: response.status });
       }
 
-      // 更新任务 ID 为真实的 API 返回 ID
+      // 更新任务 ID 为真实的 API 返回 ID，并设置队列时间
       const taskId = data.id;
       await client.from("tasks").update({
         id: taskId,
+        task_id_external: taskId,
         status: "queued",
+        queued_at: new Date().toISOString(),
       }).eq("id", tempTaskId);
 
       return NextResponse.json({
         id: taskId,
         status: "queued",
+        model: modelId,
       });
     } catch (apiError) {
       // API 调用失败，更新任务状态为失败
@@ -277,7 +265,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Task ID required" }, { status: 400 });
     }
 
-    const apiKey = process.env.ARK_API_KEY;
+    const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "ARK API Key not configured" }, { status: 500 });
     }
@@ -292,28 +280,58 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ error: data.error || "API request failed" }, { status: response.status });
+      return NextResponse.json({ 
+        error: data.error?.message || data.error?.code || "API request failed" 
+      }, { status: response.status });
     }
 
     // 更新数据库中的任务状态
     const client = getSupabaseClient();
-    const status = data.status === "succeeded" ? "succeeded" : data.status === "failed" ? "failed" : data.status;
-
+    
     const updateData: Record<string, unknown> = {
-      status,
+      status: data.status,
       progress: data.status === "running" ? 50 : data.status === "succeeded" ? 100 : 0,
     };
 
-    if (data.status === "succeeded" && data.content) {
+    // 记录时间戳
+    if (data.status === "running" || data.status === "succeeded") {
+      updateData.started_at = new Date(data.updated_at * 1000).toISOString();
+    }
+    
+    if (data.status === "succeeded") {
+      updateData.completed_at = new Date(data.updated_at * 1000).toISOString();
       updateData.result = {
-        video_url: data.content.video_url,
+        video_url: data.content?.video_url,
         resolution: data.resolution,
         duration: data.duration,
+        last_frame_url: data.content?.last_frame_url,
       };
     }
-
+    
     if (data.status === "failed") {
+      updateData.completed_at = new Date(data.updated_at * 1000).toISOString();
       updateData.error_message = data.error?.message || "Generation failed";
+    }
+
+    // Token 消耗统计
+    if (data.usage) {
+      updateData.completion_tokens = data.usage.completion_tokens;
+      updateData.total_tokens = data.usage.total_tokens;
+    }
+
+    // 计算耗时
+    const task = await client.from("tasks").select("*").eq("id", taskId).single();
+    if (task.data) {
+      const queuedAt = task.data.queued_at ? new Date(task.data.queued_at).getTime() : 0;
+      const startedAt = updateData.started_at ? new Date(updateData.started_at as string).getTime() : 0;
+      const completedAt = updateData.completed_at ? new Date(updateData.completed_at as string).getTime() : Date.now();
+      
+      if (queuedAt && startedAt) {
+        updateData.queue_duration = Math.round((startedAt - queuedAt) / 1000);
+      }
+      if (startedAt) {
+        updateData.generation_duration = Math.round((completedAt - startedAt) / 1000);
+      }
     }
 
     await client.from("tasks").update(updateData).eq("id", taskId);
@@ -324,6 +342,10 @@ export async function GET(request: NextRequest) {
       progress: updateData.progress,
       result: updateData.result,
       error_message: updateData.error_message,
+      completion_tokens: updateData.completion_tokens,
+      total_tokens: updateData.total_tokens,
+      queue_duration: updateData.queue_duration,
+      generation_duration: updateData.generation_duration,
     });
   } catch (error) {
     console.error("Get task error:", error);

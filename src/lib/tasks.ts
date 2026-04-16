@@ -69,10 +69,11 @@ export async function getTask(id: string): Promise<Task | null> {
 // 创建任务
 export async function createTask(task: {
   project_id: string;
+  model_mode?: "standard" | "fast";
   prompt_boxes: PromptBox[];
   selected_assets: string[];
   params: TaskParams;
-}, apiKey?: string): Promise<{ id: string }> {
+}, apiKey?: string): Promise<{ id: string; model?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) {
     headers["x-ark-api-key"] = apiKey;

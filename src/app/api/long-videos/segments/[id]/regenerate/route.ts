@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
+const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
+
+// 模型 ID 映射
+const MODEL_IDS = {
+  standard: "doubao-seedance-2-0-260128",
+  fast: "doubao-seedance-2-0-fast-260128",
+} as const;
+
+type ModelMode = keyof typeof MODEL_IDS;
+
 // 重新生成单个分段
 export async function POST(
   request: NextRequest,
@@ -64,6 +74,10 @@ export async function POST(
       }
     }
 
+    // 确定使用的模型
+    const mode: ModelMode = segment.model_mode || "standard";
+    const modelId = MODEL_IDS[mode];
+
     // 重置分段状态
     await client
       .from("video_segments")
@@ -71,13 +85,10 @@ export async function POST(
         status: "pending",
         video_url: null,
         error_message: null,
+        queued_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", segmentId);
-
-    // 构建请求体
-    const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
-    const MODEL_ID = "doubao-seedance-2-0-260128";
 
     const content: Array<{ type: string; text?: string; image_url?: { url: string }; role?: string }> = [];
 
@@ -120,7 +131,7 @@ export async function POST(
     }
 
     const requestBody = {
-      model: MODEL_ID,
+      model: modelId,
       content,
       generate_audio: segment.segment_generate_audio ?? true,
       ratio: segment.segment_ratio || "16:9",
@@ -153,7 +164,7 @@ export async function POST(
         .eq("id", segmentId);
 
       return NextResponse.json(
-        { error: data.error || "API request failed" },
+        { error: data.error?.message || data.error?.code || "API request failed" },
         { status: response.status }
       );
     }
@@ -178,6 +189,7 @@ export async function POST(
     return NextResponse.json({
       segment_id: segmentId,
       task_id: taskId,
+      model: modelId,
     });
   } catch (error) {
     console.error("Regenerate segment error:", error);
@@ -196,7 +208,6 @@ async function pollTaskStatus(
   interval = 3000
 ): Promise<void> {
   const client = getSupabaseClient();
-  const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 
   for (let i = 0; i < maxAttempts; i++) {
     const response = await fetch(`${ARK_API_URL}/contents/generations/tasks/${taskId}`, {
@@ -227,6 +238,9 @@ async function pollTaskStatus(
           status: "waiting_confirm",
           video_url: data.content?.video_url,
           last_frame_url: data.content?.last_frame_url,
+          completed_at: new Date(data.updated_at * 1000).toISOString(),
+          completion_tokens: data.usage?.completion_tokens,
+          total_tokens: data.usage?.total_tokens,
           updated_at: new Date().toISOString(),
         })
         .eq("id", segmentId);
@@ -239,6 +253,7 @@ async function pollTaskStatus(
         .update({
           status: "failed",
           error_message: data.error?.message || "Generation failed",
+          completed_at: new Date(data.updated_at * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", segmentId);
