@@ -40,7 +40,7 @@ interface GeneratorParams {
 
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { selectedAssets, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation } = useProjectDetail();
+  const { selectedAssets, setSelectedAssets, materials, setMaterials, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation } = useProjectDetail();
   const isDragging = useIsDragging();
   const setOverDropZone = useDragStore((state) => state.setOverDropZone);
   const isOverDropZone = useDragStore((state) => state.isOverDropZone);
@@ -730,7 +730,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         onClose={() => setSelectedDetailAsset(null)}
         onUpdate={(updatedAsset) => {
           if (updatedAsset) {
+            // 更新 selectedAssets
             setSelectedAssets((prev) =>
+              prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
+            );
+            // 更新 materials（侧边栏素材库）
+            setMaterials((prev) =>
               prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
             );
           }

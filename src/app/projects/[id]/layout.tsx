@@ -28,6 +28,8 @@ interface ProjectDetailContextType {
   loading: boolean;
   selectedAssets: SelectedAsset[];
   setSelectedAssets: React.Dispatch<React.SetStateAction<SelectedAsset[]>>;
+  materials: Asset[];
+  setMaterials: React.Dispatch<React.SetStateAction<Asset[]>>;
   addAssetToPool: (asset: Asset) => void;
   removeAssetFromPool: (assetId: string) => void;
   clearPool: () => void;
@@ -39,6 +41,8 @@ const ProjectDetailContext = createContext<ProjectDetailContextType>({
   loading: true,
   selectedAssets: [],
   setSelectedAssets: () => {},
+  materials: [],
+  setMaterials: () => {},
   addAssetToPool: () => {},
   removeAssetFromPool: () => {},
   clearPool: () => {},
@@ -424,6 +428,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         loading,
         selectedAssets,
         setSelectedAssets,
+        materials,
+        setMaterials,
         addAssetToPool,
         removeAssetFromPool,
         clearPool,
