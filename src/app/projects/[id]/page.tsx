@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
-import { Plus, X, Image, Music, Play, Trash2, Copy, Scissors, Clock, Volume2, Check } from "lucide-react";
+import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task } from "@/lib/tasks";
@@ -171,18 +171,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               promptText = `视频首帧@"${displayName}"，${promptText}`;
             }
           } else {
-            let referenceText = `"${displayName}"@这张图片`;
-            
-            // 如果绑定了音频，添加声线描述
-            if (activatedAsset.bound_audio_id) {
-              const boundAudio = selectedAssets.find(
-                (a) => a.id === activatedAsset.bound_audio_id
-              );
-              if (boundAudio?.voice_description) {
-                referenceText += `，声线为"${boundAudio.voice_description}"`;
-              }
-            }
-            
+            const referenceText = `"${displayName}"@这张图片`;
             promptText = `${referenceText}，${promptText}`;
           }
         }
@@ -258,7 +247,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          is_keyframe: true,
+          asset_category: "keyframe",
           keyframe_source_task_id: task.id,
           keyframe_description: "",
           display_name: `关键帧 ${formatDistanceToNow(new Date(), { addSuffix: false })}`,
@@ -296,15 +285,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   text = `视频首帧@"${displayName}"，${text}`;
                 }
               } else {
-                let ref = `"${displayName}"@这张图片`;
-                
-                const img = imageAssets[0];
-                if (img.bound_audio_id) {
-                  const audio = selectedAssets.find((a) => a.id === img.bound_audio_id);
-                  if (audio?.voice_description) {
-                    ref += `，声线为"${audio.voice_description}"`;
-                  }
-                }
+                const ref = `"${displayName}"@这张图片`;
                 text = `${ref}，${text}`;
               }
             }
@@ -350,7 +331,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   // 筛选关键帧素材
   const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
   const imageAssets = selectedAssets.filter((a) => a.type === "image");
-  const audioAssets = selectedAssets.filter((a) => a.type === "audio");
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
@@ -549,11 +529,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                               <Scissors className="w-6 h-6 text-primary" />
                             </div>
                           )}
-                          {asset.bound_audio_id && (
-                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] px-1 rounded flex items-center gap-0.5">
-                              <Music className="w-2.5 h-2.5" />
-                            </div>
-                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -564,17 +539,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        <div className="p-1 space-y-0.5">
-                          {/* 声音状态 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
-                            asset.bound_audio_id 
-                              ? "bg-primary/20 text-primary" 
-                              : "bg-muted-foreground/10 text-muted-foreground"
-                          )}>
-                            <Music className="w-2.5 h-2.5" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
-                          </div>
+                        <div className="p-1">
                           {/* 激活按钮 */}
                           <button
                             onClick={(e) => {
@@ -635,11 +600,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                               <Image className="w-6 h-6 text-muted-foreground" />
                             </div>
                           )}
-                          {asset.bound_audio_id && (
-                            <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] px-1 rounded flex items-center gap-0.5">
-                              <Music className="w-2.5 h-2.5" />
-                            </div>
-                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -650,17 +610,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             <X className="w-2.5 h-2.5" />
                           </button>
                         </div>
-                        <div className="p-1 space-y-0.5">
-                          {/* 声音状态 */}
-                          <div className={cn(
-                            "flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px]",
-                            asset.bound_audio_id 
-                              ? "bg-primary/20 text-primary" 
-                              : "bg-muted-foreground/10 text-muted-foreground"
-                          )}>
-                            <Music className="w-2.5 h-2.5" />
-                            <span>{asset.bound_audio_id ? "有" : "无"}声</span>
-                          </div>
+                        <div className="p-1">
                           {/* 激活按钮 */}
                           <button
                             onClick={(e) => {
@@ -678,32 +628,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             {asset.isActivated && <Check className="w-2.5 h-2.5" />}
                           </button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 音频 */}
-              {audioAssets.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                    <Music className="w-3 h-3" />
-                    音频 ({audioAssets.length})
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {audioAssets.map((asset) => (
-                      <div
-                        key={asset.id}
-                        className="relative group bg-muted rounded-lg overflow-hidden w-16 h-16 flex items-center justify-center"
-                      >
-                        <Music className="w-6 h-6 text-muted-foreground" />
-                        <button
-                          onClick={() => handleRemoveAsset(asset.id)}
-                          className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -743,24 +667,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     >
                       {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <Image className="w-3 h-3" />}
                       {asset.display_name || asset.name}
-                      {asset.bound_audio_id && <Music className="w-3 h-3 ml-1" />}
-                    </div>
-                  ))}
-                {/* 显示绑定的音频 */}
-                {selectedAssets
-                  .filter((asset) => asset.type === "audio")
-                  .map((asset) => (
-                    <div 
-                      key={asset.id} 
-                      className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
-                    >
-                      <Music className="w-3 h-3" />
-                      {asset.display_name || asset.name}
                     </div>
                   ))}
                 {selectedAssets.filter((asset) => 
                   (asset.type === "image" || asset.type === "keyframe") && asset.isActivated
-                ).length === 0 && selectedAssets.filter((asset) => asset.type === "audio").length === 0 && (
+                ).length === 0 && (
                   <span className="text-muted-foreground text-sm">无</span>
                 )}
               </div>

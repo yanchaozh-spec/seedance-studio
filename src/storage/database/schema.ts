@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { createSchemaFactory } from "drizzle-zod";
 import { z } from "zod";
 
@@ -17,30 +17,27 @@ export const projects = pgTable(
   ]
 );
 
-// 素材表（图片、音频、关键帧统一存储）
+// 素材表（图片、关键帧统一存储）
 export const assets = pgTable(
   "assets",
   {
     id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
     project_id: varchar("project_id", { length: 36 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),          // 原始文件名
-    display_name: varchar("display_name", { length: 100 }),   // 显示名称（如图1、音频1）
+    display_name: varchar("display_name", { length: 100 }),   // 显示名称
     type: varchar("type", { length: 20 }).notNull(),           // 'image' | 'audio' | 'keyframe'
-    is_keyframe: boolean("is_keyframe").default(false),        // 是否为关键帧
+    asset_category: varchar("asset_category", { length: 20 }).default('image'), // 'keyframe' | 'image'
     keyframe_description: text("keyframe_description"),       // 关键帧描述
-    keyframe_source_task_id: varchar("keyframe_source_task_id", { length: 64 }), // 来源任务ID
+    keyframe_source_task_id: varchar("keyframe_source_task_id", { length: 64 }), // 来源任务ID（仅关键帧）
     url: text("url").notNull(),                                // 访问 URL
-    thumbnail_url: text("thumbnail_url"),                      // 缩略图（仅图片）
-    bound_audio_id: varchar("bound_audio_id", { length: 36 }), // 绑定的音频 ID
+    thumbnail_url: text("thumbnail_url"),                      // 缩略图
     size: integer("size"),                                     // 文件大小（字节）
-    duration: integer("duration"),                             // 音频时长（秒）
-    voice_description: text("voice_description"),               // 声线描述
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("assets_project_id_idx").on(table.project_id),      // 外键索引
     index("assets_type_idx").on(table.type),                    // 按类型筛选
-    index("assets_is_keyframe_idx").on(table.is_keyframe),      // 按关键帧筛选
+    index("assets_asset_category_idx").on(table.asset_category), // 按资产类别筛选
     index("assets_created_at_idx").on(table.created_at),        // 排序
   ]
 );
@@ -59,6 +56,7 @@ export const tasks = pgTable(
       content: string;
       is_activated: boolean;
       activated_asset_id?: string;
+      keyframe_description?: string;
       order: number;
     }[]>().default([]),
     selected_assets: jsonb("selected_assets").$type<string[]>().default([]), // 选中的素材 ID 数组

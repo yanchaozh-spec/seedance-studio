@@ -1,8 +1,6 @@
 import { pgTable, serial, timestamp, index, varchar, foreignKey, text, integer, jsonb, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
-
-
 export const healthCheck = pgTable("health_check", {
 	id: serial().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
@@ -22,18 +20,19 @@ export const assets = pgTable("assets", {
 	projectId: varchar("project_id", { length: 36 }).notNull(),
 	name: varchar({ length: 255 }).notNull(),
 	displayName: varchar("display_name", { length: 100 }),
-	type: varchar({ length: 10 }).notNull(),
+	type: varchar({ length: 20 }).notNull(), // 'image' | 'audio' | 'keyframe'
+	assetCategory: varchar("asset_category", { length: 20 }).default('image'), // 'keyframe' | 'image'
+	keyframeDescription: text("keyframe_description"),
+	keyframeSourceTaskId: varchar("keyframe_source_task_id", { length: 64 }),
 	url: text().notNull(),
 	thumbnailUrl: text("thumbnail_url"),
-	boundAudioId: varchar("bound_audio_id", { length: 36 }),
 	size: integer(),
-	duration: integer(),
-	voiceDescription: text("voice_description"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("assets_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
 	index("assets_project_id_idx").using("btree", table.projectId.asc().nullsLast().op("text_ops")),
 	index("assets_type_idx").using("btree", table.type.asc().nullsLast().op("text_ops")),
+	index("assets_asset_category_idx").using("btree", table.assetCategory.asc().nullsLast().op("text_ops")),
 	foreignKey({
 			columns: [table.projectId],
 			foreignColumns: [projects.id],
@@ -101,16 +100,12 @@ export const videoSegments = pgTable("video_segments", {
 	status: varchar({ length: 20 }).default('pending').notNull(),
 	videoUrl: text("video_url"),
 	lastFrameUrl: text("last_frame_url"),
-	// 每段独立的提示词
 	promptContent: jsonb("prompt_content"),
-	// 每段独立的生成参数
 	segmentDuration: integer("segment_duration").default(5),
 	segmentRatio: varchar("segment_ratio", { length: 10 }).default("16:9"),
 	segmentResolution: varchar("segment_resolution", { length: 10 }).default("720p"),
 	segmentGenerateAudio: boolean("segment_generate_audio").default(true),
-	// 首帧 URL（由上一段尾帧传入）
 	firstFrameUrl: text("first_frame_url"),
-	// 关联的素材 ID
 	assetIds: jsonb("asset_ids").default([]),
 	errorMessage: text("error_message"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Sun, Moon, Scissors, Image, Music, Film } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -165,7 +166,7 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
           crossOrigin="anonymous"
         />
       )}
-      {asset.type === "image" ? (
+      {asset.type === "image" || asset.type === "keyframe" ? (
         <div className="w-full">
           <div className={cn(
             "relative",
@@ -182,12 +183,6 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
                 <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
               </div>
             )}
-            {/* 音频标记 */}
-            {asset.bound_audio_id && (
-              <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded flex items-center gap-0.5">
-                <Music className="w-2.5 h-2.5" />
-              </div>
-            )}
             {/* 删除按钮 */}
             {showRemove && onRemove && (
               <button
@@ -202,22 +197,6 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
               </button>
             )}
           </div>
-          {/* 底部信息 - 非隐藏时显示 */}
-          {!hideLabel && (
-            <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
-              {/* 音频参考按钮 */}
-              <div className={cn(
-                "flex items-center justify-center gap-1 rounded text-xs",
-                asset.bound_audio_id 
-                  ? "bg-primary text-primary-foreground" 
-                  : "bg-muted-foreground/20 text-muted-foreground",
-                size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
-              )}>
-                <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
-                <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="w-20 h-20 flex flex-col items-center justify-center bg-muted">
@@ -313,6 +292,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [loading, setLoading] = useState(true);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"materials" | "tasks">("materials");
+  const [materialFilter, setMaterialFilter] = useState<"all" | "keyframe" | "image">("all");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
@@ -406,9 +386,20 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     return pathname === href || pathname.startsWith(href + "/");
   };
 
-  const imageMaterials = materials.filter((m) => m.type === "image");
-  const audioMaterials = materials.filter((m) => m.type === "audio");
-  const keyframeMaterials = materials.filter((m) => m.type === "keyframe");
+  const imageMaterials = materials.filter((m) => m.type !== "audio" && (m.asset_category === "image" || !m.asset_category));
+  const keyframeMaterials = materials.filter((m) => m.asset_category === "keyframe");
+
+  // 根据筛选条件获取显示的素材
+  const getFilteredAssets = () => {
+    if (materialFilter === "all") {
+      return { image: imageMaterials, keyframe: keyframeMaterials };
+    } else if (materialFilter === "keyframe") {
+      return { image: [], keyframe: keyframeMaterials };
+    } else {
+      return { image: imageMaterials, keyframe: [] };
+    }
+  };
+  const filtered = getFilteredAssets();
 
   return (
     <ProjectDetailContext.Provider
@@ -526,11 +517,18 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {/* 素材库内容 */}
               {activeTab === "materials" && (
                 <>
-                  {imageMaterials.length > 0 && (
+                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-4">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="all" className="flex-1">全部</TabsTrigger>
+                      <TabsTrigger value="keyframe" className="flex-1">关键帧</TabsTrigger>
+                      <TabsTrigger value="image" className="flex-1">美术</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  {filtered.image.length > 0 && (
                     <div className="mb-4">
                       <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
                         <Image className="w-3 h-3" />
-                        {imageMaterials.map((asset, idx) => (
+                        {filtered.image.map((asset, idx) => (
                           <span key={asset.id}>
                             {asset.display_name || asset.name}
                             {idx < imageMaterials.length - 1 && "、"}
@@ -538,7 +536,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                         ))}
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {imageMaterials.map((asset) => (
+                        {filtered.image.map((asset) => (
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
@@ -551,11 +549,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </div>
                   )}
 
-                  {keyframeMaterials.length > 0 && (
+                  {filtered.keyframe.length > 0 && (
                     <div className="mb-4">
                       <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
                         <Scissors className="w-3 h-3" />
-                        {keyframeMaterials.map((asset, idx) => (
+                        {filtered.keyframe.map((asset, idx) => (
                           <span key={asset.id}>
                             {asset.display_name || asset.name}
                             {idx < keyframeMaterials.length - 1 && "、"}
@@ -563,7 +561,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                         ))}
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {keyframeMaterials.map((asset) => (
+                        {filtered.keyframe.map((asset) => (
                           <DraggableAsset
                             key={asset.id}
                             asset={asset}
@@ -576,26 +574,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </div>
                   )}
 
-                  {audioMaterials.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                        <Music className="w-3 h-3" />
-                        音频 ({audioMaterials.length})
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {audioMaterials.map((asset) => (
-                          <DraggableAsset
-                            key={asset.id}
-                            asset={asset}
-                            size="small"
-                            hideLabel
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  {materials.length === 0 && (
+                  {(filtered.image.length + filtered.keyframe.length) === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <FolderOpen className="w-12 h-12 mx-auto mb-3" />
                       <p>暂无素材</p>

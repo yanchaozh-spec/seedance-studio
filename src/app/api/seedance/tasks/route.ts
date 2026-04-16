@@ -47,15 +47,7 @@ interface VideoContent {
   role: "reference_video";
 }
 
-interface AudioContent {
-  type: "audio_url";
-  audio_url: {
-    url: string;
-  };
-  role: "reference_audio";
-}
-
-type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
+type ContentItem = TextContent | ImageContent | VideoContent;
 
 // 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
 function buildContent(
@@ -66,8 +58,6 @@ function buildContent(
     type: string;
     display_name?: string;
     name: string;
-    bound_audio_id?: string;
-    voice_description?: string;
     keyframe_description?: string;
     is_keyframe?: boolean;
   }>

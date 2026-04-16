@@ -2,21 +2,21 @@
 
 export type AssetType = "image" | "audio" | "keyframe";
 
+// 资产类别：关键帧（用于提示词拼接）| 美术资产（普通图片）
+export type AssetCategory = "keyframe" | "image";
+
 export interface Asset {
   id: string;
   project_id: string;
   name: string;
   display_name?: string;
   type: AssetType;
-  is_keyframe?: boolean;
+  asset_category?: AssetCategory; // 'keyframe' | 'image'
   keyframe_description?: string;
   keyframe_source_task_id?: string;
   url: string;
   thumbnail_url?: string;
-  bound_audio_id?: string;
   size?: number;
-  duration?: number;
-  voice_description?: string;
   created_at: string;
 }
 
@@ -39,6 +39,34 @@ export async function getAsset(id: string): Promise<Asset | null> {
   return data || null;
 }
 
+// 创建素材记录
+export async function createAssetFromUrl(params: {
+  project_id: string;
+  name: string;
+  type: AssetType;
+  asset_category?: AssetCategory;
+  url: string;
+  thumbnail_url?: string;
+  size?: number;
+}): Promise<Asset> {
+  const response = await fetch(`/api/projects/${params.project_id}/assets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: params.name,
+      type: params.type,
+      asset_category: params.asset_category,
+      url: params.url,
+      thumbnail_url: params.thumbnail_url,
+      size: params.size,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to create asset");
+  }
+  return response.json();
+}
+
 // 删除素材
 export async function deleteAsset(id: string): Promise<void> {
   const response = await fetch(`/api/assets/${id}`, {
@@ -49,8 +77,12 @@ export async function deleteAsset(id: string): Promise<void> {
   }
 }
 
-// 更新素材（绑定音频等）
-export async function updateAsset(id: string, updates: Partial<Asset>): Promise<Asset> {
+// 更新素材类别和描述
+export async function updateAsset(id: string, updates: {
+  asset_category?: AssetCategory;
+  keyframe_description?: string;
+  display_name?: string;
+}): Promise<Asset> {
   const response = await fetch(`/api/assets/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -58,81 +90,6 @@ export async function updateAsset(id: string, updates: Partial<Asset>): Promise<
   });
   if (!response.ok) {
     throw new Error("Failed to update asset");
-  }
-  return response.json();
-}
-
-// 绑定音频到图片
-export async function bindAudioToImage(imageId: string, audioId: string, voiceDescription?: string): Promise<Asset> {
-  return updateAsset(imageId, {
-    bound_audio_id: audioId,
-    voice_description: voiceDescription,
-  });
-}
-
-// 解除音频绑定
-export async function unbindAudio(imageId: string): Promise<Asset> {
-  return updateAsset(imageId, {
-    bound_audio_id: undefined,
-    voice_description: undefined,
-  });
-}
-
-// 创建素材（上传文件后调用）
-export async function createAsset(asset: Omit<Asset, "id" | "created_at">): Promise<Asset> {
-  // 先通过上传 API 获取 URL
-  const formData = new FormData();
-  const file = await fetch(asset.url).then(r => r.blob());
-  const blob = new File([file], asset.name, { type: asset.type === "image" ? "image/png" : "audio/mpeg" });
-  formData.append("file", blob);
-  formData.append("projectId", asset.project_id);
-  formData.append("type", asset.type);
-
-  const uploadResponse = await fetch("/api/assets/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!uploadResponse.ok) {
-    throw new Error("Failed to upload asset");
-  }
-
-  const { url: uploadedUrl, thumbnailUrl } = await uploadResponse.json();
-
-  // 创建素材记录
-  const response = await fetch(`/api/projects/${asset.project_id}/assets`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...asset,
-      url: uploadedUrl,
-      thumbnail_url: thumbnailUrl,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to create asset");
-  }
-  return response.json();
-}
-
-// 简化版创建素材（已有 URL）
-export async function createAssetFromUrl(assetData: {
-  project_id: string;
-  name: string;
-  type: "image" | "audio";
-  url: string;
-  thumbnail_url?: string;
-  size?: number;
-  duration?: number;
-}): Promise<Asset> {
-  const response = await fetch(`/api/projects/${assetData.project_id}/assets`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(assetData),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to create asset");
   }
   return response.json();
 }
