@@ -726,7 +726,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       {/* 素材详情对话框 */}
       <AssetDetailDialog
         asset={selectedDetailAsset}
-        allAssets={selectedAssets}
+        allAssets={[...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))]}
         onClose={() => setSelectedDetailAsset(null)}
         onUpdate={(updatedAsset) => {
           if (updatedAsset) {

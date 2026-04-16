@@ -678,7 +678,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         {/* 素材详情对话框 */}
         <AssetDetailDialog
           asset={selectedDetailAsset}
-          allAssets={materials}
+          allAssets={[...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))]}
           onClose={() => setSelectedDetailAsset(null)}
           onUpdate={(updatedAsset) => {
             if (updatedAsset) {
