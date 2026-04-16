@@ -224,26 +224,8 @@ export async function POST(request: NextRequest) {
 
     console.log("Seedance API Request:", JSON.stringify(requestBody, null, 2));
 
-    // 先保存任务到数据库（状态为 pending）
-    const tempTaskId = `temp-${Date.now()}`;
-    const { error: tempInsertError } = await client.from("tasks").insert({
-      project_id,
-      id: tempTaskId,
-      status: "pending",
-      model_mode: "standard",
-      model_id: MODEL_ID,
-      progress: 0,
-      prompt_boxes,
-      selected_assets,
-      params,
-      queued_at: new Date().toISOString(),
-    });
-
-    if (tempInsertError) {
-      console.error("Failed to create temp task:", tempInsertError);
-    }
-
     try {
+      // 先调用 API 获取 task ID
       const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
         method: "POST",
         headers: {
@@ -256,25 +238,33 @@ export async function POST(request: NextRequest) {
       const data = await response.json();
 
       if (!response.ok) {
-        // 更新失败任务状态
-        await client.from("tasks").update({
-          status: "failed",
-          error_message: data.error?.message || JSON.stringify(data),
-        }).eq("id", tempTaskId);
-
         return NextResponse.json({ 
           error: data.error?.message || data.error?.code || "API request failed" 
         }, { status: response.status });
       }
 
-      // 更新任务 ID 为真实的 API 返回 ID，并设置队列时间
+      // 使用 API 返回的 task ID 保存任务到数据库
       const taskId = data.id;
-      await client.from("tasks").update({
+      const { error: insertError } = await client.from("tasks").insert({
         id: taskId,
+        project_id,
         task_id_external: taskId,
         status: "queued",
+        model_mode: "standard",
+        model_id: MODEL_ID,
+        progress: 0,
+        prompt_boxes,
+        selected_assets,
+        params,
         queued_at: new Date().toISOString(),
-      }).eq("id", tempTaskId);
+      });
+
+      if (insertError) {
+        console.error("Failed to save task:", insertError);
+        return NextResponse.json({ 
+          error: "Failed to save task" 
+        }, { status: 500 });
+      }
 
       return NextResponse.json({
         id: taskId,
@@ -282,12 +272,7 @@ export async function POST(request: NextRequest) {
         model: MODEL_ID,
       });
     } catch (apiError) {
-      // API 调用失败，更新任务状态为失败
-      await client.from("tasks").update({
-        status: "failed",
-        error_message: apiError instanceof Error ? apiError.message : String(apiError),
-      }).eq("id", tempTaskId);
-
+      console.error("API call failed:", apiError);
       throw apiError;
     }
   } catch (error) {
