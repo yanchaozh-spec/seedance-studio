@@ -20,7 +20,7 @@ import {
   Scissors,
   Loader2,
 } from "lucide-react";
-import { Asset, bindAudioToImage, unbindAudio, deleteAsset } from "@/lib/assets";
+import { Asset, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
 
 interface AssetDetailDialogProps {
@@ -35,7 +35,6 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [keyframeDescription, setKeyframeDescription] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [isRenaming, setIsRenaming] = useState(false);
   const [assetCategory, setAssetCategory] = useState<"keyframe" | "image">("image");
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
 
@@ -51,24 +50,6 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       setAssetCategory(asset.asset_category || "image");
     }
   }, [asset]);
-
-  const handleRename = async () => {
-    if (!asset || !displayName.trim()) return;
-    try {
-      setIsRenaming(true);
-      await fetch(`/api/assets/${asset.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: displayName.trim() }),
-      });
-      toast.success("重命名成功");
-      onUpdate();
-    } catch {
-      toast.error("重命名失败");
-    } finally {
-      setIsRenaming(false);
-    }
-  };
 
   // 上传音频并绑定到当前图片
   const handleUploadAudio = async (files: FileList | null) => {
@@ -131,37 +112,50 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
     }
   };
 
-  const handleUpdateKeyframeDescription = async () => {
+  // 统一的保存函数
+  const handleSave = async () => {
     if (!asset) return;
     try {
       setBinding(true);
-      await fetch(`/api/assets/${asset.id}`, {
+      
+      // 构建更新数据
+      const updates: Record<string, unknown> = {};
+      
+      // 检查显示名称是否变化
+      if (displayName.trim() !== (asset.display_name || asset.name)) {
+        updates.display_name = displayName.trim();
+      }
+      
+      // 检查类型是否变化
+      if (assetCategory !== (asset.asset_category || "image")) {
+        updates.asset_category = assetCategory;
+      }
+      
+      // 检查关键帧描述是否变化
+      if (keyframeDescription !== (asset.keyframe_description || "")) {
+        updates.keyframe_description = keyframeDescription;
+      }
+      
+      // 如果没有变化，直接关闭
+      if (Object.keys(updates).length === 0) {
+        onClose();
+        return;
+      }
+      
+      const response = await fetch(`/api/assets/${asset.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyframe_description: keyframeDescription }),
+        body: JSON.stringify(updates),
       });
-      toast.success("更新成功");
-      onUpdate();
+      
+      if (!response.ok) throw new Error("更新失败");
+      const updatedAsset = await response.json();
+      
+      toast.success("保存成功");
+      onUpdate(updatedAsset);
+      onClose();
     } catch {
-      toast.error("更新失败");
-    } finally {
-      setBinding(false);
-    }
-  };
-
-  const handleUpdateCategory = async () => {
-    if (!asset) return;
-    try {
-      setBinding(true);
-      await fetch(`/api/assets/${asset.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asset_category: assetCategory }),
-      });
-      toast.success("类型已更新");
-      onUpdate();
-    } catch {
-      toast.error("更新失败");
+      toast.error("保存失败");
     } finally {
       setBinding(false);
     }
@@ -216,21 +210,11 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
           {/* 重命名 */}
           <div className="space-y-2">
             <Label>显示名称</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="输入显示名称"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-              />
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleRename}
-                disabled={isRenaming || displayName === (asset?.display_name || asset?.name)}
-              >
-                保存
-              </Button>
-            </div>
+            <Input
+              placeholder="输入显示名称"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
             <p className="text-xs text-muted-foreground">
               用于提示词中的引用，如：@&quot;显示名称&quot;
             </p>
@@ -331,39 +315,29 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 素材类型选择（仅图片和关键帧显示） */}
-          {(asset.type === "image" || asset.type === "keyframe") && (
-            <div className="space-y-3">
-              <label className="text-sm font-medium">素材类型</label>
-              <div className="flex gap-2">
-                <Button
-                  variant={assetCategory === "image" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setAssetCategory("image")}
-                >
-                  美术资产
-                </Button>
-                <Button
-                  variant={assetCategory === "keyframe" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setAssetCategory("keyframe")}
-                >
-                  <Scissors className="w-4 h-4 mr-1" />
-                  关键帧
-                </Button>
-              </div>
-              <Button 
-                onClick={handleUpdateCategory} 
-                disabled={binding || assetCategory === (asset.asset_category || "image")}
-                className="w-full"
-                variant="secondary"
+          {/* 素材类型选择 */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium">素材类型</label>
+            <div className="flex gap-2">
+              <Button
+                variant={assetCategory === "image" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAssetCategory("image")}
               >
-                保存类型
+                美术资产
+              </Button>
+              <Button
+                variant={assetCategory === "keyframe" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAssetCategory("keyframe")}
+              >
+                <Scissors className="w-4 h-4 mr-1" />
+                关键帧
               </Button>
             </div>
-          )}
+          </div>
 
-          {/* 关键帧描述编辑（仅关键帧类型显示） */}
+          {/* 关键帧描述编辑 */}
           {assetCategory === "keyframe" && (
             <div className="space-y-3">
               <label className="text-sm font-medium">关键帧描述</label>
@@ -372,14 +346,6 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                 value={keyframeDescription}
                 onChange={(e) => setKeyframeDescription(e.target.value)}
               />
-              <Button 
-                onClick={handleUpdateKeyframeDescription} 
-                disabled={binding}
-                className="w-full"
-              >
-                <Scissors className="w-4 h-4 mr-2" />
-                保存描述
-              </Button>
               {asset.keyframe_source_task_id && (
                 <p className="text-xs text-muted-foreground">
                   来源任务: {asset.keyframe_source_task_id.slice(0, 8)}...
@@ -394,8 +360,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             <Trash2 className="w-4 h-4 mr-2" />
             删除
           </Button>
-          <Button variant="outline" onClick={onClose}>
-            关闭
+          <Button onClick={handleSave} disabled={binding}>
+            保存
           </Button>
         </DialogFooter>
       </DialogContent>
