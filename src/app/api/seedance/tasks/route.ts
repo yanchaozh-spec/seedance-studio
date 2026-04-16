@@ -237,6 +237,8 @@ export async function POST(request: NextRequest) {
 
       const data = await response.json();
 
+      console.log("Seedance API Response:", JSON.stringify(data, null, 2));
+
       if (!response.ok) {
         return NextResponse.json({ 
           error: data.error?.message || data.error?.code || "API request failed" 
