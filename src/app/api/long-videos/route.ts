@@ -147,17 +147,20 @@ async function pollTaskStatus(
 }
 
 // 处理长视频生成（分段生成 + 拼接）
-async function processLongVideo(longVideoId: string): Promise<void> {
+async function processLongVideo(longVideoId: string, passedApiKey?: string): Promise<void> {
   const client = getSupabaseClient();
-  const apiKey = process.env.ARK_API_KEY;
+  const apiKey = passedApiKey || process.env.ARK_API_KEY;
 
   if (!apiKey) {
+    console.error("[LongVideo] ARK API Key not available");
     await client
       .from("long_videos")
       .update({ status: "failed", error_message: "ARK API Key not configured" })
       .eq("id", longVideoId);
     return;
   }
+
+  console.log("[LongVideo] Starting process with API Key:", !!apiKey);
 
   try {
     // 获取长视频信息
@@ -525,8 +528,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create segments" }, { status: 500 });
     }
 
+    // 获取前端传递的 API Key
+    const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
+
     // 异步开始处理长视频（不阻塞响应）
-    processLongVideo(longVideo.id).catch((error) => {
+    processLongVideo(longVideo.id, apiKey).catch((error) => {
       console.error("[LongVideo] Async process error:", error);
     });
 

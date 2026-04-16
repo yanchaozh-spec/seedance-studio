@@ -48,6 +48,7 @@ import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/lib/settings";
 import { formatSeconds } from "@/components/tasks/TaskCard";
 
 // 格式化时长
@@ -373,7 +374,15 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     const pollInterval = setInterval(async () => {
       for (const task of runningTasks) {
         try {
-          const response = await fetch(`/api/tasks/${task.id}/poll`);
+          // 从设置中获取 API Key
+          const apiKey = useSettingsStore.getState().arkApiKey;
+          
+          const headers: Record<string, string> = {};
+          if (apiKey) {
+            headers["x-ark-api-key"] = apiKey;
+          }
+          
+          const response = await fetch(`/api/tasks/${task.id}/poll`, { headers });
           if (response.ok) {
             const updatedTask = await response.json();
             setTasks((prev) =>

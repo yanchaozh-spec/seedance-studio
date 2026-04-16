@@ -81,14 +81,28 @@ export async function GET(
             updates.status = "succeeded";
             updates.progress = 100;
             updates.completed_at = new Date().toISOString();
-            // 从 content 数组中提取视频URL
-            const videoItem = externalTask.content?.find((c: { type: string }) => c.type === "video_url");
-            const lastFrameItem = externalTask.content?.find((c: { type: string }) => c.type === "image_url" && c.role === "last_frame");
+            
+            // content 可能是对象 { video_url: "..." } 或数组 [{ type: "video_url", video_url: {...} }]
+            let videoUrl = "";
+            let lastFrameUrl = "";
+            
+            if (Array.isArray(externalTask.content)) {
+              // 数组格式
+              const videoItem = externalTask.content.find((c: { type: string }) => c.type === "video_url");
+              const lastFrameItem = externalTask.content.find((c: { type: string }) => c.type === "image_url" && c.role === "last_frame");
+              videoUrl = videoItem?.video_url?.url || "";
+              lastFrameUrl = lastFrameItem?.image_url?.url || "";
+            } else if (externalTask.content) {
+              // 对象格式 { video_url: "...", last_frame_url: "..." }
+              videoUrl = externalTask.content.video_url || "";
+              lastFrameUrl = externalTask.content.last_frame_url || "";
+            }
+            
             updates.result = {
-              video_url: videoItem?.video_url?.url || externalTask.content?.[0]?.video_url?.url,
-              resolution: externalTask.content?.[0]?.video_url?.resolution || task.params?.resolution,
+              video_url: videoUrl,
+              resolution: task.params?.resolution,
               duration: task.params?.duration,
-              last_frame_url: lastFrameItem?.image_url?.url || externalTask.content?.find((c: { type: string }) => c.type === "image_url" && c.role === "last_frame")?.image_url?.url,
+              last_frame_url: lastFrameUrl,
             };
             // 更新耗时
             if (task.started_at) {
