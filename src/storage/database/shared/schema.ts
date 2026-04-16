@@ -63,3 +63,57 @@ export const tasks = pgTable("tasks", {
 			name: "tasks_project_id_fkey"
 		}).onDelete("cascade"),
 ]);
+
+// 长视频任务表
+export const longVideos = pgTable("long_videos", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	projectId: varchar("project_id", { length: 36 }).notNull(),
+	status: varchar({ length: 20 }).default('pending').notNull(),
+	progress: integer().default(0),
+	totalSegments: integer("total_segments").notNull(),
+	completedSegments: integer("completed_segments").default(0),
+	finalVideoUrl: text("final_video_url"),
+	finalVideoDuration: integer("final_video_duration"),
+	targetDuration: integer("target_duration").notNull(),
+	prompts: jsonb("prompts").default([]),
+	selectedAssets: jsonb("selected_assets").default([]),
+	params: jsonb(),
+	errorMessage: text("error_message"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("long_videos_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+	index("long_videos_project_id_idx").using("btree", table.projectId.asc().nullsLast().op("text_ops")),
+	index("long_videos_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.projectId],
+			foreignColumns: [projects.id],
+			name: "long_videos_project_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+// 视频分段表
+export const videoSegments = pgTable("video_segments", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	longVideoId: varchar("long_video_id", { length: 36 }).notNull(),
+	segmentIndex: integer("segment_index").notNull(),
+	taskId: varchar("task_id", { length: 64 }),
+	status: varchar({ length: 20 }).default('pending').notNull(),
+	videoUrl: text("video_url"),
+	lastFrameUrl: text("last_frame_url"),
+	promptContent: jsonb("prompt_content"),
+	firstFrameUrl: text("first_frame_url"),
+	errorMessage: text("error_message"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("video_segments_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+	index("video_segments_long_video_id_idx").using("btree", table.longVideoId.asc().nullsLast().op("text_ops")),
+	index("video_segments_task_id_idx").using("btree", table.taskId.asc().nullsLast().op("text_ops")),
+	index("video_segments_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.longVideoId],
+			foreignColumns: [longVideos.id],
+			name: "video_segments_long_video_id_fkey"
+		}).onDelete("cascade"),
+]);
