@@ -17,3 +17,6 @@ export const useDragStore = create<DragState>((set) => ({
       draggedAssetId: isDragging ? (assetId || null) : null 
     }),
 }));
+
+// Helper hook to get just the isDragging state
+export const useIsDragging = () => useDragStore((state) => state.isDragging);
