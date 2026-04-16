@@ -557,7 +557,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             key={asset.id}
                             asset={asset}
                             size="small"
-                            hideLabel
                             onClick={setSelectedDetailAsset}
                           />
                         ))}
@@ -582,7 +581,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             key={asset.id}
                             asset={asset}
                             size="small"
-                            hideLabel
                             onClick={setSelectedDetailAsset}
                           />
                         ))}
