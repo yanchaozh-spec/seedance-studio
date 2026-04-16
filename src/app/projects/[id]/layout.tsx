@@ -183,12 +183,6 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
                 <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
               </div>
             )}
-            {/* 音频标记 */}
-            {asset.bound_audio_id && (
-              <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded flex items-center gap-0.5">
-                <Music className="w-2.5 h-2.5" />
-              </div>
-            )}
             {/* 删除按钮 */}
             {showRemove && onRemove && (
               <button
@@ -203,6 +197,22 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
               </button>
             )}
           </div>
+          {/* 底部信息 - 非隐藏时显示 */}
+          {!hideLabel && (
+            <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
+              {/* 音频参考按钮 */}
+              <div className={cn(
+                "flex items-center justify-center gap-1 rounded text-xs",
+                asset.bound_audio_id 
+                  ? "bg-primary text-primary-foreground" 
+                  : "bg-muted-foreground/20 text-muted-foreground",
+                size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
+              )}>
+                <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
+                <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="w-20 h-20 flex flex-col items-center justify-center bg-muted">
