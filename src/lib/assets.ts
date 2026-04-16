@@ -93,3 +93,27 @@ export async function updateAsset(id: string, updates: {
   }
   return response.json();
 }
+
+// 绑定音频到图片
+export async function bindAudioToImage(imageId: string, audioId: string): Promise<void> {
+  const response = await fetch(`/api/assets/${imageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bound_audio_id: audioId }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to bind audio");
+  }
+}
+
+// 解除音频绑定
+export async function unbindAudio(imageId: string): Promise<void> {
+  const response = await fetch(`/api/assets/${imageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bound_audio_id: null }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to unbind audio");
+  }
+}

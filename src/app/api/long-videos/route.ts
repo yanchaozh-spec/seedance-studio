@@ -29,7 +29,8 @@ interface CreateLongVideoRequest {
 type ContentItem =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string }; role?: string }
-  | { type: "video_url"; video_url: { url: string }; role?: string };
+  | { type: "video_url"; video_url: { url: string }; role?: string }
+  | { type: "audio_url"; audio_url: { url: string }; role?: string };
 
 // 构建符合 Seedance 2.0 格式的提示词
 function buildPrompt(
@@ -38,6 +39,8 @@ function buildPrompt(
     display_name: string;
     name: string;
     type: string;
+    bound_audio_id?: string;
+    voice_description?: string;
     keyframe_description?: string;
   } | null,
   keyframeDesc?: string
@@ -56,7 +59,12 @@ function buildPrompt(
   }
 
   // 普通图片处理
-  const referenceText = `"${displayName}"@这张图片`;
+  let referenceText = `"${displayName}"@这张图片`;
+
+  // 如果绑定了音频，添加声线描述
+  if (asset.voice_description) {
+    referenceText += `，声线为"${asset.voice_description}"`;
+  }
 
   return `${referenceText}，${boxContent}`;
 }
@@ -149,6 +157,7 @@ async function processLongVideo(longVideoId: string): Promise<void> {
     // 分类素材
     const imageAssets = (assets || []).filter((a) => a.type === "image");
     const keyframeAssets = (assets || []).filter((a) => a.type === "keyframe" || a.is_keyframe);
+    const audioAssets = (assets || []).filter((a) => a.type === "audio");
 
     // 获取所有分段
     const { data: segments, error: segmentsError } = await client
@@ -207,6 +216,13 @@ async function processLongVideo(longVideoId: string): Promise<void> {
         activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
       }
 
+      // 获取绑定的音频信息
+      let voiceDesc: string | undefined;
+      if (activatedAsset?.bound_audio_id) {
+        const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
+        voiceDesc = boundAudio?.voice_description;
+      }
+
       // 构建 content 数组
       const content: ContentItem[] = [];
 
@@ -228,7 +244,12 @@ async function processLongVideo(longVideoId: string): Promise<void> {
       // 构建提示词文本
       const promptText = buildPrompt(
         prompt.content.trim(),
-        activatedAsset || null,
+        activatedAsset
+          ? {
+              ...activatedAsset,
+              voice_description: voiceDesc,
+            }
+          : null,
         prompt.keyframe_description
       );
 

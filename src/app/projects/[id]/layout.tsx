@@ -183,6 +183,12 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
                 <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
               </div>
             )}
+            {/* 音频标记 */}
+            {asset.bound_audio_id && (
+              <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-[8px] px-0.5 rounded flex items-center gap-0.5">
+                <Music className="w-2.5 h-2.5" />
+              </div>
+            )}
             {/* 删除按钮 */}
             {showRemove && onRemove && (
               <button

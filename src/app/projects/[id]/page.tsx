@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
-import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check } from "lucide-react";
+import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task } from "@/lib/tasks";
@@ -171,7 +171,19 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               promptText = `视频首帧@"${displayName}"，${promptText}`;
             }
           } else {
-            const referenceText = `"${displayName}"@这张图片`;
+            let referenceText = `"${displayName}"@这张图片`;
+            
+            // 如果绑定了音频，添加声线描述
+            if (activatedAsset.bound_audio_id) {
+              const boundAudio = selectedAssets.find(
+                (a) => a.id === activatedAsset.bound_audio_id
+              );
+              if (boundAudio) {
+                const audioName = boundAudio.display_name || boundAudio.name;
+                referenceText += `，声线：@${audioName}`;
+              }
+            }
+            
             promptText = `${referenceText}，${promptText}`;
           }
         }
@@ -285,7 +297,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   text = `视频首帧@"${displayName}"，${text}`;
                 }
               } else {
-                const ref = `"${displayName}"@这张图片`;
+                let ref = `"${displayName}"@这张图片`;
+                
+                // 如果绑定了音频，添加声线描述
+                if (activatedAsset.bound_audio_id) {
+                  const boundAudio = selectedAssets.find((a) => a.id === activatedAsset.bound_audio_id);
+                  if (boundAudio) {
+                    const audioName = boundAudio.display_name || boundAudio.name;
+                    ref += `，声线：@${audioName}`;
+                  }
+                }
+                
                 text = `${ref}，${text}`;
               }
             }
@@ -667,6 +689,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     >
                       {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <Image className="w-3 h-3" />}
                       {asset.display_name || asset.name}
+                      {asset.bound_audio_id && <Music className="w-3 h-3 ml-1" />}
                     </div>
                   ))}
                 {selectedAssets.filter((asset) => 

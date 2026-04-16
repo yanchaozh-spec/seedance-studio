@@ -47,7 +47,15 @@ interface VideoContent {
   role: "reference_video";
 }
 
-type ContentItem = TextContent | ImageContent | VideoContent;
+interface AudioContent {
+  type: "audio_url";
+  audio_url: {
+    url: string;
+  };
+  role: "reference_audio";
+}
+
+type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
 
 // 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
 function buildContent(
@@ -58,6 +66,8 @@ function buildContent(
     type: string;
     display_name?: string;
     name: string;
+    bound_audio_id?: string;
+    voice_description?: string;
     keyframe_description?: string;
     is_keyframe?: boolean;
   }>
@@ -67,6 +77,7 @@ function buildContent(
   // 分类素材
   const imageAssets = assets.filter((a) => a.type === "image");
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.is_keyframe);
+  const audioAssets = assets.filter((a) => a.type === "audio");
   
   // 按顺序处理每个提示词框
   const sortedBoxes = promptBoxes
@@ -85,14 +96,40 @@ function buildContent(
       activatedAsset = imageAssets[0] || keyframeAssets[0] || null;
     }
 
-    // 添加文本内容
-    const textContent = box.content.trim();
-    if (textContent) {
-      content.push({
-        type: "text",
-        text: textContent,
-      });
+    // 构建文本内容（包含素材引用和声线描述）
+    let textContent = box.content.trim();
+    if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
+      const displayName = activatedAsset.display_name || activatedAsset.name;
+      
+      // 关键帧特殊处理
+      if (activatedAsset.type === "keyframe" || activatedAsset.is_keyframe) {
+        const desc = box.keyframe_description || activatedAsset.keyframe_description || "";
+        if (desc) {
+          textContent = `视频首帧@"${displayName}"，${desc}，${textContent}`;
+        } else {
+          textContent = `视频首帧@"${displayName}"，${textContent}`;
+        }
+      } else {
+        // 普通图片处理
+        let referenceText = `"${displayName}"@这张图片`;
+        
+        // 如果绑定了音频，添加声线描述
+        if (activatedAsset.bound_audio_id) {
+          const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
+          if (boundAudio) {
+            const audioName = boundAudio.display_name || boundAudio.name;
+            referenceText += `，声线：@${audioName}`;
+          }
+        }
+        
+        textContent = `${referenceText}，${textContent}`;
+      }
     }
+
+    content.push({
+      type: "text",
+      text: textContent,
+    });
 
     // 添加图片内容（如果有）
     if (activatedAsset && (activatedAsset.type === "image" || activatedAsset.type === "keyframe")) {
@@ -113,6 +150,20 @@ function buildContent(
         },
         role,
       });
+    }
+
+    // 如果绑定了音频，添加音频参考
+    if (activatedAsset && activatedAsset.bound_audio_id) {
+      const boundAudio = audioAssets.find((a) => a.id === activatedAsset!.bound_audio_id);
+      if (boundAudio) {
+        content.push({
+          type: "audio_url",
+          audio_url: {
+            url: boundAudio.url,
+          },
+          role: "reference_audio",
+        });
+      }
     }
   }
 
