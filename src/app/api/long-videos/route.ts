@@ -33,8 +33,8 @@ type ContentItem =
   | { type: "audio_url"; audio_url: { url: string }; role?: string };
 
 // 构建符合 Seedance 2.0 格式的提示词
-// 格式：素材定义行 + 提示词分行
-// 示例：素材名1：[图1]，声线为：[音频1]；素材名2：[图2]；关键帧描述：[图3]
+// 格式：素材定义行（使用URL） + 提示词分行
+// 示例：林央：url1，声线为：audioUrl1；启龙：url2
 function buildPrompt(
   boxContent: string,
   asset: {
@@ -46,7 +46,6 @@ function buildPrompt(
     keyframe_description?: string;
     url: string;
   } | null,
-  imageIndex: number = 1,
   audioAssets?: Array<{ id: string; name: string; display_name?: string; url: string }>
 ): ContentItem[] {
   if (!asset) return [];
@@ -70,20 +69,19 @@ function buildPrompt(
     });
   }
 
-  // 构建文本引用标记
+  // 构建文本引用（使用 URL）
   let textRef = "";
   if (isKeyframe) {
     const desc = asset.keyframe_description || displayName;
-    textRef = `${desc}：[图${imageIndex}]`;
+    textRef = `${desc}：${asset.url}`;
   } else {
-    textRef = `${displayName}：[图${imageIndex}]`;
+    textRef = `${displayName}：${asset.url}`;
 
     // 检查是否绑定音频
     if (asset.bound_audio_id && audioAssets) {
       const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
       if (boundAudio) {
-        const audioName = boundAudio.display_name || boundAudio.name;
-        textRef += `，声线为：[音频1]`;
+        textRef += `，声线为：${boundAudio.url}`;
       }
     }
   }
@@ -99,18 +97,6 @@ function buildPrompt(
     type: "text",
     text: textParts.join("\n"),
   });
-
-  // 添加绑定的音频
-  if (!isKeyframe && asset.bound_audio_id && audioAssets) {
-    const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-    if (boundAudio) {
-      contentItems.push({
-        type: "audio_url",
-        audio_url: { url: boundAudio.url },
-        role: "reference_audio",
-      });
-    }
-  }
 
   return contentItems;
 }
@@ -312,11 +298,10 @@ async function processLongVideo(longVideoId: string): Promise<void> {
         });
       }
 
-      // 构建符合 Seedance 2.0 格式的提示词（包含 [图N] 引用）
+      // 构建符合 Seedance 2.0 格式的提示词（使用 URL）
       const promptContent = buildPrompt(
         prompt.content.trim(),
         activatedAsset || null,
-        imageIndex,
         audioAssets
       );
 

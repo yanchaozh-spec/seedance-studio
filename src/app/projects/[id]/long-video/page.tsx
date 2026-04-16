@@ -112,29 +112,24 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
     // 按顺序收集所有图片（美术资产 + 关键帧）
     const allImageAssets = [...imageAssets, ...keyframeAssets];
 
-    // 构建素材定义行
+    // 构建素材定义行（使用 URL）
     const assetRefParts: string[] = [];
-    const audioRefParts: string[] = [];
 
     for (let i = 0; i < allImageAssets.length; i++) {
       const asset = allImageAssets[i];
-      const imageIndex = i + 1;
       const displayName = asset.display_name || asset.name;
       const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
 
       if (isKeyframe) {
         const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-        assetRefParts.push(`${desc}：[图${imageIndex}]`);
+        assetRefParts.push(`${desc}：${asset.url}`);
       } else {
-        assetRefParts.push(`${displayName}：[图${imageIndex}]`);
+        assetRefParts.push(`${displayName}：${asset.url}`);
 
         if (asset.bound_audio_id) {
           const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
           if (boundAudio) {
-            const audioName = boundAudio.display_name || boundAudio.name;
-            const audioIndex = audioRefParts.length + 1;
-            assetRefParts[assetRefParts.length - 1] += `，声线为：[音频${audioIndex}]`;
-            audioRefParts.push(audioName);
+            assetRefParts[assetRefParts.length - 1] += `，声线为：${boundAudio.url}`;
           }
         }
       }
@@ -150,18 +145,6 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
         image_url: { url: asset.url },
         role: isKeyframe ? "first_frame" : "reference_image",
       });
-    }
-
-    // 添加所有音频
-    for (const audioName of audioRefParts) {
-      const audioAsset = audioAssets.find((a) => a.display_name === audioName || a.name === audioName);
-      if (audioAsset) {
-        contentItems.push({
-          type: "audio_url",
-          audio_url: { url: audioAsset.url },
-          role: "reference_audio",
-        });
-      }
     }
 
     // 构建文本内容
