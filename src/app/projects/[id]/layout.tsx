@@ -67,6 +67,16 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   const handleClick = (e: React.MouseEvent) => {
     // 如果是拖拽操作，不触发点击
@@ -96,7 +106,10 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
 
   const handleMouseUp = () => {
     // 延迟重置状态，确保 click 事件能正确判断
-    setTimeout(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
       isDragging.current = false;
       dragStartPos.current = null;
     }, 50);
@@ -305,7 +318,23 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
   useEffect(() => {
     loadProject();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedParams.id]);
+
+  // 组件卸载时清理 videoRefs，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      // 先暂停所有视频，释放资源
+      videoRefs.current.forEach((video) => {
+        if (video) {
+          video.pause();
+          video.src = "";
+          video.load();
+        }
+      });
+      videoRefs.current.clear();
+    };
+  }, []);
 
   const loadProject = async () => {
     try {
