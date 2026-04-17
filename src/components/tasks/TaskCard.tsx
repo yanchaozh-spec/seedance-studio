@@ -269,23 +269,27 @@ export function TaskCard({
         {/* 视频预览 */}
         {task.status === "succeeded" && task.result?.video_url && !compact && (
           <div className="mt-3">
-            <video
-              src={task.result.video_url}
-              controls
-              className="w-full rounded border"
-              poster={task.result.last_frame_url}
-            />
+            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+              <video
+                src={task.result.video_url}
+                controls
+                className="w-full h-full"
+                poster={task.result.last_frame_url}
+              />
+            </div>
           </div>
         )}
 
         {/* 简短预览（紧凑模式） */}
         {task.status === "succeeded" && task.result?.video_url && compact && (
           <div className="mt-2">
-            <video
-              src={task.result.video_url}
-              controls
-              className="w-full h-24 object-cover rounded border"
-            />
+            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+              <video
+                src={task.result.video_url}
+                controls
+                className="w-full h-full"
+              />
+            </div>
           </div>
         )}
       </CardContent>
