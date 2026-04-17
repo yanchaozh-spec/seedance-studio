@@ -261,6 +261,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     loadProject();
@@ -477,8 +482,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent transition-colors w-full"
             >
-              {theme === "dark" ? <Sun className="w-5 h-5 flex-shrink-0" /> : <Moon className="w-5 h-5 flex-shrink-0" />}
-              <span className={cn(collapsed && "hidden")}>{theme === "dark" ? "浅色" : "深色"}</span>
+              {mounted && (theme === "dark" ? <Sun className="w-5 h-5 flex-shrink-0" /> : <Moon className="w-5 h-5 flex-shrink-0" />)}
+              <span className={cn(collapsed && "hidden")}>{mounted && (theme === "dark" ? "浅色" : "深色")}</span>
             </button>
 
             {/* 设置按钮 */}
