@@ -654,53 +654,36 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               size="sm"
                               className="flex-1 gap-0.5 text-xs h-6 px-1"
                               onClick={() => {
-                                const video = videoRefs.current.get(task.id);
-                                if (!video) return;
+                                if (!task.result || !task.result.video_url) return;
                                 
-                                if (video.readyState < 2) {
-                                  toast.error("视频尚未加载完成");
-                                  return;
-                                }
-                                
-                                const canvas = document.createElement("canvas");
-                                canvas.width = video.videoWidth;
-                                canvas.height = video.videoHeight;
-                                
-                                const ctx = canvas.getContext("2d");
-                                if (!ctx) {
-                                  toast.error("无法创建画布");
-                                  return;
-                                }
-                                
-                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
-                                canvas.toBlob(async (blob) => {
-                                  if (blob) {
-                                    const formData = new FormData();
-                                    formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-                                    formData.append("projectId", resolvedParams.id);
-                                    formData.append("taskId", task.id);
-                                    formData.append("timestamp", video.currentTime.toString());
-                                    formData.append("assetCategory", "keyframe");
-                                    formData.append("name", `关键帧_${Date.now()}`);
+                                toast.promise(
+                                  async () => {
+                                    const response = await fetch("/api/assets/extract-frame", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        video_url: task.result!.video_url,
+                                        project_id: resolvedParams.id,
+                                        task_id: task.id,
+                                      }),
+                                    });
                                     
-                                    try {
-                                      const res = await fetch("/api/assets/extract-frame", {
-                                        method: "POST",
-                                        body: formData,
-                                      });
-                                      
-                                      if (res.ok) {
-                                        toast.success("已保存为关键帧");
-                                        loadMaterials?.();
-                                      } else {
-                                        toast.error("保存失败");
-                                      }
-                                    } catch (e) {
-                                      toast.error("抽帧失败");
+                                    if (!response.ok) {
+                                      const error = await response.json();
+                                      throw new Error(error.error || "抽帧失败");
                                     }
+                                    
+                                    return response.json();
+                                  },
+                                  {
+                                    loading: "正在抽帧...",
+                                    success: (data) => {
+                                      loadMaterials?.();
+                                      return `已保存为关键帧`;
+                                    },
+                                    error: (err) => err.message || "抽帧失败",
                                   }
-                                }, "image/png");
+                                );
                               }}
                             >
                               <Camera className="w-2.5 h-2.5" />
