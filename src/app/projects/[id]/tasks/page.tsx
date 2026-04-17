@@ -811,19 +811,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                       </div>
                     </div>
                     
-                    {/* 进度条 */}
+                    {/* 状态显示 */}
                     {task.status === "running" && (
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">生成进度</span>
-                          <span>{task.progress || 0}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-blue-500 transition-all"
-                            style={{ width: `${task.progress || 0}%` }}
-                          />
-                        </div>
+                      <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>生成中...</span>
+                      </div>
+                    )}
+                    {task.status === "queued" && (
+                      <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        <span>排队中</span>
                       </div>
                     )}
                     
