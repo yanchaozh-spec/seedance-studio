@@ -260,6 +260,7 @@ export async function POST(request: NextRequest) {
         selected_assets,
         params,
         queued_at: new Date().toISOString(),
+        api_key: apiKey, // 保存 API Key 用于轮询
       });
 
       if (insertError) {

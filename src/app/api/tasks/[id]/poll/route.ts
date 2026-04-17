@@ -41,7 +41,8 @@ export async function GET(
 
     // 如果有外部任务ID，需要调用外部API更新状态
     if (task.task_id_external && task.status !== "pending") {
-      const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
+      // 优先级：数据库保存的 API Key > 请求头 > 环境变量
+      const apiKey = task.api_key || request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
       
       if (!apiKey) {
         console.warn("[POLL] ARK_API_KEY not configured, cannot poll external API");
