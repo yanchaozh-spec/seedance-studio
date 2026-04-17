@@ -613,7 +613,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 }}
                                 src={task.result.video_url}
                                 controls
-                                className="w-full h-20 bg-black rounded"
+                                className="w-full aspect-video bg-black rounded"
                                 preload="metadata"
                               />
                             </div>
