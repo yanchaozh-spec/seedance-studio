@@ -148,6 +148,58 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     },
   });
 
+  // 存储 textarea 引用的 Map
+  const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  // 记录上一次的长度，用于判断是否新增了行
+  const prevLengthRef = useRef<number>(1);
+
+  // 监听 promptBoxes 变化，新增行时自动聚焦
+  useEffect(() => {
+    if (promptBoxes.length > prevLengthRef.current) {
+      // 检测到新增行，聚焦最后一行
+      const newBox = promptBoxes.at(-1);
+      if (newBox) {
+        const textarea = textareaRefs.current.get(newBox.id);
+        if (textarea) {
+          textarea.focus();
+        }
+      }
+    }
+    prevLengthRef.current = promptBoxes.length;
+  }, [promptBoxes]);
+
+  // 添加 textarea 引用
+  const setTextareaRef = (id: string) => (el: HTMLTextAreaElement | null) => {
+    if (el) {
+      textareaRefs.current.set(id, el);
+    } else {
+      textareaRefs.current.delete(id);
+    }
+  };
+
+  // TAB 键跳转到下一行
+  const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, currentIndex: number) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+
+      const isLastLine = currentIndex === promptBoxes.length - 1;
+
+      if (isLastLine) {
+        // 最后一行 → 新增一行
+        addPromptBox();
+      } else {
+        // 不是最后一行 → 聚焦下一行
+        const nextId = promptBoxes[currentIndex + 1]?.id;
+        if (nextId) {
+          const textarea = textareaRefs.current.get(nextId);
+          if (textarea) {
+            textarea.focus();
+          }
+        }
+      }
+    }
+  };
+
   // 添加提示词框
   const addPromptBox = () => {
     setPromptBoxes((prev) => [
@@ -504,9 +556,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             <div key={box.id} className="space-y-1.5">
               <div className="flex gap-2">
                 <Textarea
-                  placeholder={`提示词 ${index + 1}...`}
+                  ref={setTextareaRef(box.id)}
+                  placeholder={`提示词 ${index + 1}...（按 TAB 跳到下一行）`}
                   value={box.content}
                   onChange={(e) => updatePromptBox(box.id, e.target.value)}
+                  onKeyDown={(e) => handlePromptKeyDown(e, index)}
                   className="min-h-[48px] resize-none text-sm"
                 />
                 {promptBoxes.length > 1 && (
