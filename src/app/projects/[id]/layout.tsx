@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle, RotateCcw } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -890,6 +890,20 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                 
                 {/* 操作按钮 */}
                 <div className="flex gap-2 pt-4 border-t">
+                  {selectedTaskDetail.status === "succeeded" && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 text-orange-500"
+                      onClick={() => {
+                        // 保存任务数据到 sessionStorage
+                        sessionStorage.setItem("rollbackTask", JSON.stringify(selectedTaskDetail));
+                        router.push(`/projects/${resolvedParams.id}`);
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      回滚
+                    </Button>
+                  )}
                   {selectedTaskDetail.result?.video_url && (
                     <Button
                       variant="outline"
