@@ -107,13 +107,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const generateFinalPrompt = useCallback(() => {
     const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
 
-    // 使用所有素材（selectedAssets + materials 中未选中的）
-    const allAssetsList = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
+    // 只使用激活的素材
+    const activatedAssets = selectedAssets.filter((a) => a.isActivated);
 
-    // 分类素材
-    const imageAssets = allAssetsList.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
-    const keyframeAssets = allAssetsList.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
-    const audioAssets = allAssetsList.filter((a) => a.type === "audio");
+    // 分类素材（只使用激活的）
+    const imageAssets = activatedAssets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
+    const keyframeAssets = activatedAssets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
+    const audioAssets = activatedAssets.filter((a) => a.type === "audio");
 
     // 按顺序收集所有图片（美术资产 + 关键帧）
     const allImageAssets = [...imageAssets, ...keyframeAssets];
