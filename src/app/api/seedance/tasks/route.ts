@@ -162,16 +162,11 @@ function buildContent(
 // 创建视频生成任务
 export async function POST(request: NextRequest) {
   try {
-    console.log("[CREATE TASK] Received request");
-    
     const body: CreateTaskRequest = await request.json();
     const { project_id, prompt_boxes, selected_assets, params } = body;
-    
-    console.log("[CREATE TASK] Request body:", { project_id, selected_assets, params });
 
     // 获取 ARK API Key - 优先从请求头获取，其次从环境变量获取
     const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
-    console.log("[CREATE TASK] API Key present:", !!apiKey, "from header:", !!request.headers.get("x-ark-api-key"));
     
     if (!apiKey) {
       console.error("[CREATE TASK] ARK API Key not configured");
@@ -198,28 +193,11 @@ export async function POST(request: NextRequest) {
       .map((a) => a.bound_audio_id)
       .filter((id): id is string => !!id) || [];
     
-    // 调试日志：检查声线绑定
-    console.log("[CREATE TASK] 选中的素材:", JSON.stringify(assets?.map(a => ({
-      id: a.id,
-      type: a.type,
-      asset_category: a.asset_category,
-      is_keyframe: a.is_keyframe,
-      bound_audio_id: a.bound_audio_id
-    })), null, 2));
-    console.log("[CREATE TASK] 绑定音频 IDs:", boundAudioIds);
-    
     if (boundAudioIds.length > 0) {
       const { data: boundAudios } = await client
         .from("assets")
         .select("*")
         .in("id", boundAudioIds);
-      
-      console.log("[CREATE TASK] 获取到的绑定音频:", JSON.stringify(boundAudios?.map(a => ({
-        id: a.id,
-        type: a.type,
-        name: a.name,
-        url: a.url
-      })), null, 2));
       
       if (boundAudios && boundAudios.length > 0) {
         allAssets = [...allAssets, ...boundAudios.filter(b => !allAssets.some(a => a.id === b.id))];
@@ -245,26 +223,11 @@ export async function POST(request: NextRequest) {
       duration: params.duration,
       resolution: params.resolution,
       watermark: false,
-      return_last_frame: true,  // 请求返回尾帧
+      return_last_frame: true,
     };
 
-    // 调试日志：检查声线绑定情况
-    console.log("[CREATE TASK] === 声线调试信息 ===");
-    console.log("[CREATE TASK] 所有素材:", JSON.stringify(allAssets.map(a => ({
-      id: a.id,
-      type: a.type,
-      name: a.name,
-      bound_audio_id: a.bound_audio_id,
-      url: a.url
-    })), null, 2));
-    console.log("[CREATE TASK] 生成的 content:", JSON.stringify(requestBody.content, null, 2));
-    console.log("[CREATE TASK] =========================");
-
-    console.log("Seedance API Request:", JSON.stringify(requestBody, null, 2));
-
     try {
-      // 先调用 API 获取 task ID
-      console.log(`[CREATE TASK] Calling API: ${ARK_API_URL}/contents/generations/tasks`);
+      // 调用 Seedance API 获取 task ID
       const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
         method: "POST",
         headers: {
@@ -276,9 +239,8 @@ export async function POST(request: NextRequest) {
 
       const data = await response.json();
 
-      console.log("Seedance API Response:", JSON.stringify(data, null, 2));
-
       if (!response.ok) {
+        console.error("[CREATE TASK] API error:", data);
         return NextResponse.json({ 
           error: data.error?.message || data.error?.code || "API request failed" 
         }, { status: response.status });
