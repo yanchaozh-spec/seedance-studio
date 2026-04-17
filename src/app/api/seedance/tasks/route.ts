@@ -194,15 +194,32 @@ export async function POST(request: NextRequest) {
     // 如果有图片绑定了音频，也需要获取这些音频素材
     let allAssets = assets || [];
     const boundAudioIds = assets
-      ?.filter((a) => (a.type === "image" || a.type === "keyframe") && a.bound_audio_id)
+      ?.filter((a) => (a.type === "image" || a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe) && a.bound_audio_id)
       .map((a) => a.bound_audio_id)
       .filter((id): id is string => !!id) || [];
-
+    
+    // 调试日志：检查声线绑定
+    console.log("[CREATE TASK] 选中的素材:", JSON.stringify(assets?.map(a => ({
+      id: a.id,
+      type: a.type,
+      asset_category: a.asset_category,
+      is_keyframe: a.is_keyframe,
+      bound_audio_id: a.bound_audio_id
+    })), null, 2));
+    console.log("[CREATE TASK] 绑定音频 IDs:", boundAudioIds);
+    
     if (boundAudioIds.length > 0) {
       const { data: boundAudios } = await client
         .from("assets")
         .select("*")
         .in("id", boundAudioIds);
+      
+      console.log("[CREATE TASK] 获取到的绑定音频:", JSON.stringify(boundAudios?.map(a => ({
+        id: a.id,
+        type: a.type,
+        name: a.name,
+        url: a.url
+      })), null, 2));
       
       if (boundAudios && boundAudios.length > 0) {
         allAssets = [...allAssets, ...boundAudios.filter(b => !allAssets.some(a => a.id === b.id))];
@@ -230,6 +247,18 @@ export async function POST(request: NextRequest) {
       watermark: false,
       return_last_frame: true,  // 请求返回尾帧
     };
+
+    // 调试日志：检查声线绑定情况
+    console.log("[CREATE TASK] === 声线调试信息 ===");
+    console.log("[CREATE TASK] 所有素材:", JSON.stringify(allAssets.map(a => ({
+      id: a.id,
+      type: a.type,
+      name: a.name,
+      bound_audio_id: a.bound_audio_id,
+      url: a.url
+    })), null, 2));
+    console.log("[CREATE TASK] 生成的 content:", JSON.stringify(requestBody.content, null, 2));
+    console.log("[CREATE TASK] =========================");
 
     console.log("Seedance API Request:", JSON.stringify(requestBody, null, 2));
 
