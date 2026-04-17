@@ -59,85 +59,78 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
 
-  // 回滚任务数据类型
-  interface RollbackTaskData {
-    prompt_boxes?: Array<{
-      id?: string;
-      content?: string;
-      is_activated?: boolean;
-      activated_asset_id?: string;
-      keyframe_description?: string;
-    }>;
-    params?: {
-      duration?: number;
-      ratio?: string;
-      resolution?: string;
-    };
-    selected_assets?: string[];
-  }
-  
-  const [rollbackTaskData, setRollbackTaskData] = useState<RollbackTaskData | null>(null);
-  
+  // 恢复回滚数据
   useEffect(() => {
+    // 读取 sessionStorage 中的回滚数据
     const rollbackTask = sessionStorage.getItem("rollbackTask");
-    if (rollbackTask) {
-      try {
-        const task = JSON.parse(rollbackTask);
-        sessionStorage.removeItem("rollbackTask");
-        setRollbackTaskData(task);
-      } catch (e) {
-        console.error("恢复回滚数据失败:", e);
-      }
+    if (!rollbackTask) {
+      return;
     }
-  }, [resolvedParams.id]);
-  
-  // 当 materials 加载后，恢复素材选择
-  useEffect(() => {
-    if (rollbackTaskData && materials.length > 0) {
-      const task = rollbackTaskData;
-      
-      // 恢复提示词
-      if (task.prompt_boxes && task.prompt_boxes.length > 0) {
-        setPromptBoxes(task.prompt_boxes.map((box) => ({
-          id: box.id || Date.now().toString(),
-          content: box.content || "",
-          isActivated: box.is_activated ?? true,
-          activatedAssetId: box.activated_asset_id,
-          keyframeDescription: box.keyframe_description,
-        })));
-      }
-      
-      // 恢复生成参数
-      if (task.params) {
-        setParams({
-          duration: task.params.duration || 5,
-          ratio: task.params.ratio || "16:9",
-          resolution: task.params.resolution || "720p",
-        });
-      }
-      
-      // 恢复选中的素材
-      if (task.selected_assets && Array.isArray(task.selected_assets) && task.selected_assets.length > 0) {
-        const selectedAssetsToRestore: SelectedAsset[] = [];
-        task.selected_assets.forEach((assetId: string) => {
-          const asset = materials.find((m) => m.id === assetId);
-          if (asset) {
-            selectedAssetsToRestore.push({
-              ...asset,
-              isActivated: true,
-            });
-          }
-        });
-        
-        if (selectedAssetsToRestore.length > 0) {
-          setSelectedAssets(selectedAssetsToRestore);
+
+    let task;
+    try {
+      task = JSON.parse(rollbackTask);
+    } catch (e) {
+      console.error("解析回滚数据失败:", e);
+      sessionStorage.removeItem("rollbackTask");
+      return;
+    }
+
+    // 如果 materials 还没加载好，保留数据等待下一次触发
+    if (materials.length === 0) {
+      // 暂时不清理 sessionStorage，等待 materials 加载
+      return;
+    }
+
+    // materials 已加载，执行恢复
+    console.log("执行回滚恢复:", task);
+    sessionStorage.removeItem("rollbackTask");
+
+    // 恢复提示词
+    if (task.prompt_boxes && task.prompt_boxes.length > 0) {
+      setPromptBoxes(task.prompt_boxes.map((box: { id?: string; content?: string; is_activated?: boolean; activated_asset_id?: string; keyframe_description?: string }) => ({
+        id: box.id || Date.now().toString(),
+        content: box.content || "",
+        isActivated: box.is_activated ?? true,
+        activatedAssetId: box.activated_asset_id,
+        keyframeDescription: box.keyframe_description,
+      })));
+      console.log("已恢复提示词:", task.prompt_boxes.length, "个");
+    }
+
+    // 恢复生成参数
+    if (task.params) {
+      setParams({
+        duration: task.params.duration || 5,
+        ratio: task.params.ratio || "16:9",
+        resolution: task.params.resolution || "720p",
+      });
+      console.log("已恢复参数:", task.params);
+    }
+
+    // 恢复选中的素材
+    if (task.selected_assets && Array.isArray(task.selected_assets) && task.selected_assets.length > 0) {
+      const selectedAssetsToRestore: SelectedAsset[] = [];
+      task.selected_assets.forEach((assetId: string) => {
+        const asset = materials.find((m) => m.id === assetId);
+        if (asset) {
+          selectedAssetsToRestore.push({
+            ...asset,
+            isActivated: true,
+          });
+        } else {
+          console.warn("未找到素材:", assetId);
         }
+      });
+
+      if (selectedAssetsToRestore.length > 0) {
+        setSelectedAssets(selectedAssetsToRestore);
+        console.log("已恢复素材:", selectedAssetsToRestore.length, "个");
       }
-      
-      setRollbackTaskData(null);
-      toast.success("已恢复任务数据");
     }
-  }, [rollbackTaskData, materials, setSelectedAssets, setPromptBoxes, setParams]);
+
+    toast.success("已恢复任务数据");
+  }, [resolvedParams.id, materials, setSelectedAssets, setPromptBoxes, setParams]);
   
   // 素材池拖放区域
   const { dropZoneProps: poolDropZoneProps } = useDropZone({
