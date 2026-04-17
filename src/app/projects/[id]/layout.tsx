@@ -281,6 +281,19 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   };
 
+  // 统一的回滚处理函数
+  const handleRollback = (task: Task) => {
+    const taskData = {
+      id: task.id,
+      prompt_boxes: task.prompt_boxes,
+      selected_assets: task.selected_assets,
+      params: task.params,
+    };
+    console.log("执行回滚，保存数据:", taskData);
+    sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
+    router.push(`/projects/${resolvedParams.id}`);
+  };
+
   // 格式化时间
   const formatSeconds = (seconds: number | undefined | null) => {
     if (!seconds) return "-";
@@ -709,16 +722,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 variant="outline"
                                 size="sm"
                                 className="flex-1 gap-0.5 text-xs h-6 px-1 text-orange-500"
-                                onClick={() => {
-                                  const taskData = {
-                                    id: task.id,
-                                    prompt_boxes: task.prompt_boxes,
-                                    selected_assets: task.selected_assets,
-                                    params: task.params,
-                                  };
-                                  sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
-                                  router.push(`/projects/${resolvedParams.id}`);
-                                }}
+                                onClick={() => handleRollback(task)}
                               >
                                 <RotateCcw className="w-2.5 h-2.5" />
                                 <span>回滚</span>
@@ -787,14 +791,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           projectId={resolvedParams.id}
           onClose={() => setSelectedTaskDetail(null)}
           onRollback={(task) => {
-            const taskData = {
-              id: task.id,
-              prompt_boxes: task.prompt_boxes,
-              selected_assets: task.selected_assets,
-              params: task.params,
-            };
-            sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
-            router.push(`/projects/${resolvedParams.id}`);
+            handleRollback(task);
+            setSelectedTaskDetail(null);
           }}
           onDelete={(taskId) => {
             deleteTask(taskId).then(() => {
