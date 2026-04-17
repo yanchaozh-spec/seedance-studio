@@ -58,6 +58,41 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
+
+  // 检查是否有回滚任务需要恢复
+  useEffect(() => {
+    const rollbackTask = sessionStorage.getItem("rollbackTask");
+    if (rollbackTask) {
+      try {
+        const task = JSON.parse(rollbackTask);
+        sessionStorage.removeItem("rollbackTask");
+        
+        // 恢复提示词
+        if (task.prompt_boxes && task.prompt_boxes.length > 0) {
+          setPromptBoxes(task.prompt_boxes.map((box: { id: string; content: string; is_activated: boolean; activated_asset_id?: string; keyframe_description?: string }) => ({
+            id: box.id || Date.now().toString(),
+            content: box.content || "",
+            isActivated: box.is_activated ?? true,
+            activatedAssetId: box.activated_asset_id,
+            keyframeDescription: box.keyframe_description,
+          })));
+        }
+        
+        // 恢复生成参数
+        if (task.params) {
+          setParams({
+            duration: task.params.duration || 5,
+            ratio: task.params.ratio || "16:9",
+            resolution: task.params.resolution || "720p",
+          });
+        }
+        
+        toast.success("已恢复任务数据");
+      } catch (e) {
+        console.error("恢复回滚数据失败:", e);
+      }
+    }
+  }, [resolvedParams.id]);
   
   // 素材池拖放区域
   const { dropZoneProps: poolDropZoneProps } = useDropZone({
@@ -371,8 +406,27 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }, arkApiKey);
 
       toast.success("任务已创建");
-      clearPool();
-      setPromptBoxes([{ id: "1", content: "", isActivated: true }]);
+      
+      // 保存当前任务数据到 sessionStorage，供回滚使用
+      const taskData = {
+        prompt_boxes: promptBoxes.map((box) => ({
+          id: box.id,
+          content: box.content,
+          is_activated: box.isActivated,
+          activated_asset_id: box.activatedAssetId,
+          keyframe_description: box.keyframeDescription,
+        })),
+        params: {
+          duration: params_.duration,
+          ratio: params_.ratio,
+          resolution: params_.resolution,
+        },
+      };
+      sessionStorage.setItem("lastTask", JSON.stringify(taskData));
+      
+      // 生成后不清空，用户可继续调整
+      // clearPool();
+      // setPromptBoxes([{ id: "1", content: "", isActivated: true }]);
     } catch (error) {
       console.error("创建任务失败:", error);
       toast.error("创建任务失败");

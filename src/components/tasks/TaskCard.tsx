@@ -73,6 +73,7 @@ interface TaskCardProps {
   onExtractFrame?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onRegenerate?: (task: Task) => void;
+  onRollback?: (task: Task) => void;
   showDetails?: boolean;
   compact?: boolean;
   className?: string;
@@ -85,6 +86,7 @@ export function TaskCard({
   onExtractFrame,
   onDelete,
   onRegenerate,
+  onRollback,
   showDetails = true,
   compact = false,
   className,
@@ -158,6 +160,17 @@ export function TaskCard({
                     title="抽帧保存到素材库"
                   >
                     <Camera className="w-4 h-4" />
+                  </Button>
+                )}
+                {task.status === "succeeded" && onRollback && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-orange-500 hover:text-orange-600"
+                    onClick={() => onRollback(task)}
+                    title="回滚到视频生成"
+                  >
+                    <RotateCcw className="w-4 h-4" />
                   </Button>
                 )}
               </>

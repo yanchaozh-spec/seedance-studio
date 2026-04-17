@@ -817,6 +817,15 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                           <Download className="w-3.5 h-3.5" />
                           下载
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-8 text-orange-500"
+                          onClick={() => handleRollback(task)}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          回滚
+                        </Button>
                       </div>
                     </div>
                   </div>
