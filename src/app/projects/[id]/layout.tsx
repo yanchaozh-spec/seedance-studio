@@ -281,7 +281,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   };
 
-  // 统一的回滚处理函数
+  // 统一的回滚处理函数（用于需要跳转的场景，如左侧任务管理页面）
   const handleRollback = (task: Task) => {
     const taskData = {
       id: task.id,
@@ -292,6 +292,26 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     console.log("执行回滚，保存数据:", taskData);
     sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
     router.push(`/projects/${resolvedParams.id}`);
+  };
+
+  // 右侧侧边栏回滚 - 直接在当前页面恢复数据，不跳转
+  const handleRollbackInline = (task: Task) => {
+    console.log("执行页面内回滚:", task);
+
+    // 恢复提示词
+    if (task.prompt_boxes && task.prompt_boxes.length > 0) {
+      // 需要通过某种方式通知 page.tsx 恢复数据
+      // 使用 sessionStorage 传递数据，page.tsx 会自动检测并恢复
+      const taskData = {
+        id: task.id,
+        prompt_boxes: task.prompt_boxes,
+        selected_assets: task.selected_assets,
+        params: task.params,
+      };
+      sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
+      // 触发页面重新检测回滚数据
+      window.location.reload();
+    }
   };
 
   // 格式化时间
@@ -791,7 +811,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           projectId={resolvedParams.id}
           onClose={() => setSelectedTaskDetail(null)}
           onRollback={(task) => {
-            handleRollback(task);
+            // 右侧侧边栏：直接在当前页面恢复数据
+            handleRollbackInline(task);
             setSelectedTaskDetail(null);
           }}
           onDelete={(taskId) => {
