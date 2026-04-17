@@ -661,23 +661,18 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   </div>
                   {filtered.image.length > 0 && (
                     <div className="mb-4">
-                      <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                        <Image className="w-3 h-3" />
-                        {filtered.image.map((asset, idx) => (
-                          <span key={asset.id}>
-                            {asset.display_name || asset.name}
-                            {idx < imageMaterials.length - 1 && "、"}
-                          </span>
-                        ))}
-                      </h3>
                       <div className="flex flex-wrap gap-2">
                         {filtered.image.map((asset) => (
-                          <DraggableAsset
-                            key={asset.id}
-                            asset={asset}
-                            size="small"
-                            onClick={setSelectedDetailAsset}
-                          />
+                          <div key={asset.id} className="relative">
+                            <DraggableAsset
+                              asset={asset}
+                              size="small"
+                              onClick={setSelectedDetailAsset}
+                            />
+                            <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
+                              {asset.display_name || asset.name}
+                            </p>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -685,23 +680,18 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
                   {filtered.keyframe.length > 0 && (
                     <div className="mb-4">
-                      <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                        <Scissors className="w-3 h-3" />
-                        {filtered.keyframe.map((asset, idx) => (
-                          <span key={asset.id}>
-                            {asset.display_name || asset.name}
-                            {idx < keyframeMaterials.length - 1 && "、"}
-                          </span>
-                        ))}
-                      </h3>
                       <div className="flex flex-wrap gap-2">
                         {filtered.keyframe.map((asset) => (
-                          <DraggableAsset
-                            key={asset.id}
-                            asset={asset}
-                            size="small"
-                            onClick={setSelectedDetailAsset}
-                          />
+                          <div key={asset.id} className="relative">
+                            <DraggableAsset
+                              asset={asset}
+                              size="small"
+                              onClick={setSelectedDetailAsset}
+                            />
+                            <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
+                              {asset.display_name || asset.name}
+                            </p>
+                          </div>
                         ))}
                       </div>
                     </div>
