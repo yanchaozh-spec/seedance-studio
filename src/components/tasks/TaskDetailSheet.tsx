@@ -115,13 +115,22 @@ export function TaskDetailSheet({
   };
 
   const handleRollbackAction = () => {
+    // 保存任务数据到 sessionStorage
+    const taskData = {
+      id: task.id,
+      prompt_boxes: task.prompt_boxes,
+      selected_assets: task.selected_assets,
+      params: task.params,
+    };
+    sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
+    
     if (onRollback) {
       onRollback(task);
     } else {
-      // 默认回滚逻辑：保存到 sessionStorage 并跳转
-      sessionStorage.setItem("rollbackTask", JSON.stringify(task));
+      // 默认回滚逻辑：跳转
       router.push(`/projects/${projectId}`);
     }
+    // 关闭抽屉
     onClose();
   };
 

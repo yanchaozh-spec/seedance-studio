@@ -150,7 +150,13 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   const handleRollback = (task: Task) => {
     // 将任务数据保存到 sessionStorage，供视频生成页面读取
-    sessionStorage.setItem("rollbackTask", JSON.stringify(task));
+    const taskData = {
+      id: task.id,
+      prompt_boxes: task.prompt_boxes,
+      selected_assets: task.selected_assets,
+      params: task.params,
+    };
+    sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
     router.push(`/projects/${resolvedParams.id}`);
   };
 

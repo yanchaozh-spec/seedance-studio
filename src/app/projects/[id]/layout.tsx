@@ -710,7 +710,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 size="sm"
                                 className="flex-1 gap-0.5 text-xs h-6 px-1 text-orange-500"
                                 onClick={() => {
-                                  sessionStorage.setItem("rollbackTask", JSON.stringify(task));
+                                  const taskData = {
+                                    id: task.id,
+                                    prompt_boxes: task.prompt_boxes,
+                                    selected_assets: task.selected_assets,
+                                    params: task.params,
+                                  };
+                                  sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
                                   router.push(`/projects/${resolvedParams.id}`);
                                 }}
                               >
@@ -781,7 +787,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           projectId={resolvedParams.id}
           onClose={() => setSelectedTaskDetail(null)}
           onRollback={(task) => {
-            sessionStorage.setItem("rollbackTask", JSON.stringify(task));
+            const taskData = {
+              id: task.id,
+              prompt_boxes: task.prompt_boxes,
+              selected_assets: task.selected_assets,
+              params: task.params,
+            };
+            sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
             router.push(`/projects/${resolvedParams.id}`);
           }}
           onDelete={(taskId) => {
