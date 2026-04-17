@@ -259,6 +259,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<Task | null>(null);
   const [uploading, setUploading] = useState(false);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -599,20 +600,26 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </TabsList>
                   </Tabs>
                   {/* 上传按钮 */}
-                  <label className="cursor-pointer mb-3 block">
+                  <div className="mb-3">
                     <input
+                      ref={fileInputRef}
                       type="file"
                       multiple
                       accept="image/*"
                       onChange={(e) => handleUpload(e.target.files)}
                       className="hidden"
-                      disabled={uploading}
                     />
-                    <Button variant="outline" size="sm" className="w-full gap-1" disabled={uploading}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1"
+                      disabled={uploading}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
                       <Upload className="w-3.5 h-3.5" />
                       <span>{uploading ? "上传中..." : "上传图片"}</span>
                     </Button>
-                  </label>
+                  </div>
                   {filtered.image.length > 0 && (
                     <div className="mb-4">
                       <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
