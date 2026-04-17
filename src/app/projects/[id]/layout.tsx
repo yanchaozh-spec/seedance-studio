@@ -317,7 +317,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   }, []);
 
   useEffect(() => {
-    loadProject();
+    // 更新请求标识
+    projectIdRef.current = resolvedParams.id;
+    loadProject(resolvedParams.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedParams.id]);
 
@@ -336,18 +338,44 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     };
   }, []);
 
-  const loadProject = async () => {
+  // 使用请求标识防止竞态条件
+  const projectIdRef = useRef<string>("");
+
+  const loadProject = async (currentProjectId: string) => {
+    // 请求标识校验：忽略过期请求的响应
+    const requestId = currentProjectId;
+    
     try {
       setLoading(true);
-      const data = await getProject(resolvedParams.id);
+      const data = await getProject(currentProjectId);
+      
+      // 检查是否是最新的请求
+      if (projectIdRef.current !== requestId) {
+        console.log("忽略过期请求:", requestId, "最新:", projectIdRef.current);
+        return;
+      }
+      
       setProject(data);
-      const assets = await getAssets(resolvedParams.id);
+      const assets = await getAssets(currentProjectId);
+      
+      // 再次检查是否是最新的请求
+      if (projectIdRef.current !== requestId) {
+        console.log("忽略过期请求(assets):", requestId, "最新:", projectIdRef.current);
+        return;
+      }
+      
       setMaterials(assets);
     } catch (error) {
-      console.error("加载项目失败:", error);
-      router.push("/projects");
+      // 只在组件仍挂载且请求未过期时处理错误
+      if (projectIdRef.current === requestId) {
+        console.error("加载项目失败:", error);
+        router.push("/projects");
+      }
     } finally {
-      setLoading(false);
+      // 只在组件仍挂载且请求未过期时更新状态
+      if (projectIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
@@ -935,7 +963,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               );
             }
             // 同时刷新项目数据确保同步
-            loadProject();
+            loadProject(resolvedParams.id);
           }}
         />
         
