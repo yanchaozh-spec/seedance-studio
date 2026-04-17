@@ -65,9 +65,12 @@ interface DraggableAssetProps {
 function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", hideLabel }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
 
   const handleClick = (e: React.MouseEvent) => {
-    // 阻止点击事件冒泡到拖拽
+    // 如果是拖拽操作，不触发点击
+    if (isDragging.current) return;
     e.preventDefault();
     e.stopPropagation();
     if (onClick && (asset.type === "image" || asset.type === "keyframe")) {
@@ -75,7 +78,33 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
     }
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    isDragging.current = false;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (dragStartPos.current) {
+      const dx = Math.abs(e.clientX - dragStartPos.current.x);
+      const dy = Math.abs(e.clientY - dragStartPos.current.y);
+      // 如果移动超过 5px，认为是拖拽操作
+      if (dx > 5 || dy > 5) {
+        isDragging.current = true;
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    // 延迟重置状态，确保 click 事件能正确判断
+    setTimeout(() => {
+      isDragging.current = false;
+      dragStartPos.current = null;
+    }, 50);
+  };
+
   const handleDragStart = (e: React.DragEvent) => {
+    // 标记为拖拽状态
+    isDragging.current = true;
     // 开始拖拽时设置状态
     setDragging(true, asset.id);
     e.dataTransfer.effectAllowed = "move";
@@ -143,6 +172,8 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
 
   // 处理点击事件，用于打开详情对话框
   const handleCardClick = (e: React.MouseEvent) => {
+    // 如果是拖拽操作，不触发点击
+    if (isDragging.current) return;
     e.preventDefault();
     e.stopPropagation();
     if (onClick && (asset.type === "image" || asset.type === "keyframe")) {
@@ -153,6 +184,9 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
   return (
     <div
       draggable
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleCardClick}
@@ -371,9 +405,14 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
         const result = await response.json();
 
+        // 检查返回的 id 是否有效
+        if (!result.id) {
+          throw new Error("素材记录创建失败");
+        }
+
         // 创建素材记录
         const newAsset: Asset = {
-          id: result.id || crypto.randomUUID(),
+          id: result.id,
           project_id: resolvedParams.id,
           name: file.name,
           type: "image",
