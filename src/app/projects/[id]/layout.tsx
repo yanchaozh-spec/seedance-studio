@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets } from "@/lib/assets";
-import { Task, getTasks, TaskStatus } from "@/lib/tasks";
+import { Task, getTasks, TaskStatus, deleteTask } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -703,6 +704,20 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               <Download className="w-2.5 h-2.5" />
                               <span>下载</span>
                             </Button>
+                            {task.status === "succeeded" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 gap-0.5 text-xs h-6 px-1 text-orange-500"
+                                onClick={() => {
+                                  sessionStorage.setItem("rollbackTask", JSON.stringify(task));
+                                  router.push(`/projects/${resolvedParams.id}`);
+                                }}
+                              >
+                                <RotateCcw className="w-2.5 h-2.5" />
+                                <span>回滚</span>
+                              </Button>
+                            )}
                           </div>
                           
                           {/* 生成进度条 */}
@@ -760,170 +775,25 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         />
         
         {/* 任务详情抽屉 */}
-        <Sheet open={!!selectedTaskDetail} onOpenChange={() => setSelectedTaskDetail(null)}>
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                <span>任务详情</span>
-                <span className="text-sm font-normal text-muted-foreground font-mono">{selectedTaskDetail?.id.slice(0, 20)}...</span>
-              </SheetTitle>
-            </SheetHeader>
-            
-            {selectedTaskDetail && (
-              <div className="mt-6 space-y-6">
-                {/* 状态信息 */}
-                <div className="flex items-center gap-4">
-                  <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full",
-                    selectedTaskDetail.status === "succeeded" ? "bg-green-100 text-green-700" :
-                    selectedTaskDetail.status === "running" ? "bg-blue-100 text-blue-700" :
-                    selectedTaskDetail.status === "failed" ? "bg-red-100 text-red-700" :
-                    "bg-gray-100 text-gray-700"
-                  )}>
-                    {selectedTaskDetail.status === "succeeded" && <CheckCircle className="w-4 h-4" />}
-                    {selectedTaskDetail.status === "running" && <Loader className="w-4 h-4 animate-spin" />}
-                    {selectedTaskDetail.status === "failed" && <XCircle className="w-4 h-4" />}
-                    {selectedTaskDetail.status === "pending" && <Clock className="w-4 h-4" />}
-                    {selectedTaskDetail.status === "queued" && <Clock className="w-4 h-4" />}
-                    <span className="text-sm font-medium">
-                      {selectedTaskDetail.status === "succeeded" ? "已完成" :
-                       selectedTaskDetail.status === "running" ? "生成中" :
-                       selectedTaskDetail.status === "failed" ? "失败" : "排队中"}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* 视频预览 */}
-                {selectedTaskDetail.result?.video_url && (
-                  <div className="bg-black rounded-lg overflow-hidden">
-                    <video
-                      src={selectedTaskDetail.result.video_url}
-                      controls
-                      className="w-full aspect-video"
-                    />
-                  </div>
-                )}
-                
-                {/* Token 消耗 */}
-                {selectedTaskDetail.completion_tokens && (
-                  <div className="flex items-center gap-4 p-3 bg-yellow-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-yellow-600" />
-                      <span className="text-sm font-medium">Token 消耗</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Coins className="w-4 h-4 text-yellow-500" />
-                      <span className="text-yellow-700 font-medium">
-                        {selectedTaskDetail.completion_tokens.toLocaleString()}
-                      </span>
-                      <span className="text-yellow-600">tokens</span>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 时间信息 */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    时间信息
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-muted rounded-lg p-3">
-                      <div className="text-xs text-muted-foreground mb-1">提交时间</div>
-                      <div className="text-sm">
-                        {new Date(selectedTaskDetail.created_at).toLocaleString("zh-CN")}
-                      </div>
-                    </div>
-                    {selectedTaskDetail.completed_at && (
-                      <div className="bg-muted rounded-lg p-3">
-                        <div className="text-xs text-muted-foreground mb-1">完成时间</div>
-                        <div className="text-sm">
-                          {new Date(selectedTaskDetail.completed_at).toLocaleString("zh-CN")}
-                        </div>
-                      </div>
-                    )}
-                    {(selectedTaskDetail.queue_duration || selectedTaskDetail.generation_duration) && (
-                      <>
-                        {selectedTaskDetail.queue_duration && (
-                          <div className="bg-muted rounded-lg p-3">
-                            <div className="text-xs text-muted-foreground mb-1">排队耗时</div>
-                            <div className="text-sm">{formatSeconds(selectedTaskDetail.queue_duration)}</div>
-                          </div>
-                        )}
-                        {selectedTaskDetail.generation_duration && (
-                          <div className="bg-muted rounded-lg p-3">
-                            <div className="text-xs text-muted-foreground mb-1">生成耗时</div>
-                            <div className="text-sm">{formatSeconds(selectedTaskDetail.generation_duration)}</div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-                
-                {/* 提示词信息 */}
-                {selectedTaskDetail.prompt_boxes && selectedTaskDetail.prompt_boxes.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                      <Image className="w-4 h-4" />
-                      提示词
-                    </h3>
-                    <div className="bg-muted rounded-lg p-3 space-y-2">
-                      {selectedTaskDetail.prompt_boxes.filter(box => box.is_activated).map((box, idx) => (
-                        <p key={box.id} className="text-sm whitespace-pre-wrap">{box.content}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* 错误信息 */}
-                {selectedTaskDetail.status === "failed" && selectedTaskDetail.error_message && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2 text-red-600">
-                      <AlertCircle className="w-4 h-4" />
-                      错误信息
-                    </h3>
-                    <div className="bg-red-50 rounded-lg p-3">
-                      <p className="text-sm text-red-700 whitespace-pre-wrap">{selectedTaskDetail.error_message}</p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 操作按钮 */}
-                <div className="flex gap-2 pt-4 border-t">
-                  {selectedTaskDetail.status === "succeeded" && (
-                    <Button
-                      variant="outline"
-                      className="flex-1 gap-2 text-orange-500"
-                      onClick={() => {
-                        // 保存任务数据到 sessionStorage
-                        sessionStorage.setItem("rollbackTask", JSON.stringify(selectedTaskDetail));
-                        router.push(`/projects/${resolvedParams.id}`);
-                      }}
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      回滚
-                    </Button>
-                  )}
-                  {selectedTaskDetail.result?.video_url && (
-                    <Button
-                      variant="outline"
-                      className="flex-1 gap-2"
-                      onClick={() => {
-                        const a = document.createElement("a");
-                        a.href = selectedTaskDetail.result!.video_url!;
-                        a.download = `video-${selectedTaskDetail.id}.mp4`;
-                        a.click();
-                      }}
-                    >
-                      <Download className="w-4 h-4" />
-                      下载视频
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
+        <TaskDetailSheet
+          task={selectedTaskDetail}
+          assets={materials}
+          projectId={resolvedParams.id}
+          onClose={() => setSelectedTaskDetail(null)}
+          onRollback={(task) => {
+            sessionStorage.setItem("rollbackTask", JSON.stringify(task));
+            router.push(`/projects/${resolvedParams.id}`);
+          }}
+          onDelete={(taskId) => {
+            deleteTask(taskId).then(() => {
+              setTasks(prev => prev.filter(t => t.id !== taskId));
+              toast.success("删除成功");
+            }).catch(() => {
+              toast.error("删除失败");
+            });
+          }}
+          onAssetCreated={loadMaterials}
+        />
       </div>
     </ProjectDetailContext.Provider>
   );
