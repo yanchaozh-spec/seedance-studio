@@ -113,7 +113,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 分类素材（只使用激活的）
     const imageAssets = activatedAssets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
     const keyframeAssets = activatedAssets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
-    const audioAssets = activatedAssets.filter((a) => a.type === "audio");
+    // 音频素材：找出所有被激活图片引用的音频
+    const audioAssets = selectedAssets.filter((a) => 
+      a.type === "audio" && 
+      activatedAssets.some(img => img.bound_audio_id === a.id)
+    );
 
     // 按顺序收集所有图片（美术资产 + 关键帧）
     const allImageAssets = [...imageAssets, ...keyframeAssets];
