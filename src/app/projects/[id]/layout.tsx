@@ -761,7 +761,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         
         {/* 任务详情抽屉 */}
         <Sheet open={!!selectedTaskDetail} onOpenChange={() => setSelectedTaskDetail(null)}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
                 <span>任务详情</span>
@@ -794,11 +794,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                 
                 {/* 视频预览 */}
                 {selectedTaskDetail.result?.video_url && (
-                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                  <div className="bg-black rounded-lg overflow-hidden">
                     <video
                       src={selectedTaskDetail.result.video_url}
                       controls
-                      className="w-full h-full object-contain"
+                      className="w-full aspect-video"
                     />
                   </div>
                 )}
