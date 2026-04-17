@@ -69,7 +69,6 @@ export async function GET(
 
         if (response.ok) {
           const externalTask = await response.json();
-          console.log(`[POLL] External API response:`, JSON.stringify(externalTask).substring(0, 500));
           
           // 更新本地任务状态
           const updates: Record<string, unknown> = {

@@ -128,8 +128,6 @@ export async function POST(request: NextRequest) {
       return_last_frame: true,
     };
 
-    console.log("[Generate Segment] Request:", JSON.stringify(requestBody, null, 2));
-
     // 调用 Seedance API
     const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
       method: "POST",
