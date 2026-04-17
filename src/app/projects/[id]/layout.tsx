@@ -587,151 +587,144 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   ) : (
                     <div className="space-y-2">
                       {tasks.slice(0, 10).map((task) => (
-                        <div key={task.id} className="bg-muted rounded-lg overflow-hidden">
-                          {/* 水平布局：左侧视频 + 右侧信息 */}
-                          <div className="flex">
-                            {/* 左侧视频区域 */}
-                            {task.status === "succeeded" && task.result?.video_url ? (
-                              <div 
-                                className="w-28 h-16 bg-black flex-shrink-0"
-                              >
-                                <video
-                                  ref={(el) => {
-                                    if (el) videoRefs.current.set(task.id, el);
-                                  }}
-                                  src={task.result.video_url}
-                                  controls
-                                  className="w-full h-full object-contain"
-                                  preload="metadata"
-                                />
-                              </div>
-                            ) : task.status === "running" ? (
-                              <div className="w-28 h-16 bg-muted-foreground/10 flex items-center justify-center flex-shrink-0">
-                                <Loader className="w-5 h-5 animate-spin text-blue-500" />
-                              </div>
-                            ) : task.status === "failed" ? (
-                              <div className="w-28 h-16 bg-muted-foreground/10 flex items-center justify-center flex-shrink-0">
-                                <XCircle className="w-5 h-5 text-red-500" />
-                              </div>
-                            ) : (
-                              <div className="w-28 h-16 bg-muted-foreground/10 flex items-center justify-center flex-shrink-0">
-                                <Clock className="w-4 h-4 text-muted-foreground" />
-                              </div>
-                            )}
-                            
-                            {/* 右侧详情区域 */}
-                            <div className="flex-1 p-1.5 min-w-0 flex flex-col justify-between">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground font-mono truncate">
-                                  {task.id.slice(0, 8)}...
-                                </span>
-                                <span className={cn("text-xs font-medium flex-shrink-0 ml-1", 
-                                  task.status === "succeeded" ? "text-green-500" :
-                                  task.status === "running" ? "text-blue-500" :
-                                  task.status === "failed" ? "text-red-500" : "text-muted-foreground"
-                                )}>
-                                  {task.status === "succeeded" ? "已完成" :
-                                   task.status === "running" ? "生成中" :
-                                   task.status === "failed" ? "失败" : "排队中"}
-                                </span>
-                              </div>
-                              
-                              {/* Token */}
-                              {task.completion_tokens && (
-                                <div className="text-xs text-yellow-600">
-                                  {task.completion_tokens.toLocaleString()} tokens
-                                </div>
-                              )}
-                              
-                              {/* 操作按钮 */}
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1 gap-0.5 text-xs h-6 px-1"
-                                  onClick={() => setSelectedTaskDetail(task)}
-                                >
-                                  <Eye className="w-2.5 h-2.5" />
-                                  <span>详情</span>
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1 gap-0.5 text-xs h-6 px-1"
-                                  onClick={() => {
-                                    const video = videoRefs.current.get(task.id);
-                                    if (!video) return;
-                                    
-                                    if (video.readyState < 2) {
-                                      toast.error("视频尚未加载完成");
-                                      return;
-                                    }
-                                    
-                                    const canvas = document.createElement("canvas");
-                                    canvas.width = video.videoWidth;
-                                    canvas.height = video.videoHeight;
-                                    
-                                    const ctx = canvas.getContext("2d");
-                                    if (!ctx) {
-                                      toast.error("无法创建画布");
-                                      return;
-                                    }
-                                    
-                                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                    
-                                    canvas.toBlob(async (blob) => {
-                                      if (blob) {
-                                        const formData = new FormData();
-                                        formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-                                        formData.append("projectId", resolvedParams.id);
-                                        formData.append("taskId", task.id);
-                                        formData.append("timestamp", video.currentTime.toString());
-                                        formData.append("assetCategory", "keyframe");
-                                        formData.append("name", `关键帧_${Date.now()}`);
-                                        
-                                        try {
-                                          const res = await fetch("/api/assets/extract-frame", {
-                                            method: "POST",
-                                            body: formData,
-                                          });
-                                          
-                                          if (res.ok) {
-                                            toast.success("已保存为关键帧");
-                                            loadMaterials?.();
-                                          } else {
-                                            toast.error("保存失败");
-                                          }
-                                        } catch (e) {
-                                          toast.error("抽帧失败");
-                                        }
-                                      }
-                                    }, "image/png");
-                                  }}
-                                >
-                                  <Camera className="w-2.5 h-2.5" />
-                                  <span>抽帧</span>
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1 gap-0.5 text-xs h-6 px-1"
-                                  onClick={() => {
-                                    const a = document.createElement("a");
-                                    a.href = task.result?.video_url || "";
-                                    a.download = `video-${task.id}.mp4`;
-                                    a.click();
-                                  }}
-                                >
-                                  <Download className="w-2.5 h-2.5" />
-                                  <span>下载</span>
-                                </Button>
-                              </div>
+                        <div key={task.id} className="bg-muted rounded-lg p-2">
+                          {/* 顶部：ID + 状态 */}
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs text-muted-foreground font-mono truncate">
+                              {task.id.slice(0, 8)}...
+                            </span>
+                            <span className={cn("text-xs font-medium flex-shrink-0 ml-1", 
+                              task.status === "succeeded" ? "text-green-500" :
+                              task.status === "running" ? "text-blue-500" :
+                              task.status === "failed" ? "text-red-500" : "text-muted-foreground"
+                            )}>
+                              {task.status === "succeeded" ? "已完成" :
+                               task.status === "running" ? "生成中" :
+                               task.status === "failed" ? "失败" : "排队中"}
+                            </span>
+                          </div>
+                          
+                          {/* 视频/状态区域 */}
+                          {task.status === "succeeded" && task.result?.video_url ? (
+                            <div className="mb-1.5">
+                              <video
+                                ref={(el) => {
+                                  if (el) videoRefs.current.set(task.id, el);
+                                }}
+                                src={task.result.video_url}
+                                controls
+                                className="w-full h-20 bg-black rounded"
+                                preload="metadata"
+                              />
                             </div>
+                          ) : task.status === "running" ? (
+                            <div className="h-20 bg-muted-foreground/10 rounded flex items-center justify-center mb-1.5">
+                              <Loader className="w-6 h-6 animate-spin text-blue-500" />
+                            </div>
+                          ) : task.status === "failed" ? (
+                            <div className="h-20 bg-muted-foreground/10 rounded flex items-center justify-center mb-1.5">
+                              <XCircle className="w-6 h-6 text-red-500" />
+                            </div>
+                          ) : (
+                            <div className="h-20 bg-muted-foreground/10 rounded flex items-center justify-center mb-1.5">
+                              <Clock className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          
+                          {/* Token */}
+                          {task.completion_tokens && (
+                            <div className="text-xs text-yellow-600 mb-1.5">
+                              {task.completion_tokens.toLocaleString()} tokens
+                            </div>
+                          )}
+                          
+                          {/* 操作按钮 */}
+                          <div className="flex gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-0.5 text-xs h-6 px-1"
+                              onClick={() => setSelectedTaskDetail(task)}
+                            >
+                              <Eye className="w-2.5 h-2.5" />
+                              <span>详情</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-0.5 text-xs h-6 px-1"
+                              onClick={() => {
+                                const video = videoRefs.current.get(task.id);
+                                if (!video) return;
+                                
+                                if (video.readyState < 2) {
+                                  toast.error("视频尚未加载完成");
+                                  return;
+                                }
+                                
+                                const canvas = document.createElement("canvas");
+                                canvas.width = video.videoWidth;
+                                canvas.height = video.videoHeight;
+                                
+                                const ctx = canvas.getContext("2d");
+                                if (!ctx) {
+                                  toast.error("无法创建画布");
+                                  return;
+                                }
+                                
+                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                
+                                canvas.toBlob(async (blob) => {
+                                  if (blob) {
+                                    const formData = new FormData();
+                                    formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+                                    formData.append("projectId", resolvedParams.id);
+                                    formData.append("taskId", task.id);
+                                    formData.append("timestamp", video.currentTime.toString());
+                                    formData.append("assetCategory", "keyframe");
+                                    formData.append("name", `关键帧_${Date.now()}`);
+                                    
+                                    try {
+                                      const res = await fetch("/api/assets/extract-frame", {
+                                        method: "POST",
+                                        body: formData,
+                                      });
+                                      
+                                      if (res.ok) {
+                                        toast.success("已保存为关键帧");
+                                        loadMaterials?.();
+                                      } else {
+                                        toast.error("保存失败");
+                                      }
+                                    } catch (e) {
+                                      toast.error("抽帧失败");
+                                    }
+                                  }
+                                }, "image/png");
+                              }}
+                            >
+                              <Camera className="w-2.5 h-2.5" />
+                              <span>抽帧</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-0.5 text-xs h-6 px-1"
+                              onClick={() => {
+                                const a = document.createElement("a");
+                                a.href = task.result?.video_url || "";
+                                a.download = `video-${task.id}.mp4`;
+                                a.click();
+                              }}
+                            >
+                              <Download className="w-2.5 h-2.5" />
+                              <span>下载</span>
+                            </Button>
                           </div>
                           
                           {/* 生成进度条 */}
                           {task.status === "running" && (
-                            <div className="h-1 bg-muted-foreground/20">
+                            <div className="h-1 bg-muted-foreground/20 mt-1.5 rounded-full overflow-hidden">
                               <div 
                                 className="h-full bg-blue-500 transition-all"
                                 style={{ width: `${task.progress || 0}%` }}
