@@ -174,14 +174,14 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
       {asset.type === "image" || asset.type === "keyframe" ? (
         <div className="w-full">
           <div className={cn(
-            "relative",
+            "w-full flex items-center justify-center bg-muted",
             size === "small" ? "aspect-square" : "aspect-video"
           )}>
             {asset.thumbnail_url ? (
               <img
                 src={asset.thumbnail_url}
                 alt={asset.name}
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-full object-contain"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted">

@@ -467,7 +467,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               <CardContent>
                 <div className="grid grid-cols-4 gap-3">
                   {selectedAssetObjects.map((asset) => (
-                    <div key={asset.id} className="relative aspect-square rounded-lg overflow-hidden border bg-muted">
+                    <div key={asset.id} className="relative aspect-square rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
                       {asset.type === "audio" ? (
                         <div className="w-full h-full flex items-center justify-center">
                           <span className="text-xs text-muted-foreground">音频</span>
@@ -476,7 +476,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                         <img
                           src={asset.thumbnail_url || asset.url}
                           alt={asset.display_name || asset.name}
-                          className="w-full h-full object-cover"
+                          className="max-w-full max-h-full object-contain"
                         />
                       )}
                     </div>

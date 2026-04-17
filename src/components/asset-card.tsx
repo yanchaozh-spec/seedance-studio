@@ -64,11 +64,11 @@ export function AssetCard({
 
       {/* 图片/缩略图 */}
       {asset.thumbnail_url || asset.url ? (
-        <div className={cn("w-full", size === "sm" ? "aspect-square" : "aspect-video")}>
+        <div className={cn("w-full flex items-center justify-center bg-muted", size === "sm" ? "aspect-square" : "aspect-video")}>
           <img
             src={asset.thumbnail_url || asset.url}
             alt={asset.name}
-            className="w-full h-full object-cover"
+            className="max-w-full max-h-full object-contain"
           />
         </div>
       ) : (
