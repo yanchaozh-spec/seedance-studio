@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdminDb } from "@/storage/database/supabase-client";
 
 // 获取存储客户端
 function getStorageClient() {
@@ -98,9 +98,40 @@ export async function POST(request: NextRequest) {
     // 如果是音频，获取时长（需要前端通过 audio 元素获取）
     const duration = type === "audio" ? null : null;
 
+    // 创建数据库记录
+    let assetId: string | null = null;
+    try {
+      const supabaseAdmin = getSupabaseAdminDb();
+      const assetCategory = type === "keyframe" ? "keyframe" : "image";
+      
+      const { data: assetData, error: assetError } = await supabaseAdmin
+        .from("assets")
+        .insert({
+          project_id: projectId,
+          name: file.name,
+          type: type,
+          asset_category: assetCategory,
+          url: urlData.publicUrl,
+          thumbnail_url: thumbnailUrl,
+          size: file.size,
+        })
+        .select("id")
+        .single();
+      
+      if (assetError) {
+        console.error("Failed to create asset record:", assetError);
+      } else {
+        assetId = assetData.id;
+        console.log("Asset record created:", assetId);
+      }
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+    }
+
     console.log("Upload successful:", urlData.publicUrl);
 
     return NextResponse.json({
+      id: assetId,
       url: urlData.publicUrl,
       thumbnailUrl,
       duration,

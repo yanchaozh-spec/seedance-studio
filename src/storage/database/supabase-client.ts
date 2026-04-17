@@ -124,4 +124,23 @@ function getSupabaseClient(token?: string): SupabaseClient {
   });
 }
 
-export { loadEnv, getSupabaseCredentials, getSupabaseServiceRoleKey, getSupabaseClient };
+function getSupabaseAdminDb(): SupabaseClient {
+  const { url } = getSupabaseCredentials();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
+  
+  if (!serviceRoleKey) {
+    throw new Error('Service role key not available');
+  }
+  
+  return createClient(url, serviceRoleKey, {
+    db: {
+      timeout: 60000,
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+export { loadEnv, getSupabaseCredentials, getSupabaseServiceRoleKey, getSupabaseClient, getSupabaseAdminDb };
