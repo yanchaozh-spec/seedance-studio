@@ -617,30 +617,80 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             <div className="bg-muted rounded-lg p-4 whitespace-pre-wrap text-sm">
               {generateFinalPrompt() || "(空)"}
             </div>
-            <div className="mt-4">
-              <h3 className="text-sm font-medium mb-2">使用的素材:</h3>
-              <div className="flex flex-wrap gap-2">
-                {/* 只显示激活的图片和关键帧 */}
-                {selectedAssets
-                  .filter((asset) => 
-                    (asset.type === "image" || asset.type === "keyframe") && 
-                    asset.isActivated
-                  )
-                  .map((asset) => (
-                    <div 
-                      key={asset.id} 
-                      className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
-                    >
-                      {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <Image className="w-3 h-3" />}
-                      {asset.display_name || asset.name}
-                      {asset.bound_audio_id && <Music className="w-3 h-3 ml-1" />}
-                    </div>
-                  ))}
-                {selectedAssets.filter((asset) => 
-                  (asset.type === "image" || asset.type === "keyframe") && asset.isActivated
-                ).length === 0 && (
-                  <span className="text-muted-foreground text-sm">无</span>
-                )}
+            <div className="mt-4 space-y-3">
+              {/* 图片和关键帧素材 */}
+              <div>
+                <h3 className="text-sm font-medium mb-2">图片素材:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAssets
+                    .filter((asset) => 
+                      (asset.type === "image" || asset.type === "keyframe") && 
+                      asset.isActivated
+                    )
+                    .map((asset) => (
+                      <div 
+                        key={asset.id} 
+                        className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
+                      >
+                        {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <Image className="w-3 h-3" />}
+                        {asset.display_name || asset.name}
+                      </div>
+                    ))}
+                  {selectedAssets.filter((asset) => 
+                    (asset.type === "image" || asset.type === "keyframe") && asset.isActivated
+                  ).length === 0 && (
+                    <span className="text-muted-foreground text-sm">无</span>
+                  )}
+                </div>
+              </div>
+              
+              {/* 声线素材 */}
+              <div>
+                <h3 className="text-sm font-medium mb-2">声线素材:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAssets
+                    .filter((asset) => {
+                      // 找出所有绑定到激活图片的音频
+                      const isBoundAudio = selectedAssets.some(a => 
+                        a.type === "audio" && 
+                        a.isActivated &&
+                        asset.asset_category !== "keyframe" &&
+                        asset.type === "image" &&
+                        asset.isActivated &&
+                        a.id === asset.bound_audio_id
+                      );
+                      return isBoundAudio;
+                    })
+                    .map((asset) => {
+                      const boundAudio = selectedAssets.find(a => 
+                        a.type === "audio" && a.id === asset.bound_audio_id
+                      );
+                      return boundAudio ? (
+                        <div 
+                          key={boundAudio.id} 
+                          className="bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded px-2 py-1 text-sm flex items-center gap-1"
+                        >
+                          <Music className="w-3 h-3" />
+                          {boundAudio.display_name || boundAudio.name}
+                          <span className="text-muted-foreground text-xs ml-1">
+                            → {asset.display_name || asset.name}
+                          </span>
+                        </div>
+                      ) : null;
+                    })}
+                  {selectedAssets.filter((asset) => {
+                    return selectedAssets.some(a => 
+                      a.type === "audio" && 
+                      a.isActivated &&
+                      asset.asset_category !== "keyframe" &&
+                      asset.type === "image" &&
+                      asset.isActivated &&
+                      a.id === asset.bound_audio_id
+                    );
+                  }).length === 0 && (
+                    <span className="text-muted-foreground text-sm">无</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
