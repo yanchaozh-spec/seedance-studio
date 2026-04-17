@@ -149,15 +149,17 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   };
 
   const handleRollback = (task: Task) => {
-    // 将任务数据保存到 sessionStorage，供视频生成页面读取
-    const taskData = {
-      id: task.id,
-      prompt_boxes: task.prompt_boxes,
-      selected_assets: task.selected_assets,
-      params: task.params,
-    };
-    sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
-    router.push(`/projects/${resolvedParams.id}`);
+    // 使用 history.state 替代 sessionStorage，避免同步阻塞
+    if (task.prompt_boxes && task.prompt_boxes.length > 0) {
+      const taskData = {
+        id: task.id,
+        prompt_boxes: task.prompt_boxes,
+        selected_assets: task.selected_assets,
+        params: task.params,
+      };
+      window.history.pushState(taskData, "", window.location.href);
+      router.push(`/projects/${resolvedParams.id}`);
+    }
   };
 
   // 全局下载处理函数

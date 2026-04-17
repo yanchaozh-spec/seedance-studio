@@ -59,43 +59,67 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
 
-  // 恢复回滚数据
+  // 恢复回滚数据（支持 history.state 和 sessionStorage）
   useEffect(() => {
-    // 读取 sessionStorage 中的回滚数据
-    const rollbackTask = sessionStorage.getItem("rollbackTask");
-    if (!rollbackTask) {
-      return;
+    // 类型定义
+    interface RollbackData {
+      id?: string;
+      prompt_boxes?: Array<{
+        id?: string;
+        content?: string;
+        is_activated?: boolean;
+        activated_asset_id?: string;
+        keyframe_description?: string;
+      }>;
+      selected_assets?: string[];
+      params?: {
+        duration?: number;
+        ratio?: string;
+        resolution?: string;
+      };
     }
 
-    let task;
-    try {
-      task = JSON.parse(rollbackTask);
-    } catch (e) {
-      console.error("解析回滚数据失败:", e);
-      sessionStorage.removeItem("rollbackTask");
-      return;
+    // 优先从 history.state 读取（避免同步阻塞）
+    let rollbackData: RollbackData | null = window.history.state as RollbackData | null;
+    
+    // 如果 history.state 没有，尝试从 sessionStorage 读取（向后兼容）
+    if (!rollbackData?.prompt_boxes) {
+      const rollbackTask = sessionStorage.getItem("rollbackTask");
+      if (!rollbackTask) {
+        return;
+      }
+      try {
+        rollbackData = JSON.parse(rollbackTask);
+      } catch {
+        sessionStorage.removeItem("rollbackTask");
+        return;
+      }
+    } else {
+      // 从 history.state 读取后清除
+      window.history.replaceState(null, "", window.location.href);
     }
+
+    const task = rollbackData;
+    if (!task || !task.prompt_boxes) return;
 
     // 如果 materials 还没加载好，保留数据等待下一次触发
     if (materials.length === 0) {
-      // 暂时不清理 sessionStorage，等待 materials 加载
       return;
     }
 
     // materials 已加载，执行恢复
-    console.log("执行回滚恢复:", task);
+    // 清除 sessionStorage
     sessionStorage.removeItem("rollbackTask");
 
     // 恢复提示词
-    if (task.prompt_boxes && task.prompt_boxes.length > 0) {
-      setPromptBoxes(task.prompt_boxes.map((box: { id?: string; content?: string; is_activated?: boolean; activated_asset_id?: string; keyframe_description?: string }) => ({
+    if (task.prompt_boxes.length > 0) {
+      setPromptBoxes(task.prompt_boxes.map((box) => ({
         id: box.id || Date.now().toString(),
         content: box.content || "",
         isActivated: box.is_activated ?? true,
         activatedAssetId: box.activated_asset_id,
         keyframeDescription: box.keyframe_description,
       })));
-      console.log("已恢复提示词:", task.prompt_boxes.length, "个");
     }
 
     // 恢复生成参数
@@ -105,7 +129,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         ratio: task.params.ratio || "16:9",
         resolution: task.params.resolution || "720p",
       });
-      console.log("已恢复参数:", task.params);
     }
 
     // 恢复选中的素材

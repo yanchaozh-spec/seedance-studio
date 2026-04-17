@@ -381,32 +381,32 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
   // 统一的回滚处理函数（用于需要跳转的场景，如左侧任务管理页面）
   const handleRollback = (task: Task) => {
-    const taskData = {
-      id: task.id,
-      prompt_boxes: task.prompt_boxes,
-      selected_assets: task.selected_assets,
-      params: task.params,
-    };
-    console.log("执行回滚，保存数据:", taskData);
-    sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
-    router.push(`/projects/${resolvedParams.id}`);
-  };
-
-  // 右侧侧边栏回滚 - 直接在当前页面恢复数据，不跳转
-  const handleRollbackInline = (task: Task) => {
-    console.log("执行页面内回滚:", task);
-
-    // 恢复提示词
+    // 使用 history.state 替代 sessionStorage，避免同步阻塞
     if (task.prompt_boxes && task.prompt_boxes.length > 0) {
-      // 需要通过某种方式通知 page.tsx 恢复数据
-      // 使用 sessionStorage 传递数据，page.tsx 会自动检测并恢复
       const taskData = {
         id: task.id,
         prompt_boxes: task.prompt_boxes,
         selected_assets: task.selected_assets,
         params: task.params,
       };
-      sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
+      // 使用 history.state 传递数据，避免 JSON.stringify 阻塞
+      window.history.pushState(taskData, "", window.location.href);
+      router.push(`/projects/${resolvedParams.id}`);
+    }
+  };
+
+  // 右侧侧边栏回滚 - 直接在当前页面恢复数据，不跳转
+  const handleRollbackInline = (task: Task) => {
+    // 恢复提示词
+    if (task.prompt_boxes && task.prompt_boxes.length > 0) {
+      // 使用 history.state 传递数据，避免同步阻塞
+      const taskData = {
+        id: task.id,
+        prompt_boxes: task.prompt_boxes,
+        selected_assets: task.selected_assets,
+        params: task.params,
+      };
+      window.history.pushState(taskData, "", window.location.href);
       // 触发页面重新检测回滚数据
       window.location.reload();
     }
