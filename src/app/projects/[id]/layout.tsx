@@ -193,7 +193,7 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
       className={cn(
         "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
         (asset.type === "image" || asset.type === "keyframe") && onClick && "cursor-pointer hover:ring-2 hover:ring-primary transition-all",
-        size === "small" ? "w-24" : "w-full"
+        size === "small" ? "w-20" : "w-full"
       )}
     >
       {/* 隐藏的图片元素用于拖拽 */}
@@ -599,9 +599,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           <main className="flex-1 overflow-auto">{children}</main>
 
           {/* 右侧常驻面板（素材库 + 任务管理） */}
-          <aside className="w-72 border-l bg-card flex flex-col">
+          <aside className="w-72 border-l bg-card flex flex-col shrink-0 max-h-screen">
             {/* 标签页切换 */}
-            <div className="p-3 border-b">
+            <div className="p-2 border-b shrink-0">
               <div className="flex gap-1.5">
                 <Button
                   variant={activeTab === "materials" ? "default" : "outline"}
@@ -627,19 +627,19 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-2">
               {/* 素材库内容 */}
               {activeTab === "materials" && (
                 <>
-                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-3">
-                    <TabsList className="w-full h-8">
+                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-2">
+                    <TabsList className="w-full h-7">
                       <TabsTrigger value="all" className="flex-1 text-xs">全部</TabsTrigger>
                       <TabsTrigger value="keyframe" className="flex-1 text-xs">关键帧</TabsTrigger>
                       <TabsTrigger value="image" className="flex-1 text-xs">美术</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   {/* 上传按钮 */}
-                  <div className="mb-3">
+                  <div className="mb-2">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -661,15 +661,15 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   </div>
                   {filtered.image.length > 0 && (
                     <div className="mb-4">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {filtered.image.map((asset) => (
-                          <div key={asset.id} className="relative">
+                          <div key={asset.id} className="flex flex-col items-center">
                             <DraggableAsset
                               asset={asset}
                               size="small"
                               onClick={setSelectedDetailAsset}
                             />
-                            <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
+                            <p className="text-[10px] text-center mt-0.5 truncate max-w-20" title={asset.display_name || asset.name}>
                               {asset.display_name || asset.name}
                             </p>
                           </div>
@@ -680,9 +680,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
                   {filtered.keyframe.length > 0 && (
                     <div className="mb-4">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {filtered.keyframe.map((asset) => (
-                          <div key={asset.id} className="relative">
+                          <div key={asset.id} className="flex flex-col items-center">
                             <DraggableAsset
                               asset={asset}
                               size="small"
@@ -699,10 +699,10 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
 
                   {(filtered.image.length + filtered.keyframe.length) === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FolderOpen className="w-12 h-12 mx-auto mb-3" />
+                    <div className="text-center py-6 text-muted-foreground text-xs">
+                      <FolderOpen className="w-8 h-8 mx-auto mb-2" />
                       <p>暂无素材</p>
-                      <p className="text-sm">请先上传素材</p>
+                      <p className="text-[10px]">请先上传素材</p>
                     </div>
                   )}
                 </>
@@ -711,35 +711,33 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {/* 任务管理内容 */}
               {activeTab === "tasks" && (
                 <>
-                  <div className="mb-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
-                    >
-                      完整任务管理
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mb-2 text-xs h-7"
+                    onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
+                  >
+                    完整任务管理
+                  </Button>
                   {loadingTasks ? (
-                    <div className="flex items-center justify-center py-6">
-                      <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full" />
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full" />
                     </div>
                   ) : tasks.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground text-sm">
-                      <Video className="w-8 h-8 mx-auto mb-2" />
+                    <div className="text-center py-4 text-muted-foreground text-xs">
+                      <Video className="w-6 h-6 mx-auto mb-1" />
                       <p>暂无任务</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {tasks.slice(0, 10).map((task) => (
-                        <div key={task.id} className="bg-muted rounded-lg p-2">
+                        <div key={task.id} className="bg-muted rounded-md p-2 space-y-1.5">
                           {/* 顶部：ID + 状态 */}
-                          <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center justify-between">
                             <span className="text-xs text-muted-foreground font-mono truncate">
                               {task.id.slice(0, 8)}...
                             </span>
-                            <span className={cn("text-xs font-medium flex-shrink-0 ml-1", 
+                            <span className={cn("text-[10px] font-medium flex-shrink-0 ml-1", 
                               task.status === "succeeded" ? "text-green-500" :
                               task.status === "running" ? "text-blue-500" :
                               task.status === "failed" ? "text-red-500" : "text-muted-foreground"
@@ -752,53 +750,52 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           
                           {/* 视频/状态区域 */}
                           {task.status === "succeeded" && task.result?.video_url ? (
-                            <div className="mb-1">
+                            <div className="aspect-video bg-black rounded overflow-hidden">
                               <video
                                 ref={(el) => {
                                   if (el) videoRefs.current.set(task.id, el);
                                 }}
                                 src={task.result.video_url}
                                 controls
-                                className="w-full aspect-video bg-black rounded"
+                                className="w-full h-full object-cover"
                                 preload="metadata"
                               />
                             </div>
                           ) : task.status === "running" ? (
-                            <div className="h-12 bg-muted-foreground/10 rounded flex items-center justify-center mb-1">
+                            <div className="h-10 bg-muted-foreground/10 rounded flex items-center justify-center">
                               <Loader className="w-4 h-4 animate-spin text-blue-500" />
                             </div>
                           ) : task.status === "failed" ? (
-                            <div className="h-12 bg-muted-foreground/10 rounded flex items-center justify-center mb-1">
+                            <div className="h-10 bg-muted-foreground/10 rounded flex items-center justify-center">
                               <XCircle className="w-4 h-4 text-red-500" />
                             </div>
                           ) : (
-                            <div className="h-12 bg-muted-foreground/10 rounded flex items-center justify-center mb-1">
+                            <div className="h-10 bg-muted-foreground/10 rounded flex items-center justify-center">
                               <Clock className="w-4 h-4 text-muted-foreground" />
                             </div>
                           )}
                           
                           {/* Token */}
                           {task.completion_tokens && (
-                            <div className="text-xs text-yellow-600 mb-1">
+                            <div className="text-[10px] text-yellow-600 truncate">
                               {task.completion_tokens.toLocaleString()} tokens
                             </div>
                           )}
                           
                           {/* 操作按钮 */}
-                          <div className="flex gap-1">
+                          <div className="grid grid-cols-4 gap-1">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-0.5 text-xs h-6 px-1"
+                              className="text-[10px] h-6 px-0.5"
                               onClick={() => setSelectedTaskDetail(task)}
                             >
-                              <Eye className="w-2.5 h-2.5" />
-                              <span>详情</span>
+                              详情
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-0.5 text-xs h-6 px-1"
+                              className="text-[10px] h-6 px-0.5"
                               onClick={() => {
                                 if (!task.result || !task.result.video_url) return;
                                 
@@ -832,13 +829,12 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 );
                               }}
                             >
-                              <Camera className="w-2.5 h-2.5" />
-                              <span>抽帧</span>
+                              抽帧
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-0.5 text-xs h-6 px-1"
+                              className="text-[10px] h-6 px-0.5"
                               onClick={() => {
                                 const a = document.createElement("a");
                                 a.href = task.result?.video_url || "";
@@ -846,25 +842,23 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 a.click();
                               }}
                             >
-                              <Download className="w-2.5 h-2.5" />
-                              <span>下载</span>
+                              下载
                             </Button>
                             {task.status === "succeeded" && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="flex-1 gap-0.5 text-xs h-6 px-1 text-orange-500"
+                                className="text-[10px] h-6 px-0.5 text-orange-500"
                                 onClick={() => handleRollbackInline(task)}
                               >
-                                <RotateCcw className="w-2.5 h-2.5" />
-                                <span>回滚</span>
+                                回滚
                               </Button>
                             )}
                           </div>
                           
                           {/* 生成进度条 */}
                           {task.status === "running" && (
-                            <div className="h-1 bg-muted-foreground/20 mt-1 rounded-full overflow-hidden">
+                            <div className="h-1 bg-muted-foreground/20 rounded-full overflow-hidden">
                               <div 
                                 className="h-full bg-blue-500 transition-all"
                                 style={{ width: `${task.progress || 0}%` }}
