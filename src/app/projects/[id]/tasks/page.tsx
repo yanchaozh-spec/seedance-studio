@@ -266,6 +266,7 @@ function TaskDetailSheet({ task, assets, projectId, onClose, onRollback, onDelet
                   ref={videoRef}
                   src={task.result.video_url}
                   controls
+                  crossOrigin="anonymous"
                   className="w-full aspect-video"
                   muted={muted}
                 />
@@ -711,6 +712,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         }}
                         src={task.result.video_url}
                         controls
+                        crossOrigin="anonymous"
                         className="w-full h-full object-contain"
                         preload="metadata"
                       />
