@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle, RotateCcw } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle, RotateCcw, Upload } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -257,6 +257,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<Task | null>(null);
+  const [uploading, setUploading] = useState(false);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const pathname = usePathname();
   const router = useRouter();
@@ -335,6 +336,62 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       setMaterials(assets);
     } catch (error) {
       console.error("加载素材失败:", error);
+    }
+  };
+
+  // 上传图片素材
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      for (const file of files) {
+        // 验证文件类型
+        const isImage = file.type.startsWith("image/");
+        if (!isImage) {
+          toast.error(`${file.name} 格式不支持`);
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("projectId", resolvedParams.id);
+        formData.append("type", "image");
+        formData.append("asset_category", "image");
+
+        const response = await fetch("/api/assets/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("上传失败");
+        }
+
+        const result = await response.json();
+
+        // 创建素材记录
+        const newAsset: Asset = {
+          id: result.id || crypto.randomUUID(),
+          project_id: resolvedParams.id,
+          name: file.name,
+          type: "image",
+          asset_category: "image",
+          url: result.url,
+          thumbnail_url: result.thumbnailUrl || result.url,
+          size: file.size,
+          created_at: new Date().toISOString(),
+        };
+
+        setMaterials((prev) => [newAsset, ...prev]);
+      }
+
+      toast.success("上传成功");
+    } catch (error) {
+      console.error("上传失败:", error);
+      toast.error("上传失败");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -541,6 +598,21 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       <TabsTrigger value="image" className="flex-1 text-xs">美术</TabsTrigger>
                     </TabsList>
                   </Tabs>
+                  {/* 上传按钮 */}
+                  <label className="cursor-pointer mb-3 block">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => handleUpload(e.target.files)}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                    <Button variant="outline" size="sm" className="w-full gap-1" disabled={uploading}>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{uploading ? "上传中..." : "上传图片"}</span>
+                    </Button>
+                  </label>
                   {filtered.image.length > 0 && (
                     <div className="mb-4">
                       <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
