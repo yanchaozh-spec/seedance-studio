@@ -742,7 +742,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 variant="outline"
                                 size="sm"
                                 className="flex-1 gap-0.5 text-xs h-6 px-1 text-orange-500"
-                                onClick={() => handleRollback(task)}
+                                onClick={() => handleRollbackInline(task)}
                               >
                                 <RotateCcw className="w-2.5 h-2.5" />
                                 <span>回滚</span>
