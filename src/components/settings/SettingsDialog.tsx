@@ -107,7 +107,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">接入点 ID</Label>
               <Input
-                placeholder="ep-20260416124751-x4tfn"
+                placeholder="ep-xxxxxxxxxxxx"
                 value={localModelId}
                 onChange={(e) => setLocalModelId(e.target.value)}
                 className="text-sm"

@@ -8,8 +8,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API Key 不能为空" }, { status: 400 });
     }
     
-    // 使用传入的 modelId 或默认的接入点 ID
-    const testModelId = modelId || "ep-20260416124751-x4tfn";
+    // 使用传入的 modelId 或环境变量中的接入点 ID
+    const testModelId = modelId || process.env.ARK_MODEL_ID || "";
     
     // 调用 Seedance API 测试连通性
     const response = await fetch("https://ark.cn-beijing.volces.com/api/v3/chat/completions", {

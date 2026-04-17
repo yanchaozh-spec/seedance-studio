@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
-
-// 默认接入点 ID
-const DEFAULT_MODEL_ID = "ep-20260416124751-x4tfn";
+const DEFAULT_MODEL_ID = process.env.ARK_MODEL_ID || "";
 
 // 请求体类型
 interface CreateTaskRequest {

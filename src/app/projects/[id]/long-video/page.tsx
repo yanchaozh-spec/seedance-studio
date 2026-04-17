@@ -43,7 +43,7 @@ import { useDragStore } from "@/lib/drag-store";
 // 步进式长视频编辑页面
 export default function LongVideoPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { arkApiKey } = useSettingsStore();
+  const { arkApiKey, modelId } = useSettingsStore();
 
   // 项目状态
   const [projectId] = useState(resolvedParams.id);
@@ -190,7 +190,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
 
     // 返回 JSON 格式预览
     const requestBody = {
-      model: "ep-20260416124751-x4tfn",
+      model: modelId || "",
       content: contentItems,
       generate_audio: true,
       ratio: currentRatio,

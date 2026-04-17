@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
-
-// 固定使用自定义推理节点接入点 ID
-const MODEL_ID = "ep-20260416124751-x4tfn";
+const MODEL_ID = process.env.ARK_MODEL_ID || "";
 
 // 重新生成单个分段
 export async function POST(

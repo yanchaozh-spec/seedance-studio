@@ -193,7 +193,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
     // 返回 JSON 格式预览
     const requestBody = {
-      model: "ep-20260416124751-x4tfn",
+      model: modelId || "",
       content: contentItems,
       generate_audio: true,
       ratio: params_.ratio,
