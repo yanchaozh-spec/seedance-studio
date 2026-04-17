@@ -194,37 +194,43 @@ export async function submitFrameFromCanvas(
   }
 ): Promise<{ success: boolean; asset: Asset; url: string }> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(async (blob) => {
-      if (!blob) {
-        reject(new Error("Failed to capture frame"));
-        return;
-      }
-
-      try {
-        const formData = new FormData();
-        formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-        formData.append("projectId", projectId);
-        formData.append("taskId", options?.taskId || "");
-        formData.append("timestamp", (options?.timestamp || 0).toString());
-        formData.append("assetCategory", options?.assetCategory || "image");
-        formData.append("name", options?.name || `frame-${Date.now()}`);
-
-        const response = await fetch("/api/assets/extract-frame", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          reject(new Error(error.error || "Failed to extract frame"));
+    try {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          // blob 为 null 表示 canvas 被污染
+          reject(new Error("Canvas is tainted (cross-origin content)"));
           return;
         }
 
-        const result = await response.json();
-        resolve(result);
-      } catch (error) {
-        reject(error);
-      }
-    }, "image/png");
+        try {
+          const formData = new FormData();
+          formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+          formData.append("projectId", projectId);
+          formData.append("taskId", options?.taskId || "");
+          formData.append("timestamp", (options?.timestamp || 0).toString());
+          formData.append("assetCategory", options?.assetCategory || "image");
+          formData.append("name", options?.name || `frame-${Date.now()}`);
+
+          const response = await fetch("/api/assets/extract-frame", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            reject(new Error(error.error || "Failed to extract frame"));
+            return;
+          }
+
+          const result = await response.json();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      }, "image/png");
+    } catch (error) {
+      // canvas.toBlob 本身抛出错误（通常是跨域污染）
+      reject(new Error("Canvas is tainted (cross-origin content)"));
+    }
   });
 }

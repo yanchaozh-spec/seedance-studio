@@ -598,44 +598,45 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // 转换为 blob 并上传
-        try {
-          canvas.toBlob(async (blob) => {
-            if (blob) {
-              const formData = new FormData();
-              formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-              formData.append("projectId", resolvedParams.id);
-              formData.append("taskId", task.id);
-              formData.append("timestamp", video.currentTime.toString());
-              formData.append("assetCategory", "keyframe");
-              formData.append("name", `关键帧_${Date.now()}`);
-              
-              const response = await fetch("/api/assets/extract-frame", {
-                method: "POST",
-                body: formData,
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                toast.success(`已保存为关键帧: ${result.asset.name}`);
-                // 刷新素材列表
-                const assetsData = await getAssets(resolvedParams.id);
-                setAssets(assetsData);
-              } else {
-                const error = await response.json();
-                toast.error(error.error || "保存失败");
-              }
-            }
-          }, "image/png");
-        } catch {
-          // Canvas 被污染，降级到 API 方式
+        // 使用 Promise 包装 toBlob，以便捕获跨域错误
+        const blob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((b) => resolve(b), "image/png");
+        });
+        
+        if (blob) {
+          const formData = new FormData();
+          formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+          formData.append("projectId", resolvedParams.id);
+          formData.append("taskId", task.id);
+          formData.append("timestamp", video.currentTime.toString());
+          formData.append("assetCategory", "keyframe");
+          formData.append("name", `关键帧_${Date.now()}`);
+          
+          const response = await fetch("/api/assets/extract-frame", {
+            method: "POST",
+            body: formData,
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            toast.success(`已保存为关键帧: ${result.asset.name}`);
+            // 刷新素材列表
+            const assetsData = await getAssets(resolvedParams.id);
+            setAssets(assetsData);
+          } else {
+            const error = await response.json();
+            toast.error(error.error || "保存失败");
+          }
+        } else {
+          // blob 为 null，表示 canvas 被污染
           await fallbackExtractFrame(task.result.video_url, task.id);
         }
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "抽帧失败");
+        // 可能是 canvas 被污染，尝试降级
+        await fallbackExtractFrame(task.result.video_url, task.id);
       }
     } else {
-      // 降级方案：使用 API 抽帧（默认第 0 帧）
+      // 没有视频引用，降级到 API 方式
       await fallbackExtractFrame(task.result.video_url, task.id);
     }
   };
