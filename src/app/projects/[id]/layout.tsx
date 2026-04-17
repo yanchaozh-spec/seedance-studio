@@ -711,32 +711,31 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {/* 任务管理内容 */}
               {activeTab === "tasks" && (
                 <>
-                  <div className="mb-4 flex gap-2">
+                  <div className="mb-3">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="w-full"
                       onClick={() => router.push(`/projects/${resolvedParams.id}/tasks`)}
                     >
                       完整任务管理
                     </Button>
                   </div>
                   {loadingTasks ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full" />
                     </div>
                   ) : tasks.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Video className="w-12 h-12 mx-auto mb-3" />
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      <Video className="w-8 h-8 mx-auto mb-2" />
                       <p>暂无任务</p>
-                      <p className="text-sm">开始生成视频后将显示在这里</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {tasks.slice(0, 10).map((task) => (
                         <div key={task.id} className="bg-muted rounded-lg p-2">
                           {/* 顶部：ID + 状态 */}
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-1">
                             <span className="text-xs text-muted-foreground font-mono truncate">
                               {task.id.slice(0, 8)}...
                             </span>
@@ -753,7 +752,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           
                           {/* 视频/状态区域 */}
                           {task.status === "succeeded" && task.result?.video_url ? (
-                            <div className="mb-1.5">
+                            <div className="mb-1">
                               <video
                                 ref={(el) => {
                                   if (el) videoRefs.current.set(task.id, el);
@@ -765,22 +764,22 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               />
                             </div>
                           ) : task.status === "running" ? (
-                            <div className="h-20 bg-muted-foreground/10 rounded flex items-center justify-center mb-1.5">
-                              <Loader className="w-6 h-6 animate-spin text-blue-500" />
+                            <div className="h-12 bg-muted-foreground/10 rounded flex items-center justify-center mb-1">
+                              <Loader className="w-4 h-4 animate-spin text-blue-500" />
                             </div>
                           ) : task.status === "failed" ? (
-                            <div className="h-20 bg-muted-foreground/10 rounded flex items-center justify-center mb-1.5">
-                              <XCircle className="w-6 h-6 text-red-500" />
+                            <div className="h-12 bg-muted-foreground/10 rounded flex items-center justify-center mb-1">
+                              <XCircle className="w-4 h-4 text-red-500" />
                             </div>
                           ) : (
-                            <div className="h-20 bg-muted-foreground/10 rounded flex items-center justify-center mb-1.5">
-                              <Clock className="w-6 h-6 text-muted-foreground" />
+                            <div className="h-12 bg-muted-foreground/10 rounded flex items-center justify-center mb-1">
+                              <Clock className="w-4 h-4 text-muted-foreground" />
                             </div>
                           )}
                           
                           {/* Token */}
                           {task.completion_tokens && (
-                            <div className="text-xs text-yellow-600 mb-1.5">
+                            <div className="text-xs text-yellow-600 mb-1">
                               {task.completion_tokens.toLocaleString()} tokens
                             </div>
                           )}
@@ -865,7 +864,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           
                           {/* 生成进度条 */}
                           {task.status === "running" && (
-                            <div className="h-1 bg-muted-foreground/20 mt-1.5 rounded-full overflow-hidden">
+                            <div className="h-1 bg-muted-foreground/20 mt-1 rounded-full overflow-hidden">
                               <div 
                                 className="h-full bg-blue-500 transition-all"
                                 style={{ width: `${task.progress || 0}%` }}
