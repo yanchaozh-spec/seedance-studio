@@ -261,16 +261,14 @@ function TaskDetailSheet({ task, assets, projectId, onClose, onRollback, onDelet
           {/* 视频播放器 */}
           {task.status === "succeeded" && task.result?.video_url && (
             <div className="space-y-3">
-              <div className="relative max-w-md mx-auto bg-black rounded-lg overflow-hidden">
-                <div className="relative aspect-video">
-                  <video
-                    ref={videoRef}
-                    src={task.result.video_url}
-                    controls
-                    className="absolute inset-0 w-full h-full"
-                    muted={muted}
-                  />
-                </div>
+              <div className="bg-black rounded-lg overflow-hidden">
+                <video
+                  ref={videoRef}
+                  src={task.result.video_url}
+                  controls
+                  className="w-full aspect-video"
+                  muted={muted}
+                />
               </div>
               {/* 音量控制 */}
               <div className="flex items-center gap-3 px-2">
