@@ -95,7 +95,6 @@ export async function POST(request: NextRequest) {
           asset_category: assetCategory,
           url: imageUrl,
           thumbnail_url: imageUrl,
-          keyframe_source_task_id: taskId || null,
           keyframe_description: timestamp ? `视频帧 @ ${timestamp}s` : null,
         })
         .select()
@@ -187,7 +186,6 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
         asset_category: "keyframe",
         url: imageUrl,
         thumbnail_url: imageUrl,
-        keyframe_source_task_id: taskId || null,
         keyframe_description: timestamp ? `视频帧 @ ${timestamp}s` : null,
       })
       .select()
