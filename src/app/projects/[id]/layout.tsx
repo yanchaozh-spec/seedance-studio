@@ -613,7 +613,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 }}
                                 src={task.result.video_url}
                                 controls
-                                crossOrigin="anonymous"
                                 className="w-full aspect-video bg-black rounded"
                                 preload="metadata"
                               />

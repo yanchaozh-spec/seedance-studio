@@ -127,9 +127,9 @@ function TaskDetailSheet({ task, assets, projectId, onClose, onRollback, onDelet
 
     const video = videoRef.current;
     
-    // 确保视频已加载
-    if (video.readyState < 2) {
-      toast.error("视频尚未加载完成");
+    // 确保视频已加载且有有效尺寸
+    if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      toast.error("视频尚未加载完成，请稍后再试");
       return;
     }
 
@@ -151,15 +151,40 @@ function TaskDetailSheet({ task, assets, projectId, onClose, onRollback, onDelet
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       // 提交到服务器
-      const result = await submitFrameFromCanvas(canvas, projectId, {
-        taskId: task.id,
-        timestamp: currentTime,
-        assetCategory,
-        name: `视频帧_${new Date().toLocaleTimeString().replace(/:/g, "-")}`,
-      });
-      
-      toast.success("已保存到素材库");
-      onAssetCreated?.();
+      try {
+        const result = await submitFrameFromCanvas(canvas, projectId, {
+          taskId: task.id,
+          timestamp: currentTime,
+          assetCategory,
+          name: `视频帧_${new Date().toLocaleTimeString().replace(/:/g, "-")}`,
+        });
+        
+        toast.success("已保存到素材库");
+        onAssetCreated?.();
+      } catch {
+        // Canvas 被污染，降级到 API 方式
+        toast.loading("正在抽帧...", { id: "extract-frame" });
+        const response = await fetch("/api/assets/extract-frame", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            video_url: task.result!.video_url,
+            project_id: projectId,
+            task_id: task.id,
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          toast.error(error.error || "抽帧失败", { id: "extract-frame" });
+        } else {
+          const result = await response.json();
+          toast.success("已保存到素材库", { id: "extract-frame" });
+          onAssetCreated?.();
+        }
+      }
     } catch (error) {
       console.error("抽帧失败:", error);
       toast.error(error instanceof Error ? error.message : "抽帧失败");
@@ -266,7 +291,6 @@ function TaskDetailSheet({ task, assets, projectId, onClose, onRollback, onDelet
                   ref={videoRef}
                   src={task.result.video_url}
                   controls
-                  crossOrigin="anonymous"
                   className="w-full aspect-video"
                   muted={muted}
                 />
@@ -575,66 +599,76 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         // 转换为 blob 并上传
-        canvas.toBlob(async (blob) => {
-          if (blob) {
-            const formData = new FormData();
-            formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
-            formData.append("projectId", resolvedParams.id);
-            formData.append("taskId", task.id);
-            formData.append("timestamp", video.currentTime.toString());
-            formData.append("assetCategory", "keyframe");
-            formData.append("name", `关键帧_${Date.now()}`);
-            
-            const response = await fetch("/api/assets/extract-frame", {
-              method: "POST",
-              body: formData,
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              toast.success(`已保存为关键帧: ${result.asset.name}`);
-              // 刷新素材列表
-              const assetsData = await getAssets(resolvedParams.id);
-              setAssets(assetsData);
-            } else {
-              const error = await response.json();
-              toast.error(error.error || "保存失败");
+        try {
+          canvas.toBlob(async (blob) => {
+            if (blob) {
+              const formData = new FormData();
+              formData.append("file", new File([blob], "frame.png", { type: "image/png" }));
+              formData.append("projectId", resolvedParams.id);
+              formData.append("taskId", task.id);
+              formData.append("timestamp", video.currentTime.toString());
+              formData.append("assetCategory", "keyframe");
+              formData.append("name", `关键帧_${Date.now()}`);
+              
+              const response = await fetch("/api/assets/extract-frame", {
+                method: "POST",
+                body: formData,
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                toast.success(`已保存为关键帧: ${result.asset.name}`);
+                // 刷新素材列表
+                const assetsData = await getAssets(resolvedParams.id);
+                setAssets(assetsData);
+              } else {
+                const error = await response.json();
+                toast.error(error.error || "保存失败");
+              }
             }
-          }
-        }, "image/png");
+          }, "image/png");
+        } catch {
+          // Canvas 被污染，降级到 API 方式
+          await fallbackExtractFrame(task.result.video_url, task.id);
+        }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "抽帧失败");
       }
     } else {
       // 降级方案：使用 API 抽帧（默认第 0 帧）
-      try {
-        toast.loading("正在抽帧...", { id: "extract-frame" });
-        const response = await fetch("/api/assets/extract-frame", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            video_url: task.result!.video_url,
-            project_id: resolvedParams.id,
-            task_id: task.id,
-          }),
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          toast.error(error.error || "抽帧失败", { id: "extract-frame" });
-          return;
-        }
-        
-        const result = await response.json();
-        toast.success(`已保存为关键帧: ${result.asset.name}`, { id: "extract-frame" });
-        // 刷新素材列表
-        const assetsData = await getAssets(resolvedParams.id);
-        setAssets(assetsData);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "抽帧失败", { id: "extract-frame" });
+      await fallbackExtractFrame(task.result.video_url, task.id);
+    }
+  };
+
+  // API 降级抽帧函数
+  const fallbackExtractFrame = async (videoUrl: string, taskId: string) => {
+    try {
+      toast.loading("正在抽帧...", { id: "extract-frame" });
+      const response = await fetch("/api/assets/extract-frame", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          video_url: videoUrl,
+          project_id: resolvedParams.id,
+          task_id: taskId,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error.error || "抽帧失败", { id: "extract-frame" });
+        return;
       }
+      
+      const result = await response.json();
+      toast.success(`已保存为关键帧: ${result.asset.name}`, { id: "extract-frame" });
+      // 刷新素材列表
+      const assetsData = await getAssets(resolvedParams.id);
+      setAssets(assetsData);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "抽帧失败", { id: "extract-frame" });
     }
   };
 
@@ -712,7 +746,6 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         }}
                         src={task.result.video_url}
                         controls
-                        crossOrigin="anonymous"
                         className="w-full h-full object-contain"
                         preload="metadata"
                       />
