@@ -329,8 +329,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 音频参考（仅美术资产显示，非虚拟人像） */}
-          {assetCategory === "image" && asset.type !== "virtual_avatar" && (
+          {/* 音频参考（仅美术资产显示） */}
+          {assetCategory === "image" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">音频参考</label>

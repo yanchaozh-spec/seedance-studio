@@ -161,9 +161,14 @@ function buildContent(
     const refName = imageRefMap.get(asset.id)!;
     const displayName = asset.display_name || asset.name;
 
-    // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式
+    // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式，支持声线
     if (asset.type === "virtual_avatar" && asset.asset_id) {
-      assetDefParts.push(`@${refName} 为 ${displayName}（资产 ID: [${asset.asset_id}]）`);
+      let defPart = `@${refName} 为 ${displayName}（资产 ID: [${asset.asset_id}]）`;
+      if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+        const audioRef = audioRefMap.get(asset.bound_audio_id)!;
+        defPart += `，声线为${audioRef}`;
+      }
+      assetDefParts.push(defPart);
     } else if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
       const audioRef = audioRefMap.get(asset.bound_audio_id)!;
       assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);

@@ -15,6 +15,7 @@ import { Asset } from "@/lib/assets";
 import { Task, createTask, getVideoUrl } from "@/lib/tasks";
 import { useProjectDetail } from "./layout";
 import { useSettingsStore } from "@/lib/settings";
+import { uploadFile } from "@/lib/upload";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
@@ -87,6 +88,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
   const [virtualAvatarDialogOpen, setVirtualAvatarDialogOpen] = useState(false);
   const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "" });
+  const [virtualAvatarThumbnailFile, setVirtualAvatarThumbnailFile] = useState<File | null>(null);
+  const [virtualAvatarThumbnailPreview, setVirtualAvatarThumbnailPreview] = useState<string | null>(null);
+  const [virtualAvatarUploading, setVirtualAvatarUploading] = useState(false);
 
   // 恢复回滚数据（从 sessionStorage 读取）
   useEffect(() => {
@@ -436,10 +440,15 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
         assetDefParts.push(`${refName}为${desc}`);
       } else if (isVirtualAvatar) {
-        // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式
+        // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式，支持声线
         const assetId = (asset as { asset_id?: string }).asset_id;
         if (assetId) {
-          assetDefParts.push(`@${refName} 为 ${displayName}（资产 ID: [${assetId}]）`);
+          let defPart = `@${refName} 为 ${displayName}（资产 ID: [${assetId}]）`;
+          if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+            const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
+            defPart += `，声线为${audioRef}`;
+          }
+          assetDefParts.push(defPart);
         } else {
           assetDefParts.push(`${refName}为${displayName}`);
         }
@@ -1091,14 +1100,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
       {/* 添加虚拟人像对话框 */}
       {virtualAvatarDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setVirtualAvatarDialogOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => { setVirtualAvatarDialogOpen(false); setVirtualAvatarThumbnailFile(null); setVirtualAvatarThumbnailPreview(null); }}>
           <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <UserRound className="w-5 h-5" />
                 添加虚拟人像
               </h2>
-              <Button variant="ghost" size="sm" onClick={() => setVirtualAvatarDialogOpen(false)}>
+              <Button variant="ghost" size="sm" onClick={() => { setVirtualAvatarDialogOpen(false); setVirtualAvatarThumbnailFile(null); setVirtualAvatarThumbnailPreview(null); }}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -1140,19 +1149,80 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
-                  预览图 URL <span className="text-muted-foreground font-normal">(可选)</span>
+                  缩略图 <span className="text-muted-foreground font-normal">(可选，仅用于 UI 预览)</span>
                 </label>
-                <Input
-                  placeholder="https://example.com/avatar.jpg"
-                  value={virtualAvatarForm.thumbnailUrl}
-                  onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: e.target.value.trim() }))}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  用于素材池中显示缩略图，不发送给 API
-                </p>
+                <div className="space-y-2">
+                  {/* 缩略图预览 */}
+                  {(virtualAvatarThumbnailPreview || virtualAvatarForm.thumbnailUrl) && (
+                    <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                      <img
+                        src={virtualAvatarThumbnailPreview || virtualAvatarForm.thumbnailUrl}
+                        alt="缩略图预览"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVirtualAvatarThumbnailFile(null);
+                          setVirtualAvatarThumbnailPreview(null);
+                          setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: "" }));
+                        }}
+                        className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  {/* 上传方式切换 */}
+                  {!virtualAvatarThumbnailPreview && !virtualAvatarForm.thumbnailUrl && (
+                    <div className="flex gap-2">
+                      <label className="flex-1 flex flex-col items-center justify-center gap-1 h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors">
+                        {virtualAvatarUploading ? (
+                          <>
+                            <span className="text-xs text-muted-foreground animate-pulse">上传中...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Image className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">本地上传</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={virtualAvatarUploading}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            // 预览
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              setVirtualAvatarThumbnailPreview(ev.target?.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                            setVirtualAvatarThumbnailFile(file);
+                          }}
+                        />
+                      </label>
+                      <div className="flex-1 flex flex-col items-center justify-center h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors">
+                        <Input
+                          placeholder="输入图片 URL"
+                          value={virtualAvatarForm.thumbnailUrl}
+                          onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: e.target.value.trim() }))}
+                          className="h-7 text-xs border-0 bg-transparent text-center placeholder:text-[10px]"
+                        />
+                        <span className="text-[10px] text-muted-foreground mt-0.5">URL 输入</span>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    缩略图仅用于素材池显示，不发送给 API
+                  </p>
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setVirtualAvatarDialogOpen(false)}>
+                <Button variant="outline" onClick={() => { setVirtualAvatarDialogOpen(false); setVirtualAvatarThumbnailFile(null); setVirtualAvatarThumbnailPreview(null); }}>
                   取消
                 </Button>
                 <Button
@@ -1166,6 +1236,24 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       return;
                     }
                     try {
+                      // 如果有本地缩略图文件，先上传到 TOS
+                      let thumbnailUrl = virtualAvatarForm.thumbnailUrl.trim() || null;
+                      if (virtualAvatarThumbnailFile) {
+                        try {
+                          setVirtualAvatarUploading(true);
+                          const uploadResult = await uploadFile(virtualAvatarThumbnailFile, {
+                            projectId: resolvedParams.id,
+                            type: "image",
+                          });
+                          thumbnailUrl = uploadResult.url;
+                        } catch (uploadError) {
+                          console.error("缩略图上传失败:", uploadError);
+                          toast.error("缩略图上传失败，将使用 URL 或留空");
+                        } finally {
+                          setVirtualAvatarUploading(false);
+                        }
+                      }
+
                       const response = await fetch(`/api/projects/${resolvedParams.id}/assets`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1175,7 +1263,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                           type: "virtual_avatar",
                           asset_id: virtualAvatarForm.assetId.trim(),
                           url: `asset://${virtualAvatarForm.assetId.trim()}`,
-                          thumbnail_url: virtualAvatarForm.thumbnailUrl.trim() || null,
+                          thumbnail_url: thumbnailUrl,
                         }),
                       });
                       if (!response.ok) throw new Error("创建失败");
@@ -1186,6 +1274,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       addAssetToPool({ ...newAsset, isActivated: true } as SelectedAsset);
                       // 重置表单并关闭对话框
                       setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "" });
+                      setVirtualAvatarThumbnailFile(null);
+                      setVirtualAvatarThumbnailPreview(null);
                       setVirtualAvatarDialogOpen(false);
                       toast.success("虚拟人像已添加");
                     } catch (error) {

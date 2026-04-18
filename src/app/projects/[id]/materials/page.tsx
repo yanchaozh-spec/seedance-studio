@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   ImageOff,
   GripVertical,
+  UserRound,
 } from "lucide-react";
 import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
 import { toast } from "sonner";
@@ -161,16 +162,22 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
     }
   };
 
-  // 筛选图片素材（排除音频）
+  // 筛选图片素材（排除音频和虚拟人像）
   const imageAssets = assets.filter((a) => {
     if (a.type === "audio") return false;
+    if (a.type === "virtual_avatar") return false;
     const isImage = a.asset_category === "image" || !a.asset_category;
     return isImage;
   });
 
   const keyframeAssets = assets.filter((a) => {
     if (a.type === "audio") return false;
+    if (a.type === "virtual_avatar") return false;
     return a.asset_category === "keyframe";
+  });
+
+  const virtualAvatarAssets = assets.filter((a) => {
+    return a.type === "virtual_avatar";
   });
 
   // 拖拽排序传感器
@@ -303,6 +310,34 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                   <SortableContext items={keyframeAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
                       {keyframeAssets.map((asset) => (
+                        <SortableAssetCard
+                          key={asset.id}
+                          asset={asset}
+                          onClick={() => setSelectedAsset(asset)}
+                          onRemove={() => handleDeleteAsset(asset.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            )}
+
+            {/* 虚拟人像 */}
+            {virtualAvatarAssets.length > 0 && (
+              <div>
+                <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1">
+                  <UserRound className="w-3.5 h-3.5" />
+                  虚拟人像 ({virtualAvatarAssets.length})
+                </h2>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, virtualAvatarAssets)}
+                >
+                  <SortableContext items={virtualAvatarAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {virtualAvatarAssets.map((asset) => (
                         <SortableAssetCard
                           key={asset.id}
                           asset={asset}

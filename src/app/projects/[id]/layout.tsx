@@ -342,8 +342,8 @@ export function DraggableAsset({
                   {asset.keyframe_description || "-"}
                 </p>
               )}
-              {/* 音频参考按钮 - 仅美术资产显示（非关键帧、非虚拟人像） */}
-              {asset.asset_category !== "keyframe" && asset.type !== "virtual_avatar" && (
+              {/* 音频参考按钮 - 仅美术资产显示（非关键帧） */}
+              {asset.asset_category !== "keyframe" && (
                 <div className={cn(
                   "flex items-center justify-center gap-1 rounded text-xs",
                   asset.bound_audio_id 
@@ -460,7 +460,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [loading, setLoading] = useState(true);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"materials" | "tasks">("materials");
-  const [materialFilter, setMaterialFilter] = useState<"all" | "keyframe" | "image">("all");
+  const [materialFilter, setMaterialFilter] = useState<"all" | "keyframe" | "image" | "virtual_avatar">("all");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
@@ -852,17 +852,20 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     return pathname === href || pathname.startsWith(href + "/");
   };
 
-  const imageMaterials = materials.filter((m) => m.type !== "audio" && (m.asset_category === "image" || !m.asset_category));
+  const imageMaterials = materials.filter((m) => m.type !== "audio" && m.type !== "virtual_avatar" && (m.asset_category === "image" || !m.asset_category));
   const keyframeMaterials = materials.filter((m) => m.asset_category === "keyframe");
+  const virtualAvatarMaterials = materials.filter((m) => m.type === "virtual_avatar");
 
   // 根据筛选条件获取显示的素材
   const getFilteredAssets = () => {
     if (materialFilter === "all") {
-      return { image: imageMaterials, keyframe: keyframeMaterials };
+      return { image: imageMaterials, keyframe: keyframeMaterials, virtualAvatar: virtualAvatarMaterials };
     } else if (materialFilter === "keyframe") {
-      return { image: [], keyframe: keyframeMaterials };
+      return { image: [] as Asset[], keyframe: keyframeMaterials, virtualAvatar: [] as Asset[] };
+    } else if (materialFilter === "virtual_avatar") {
+      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: virtualAvatarMaterials };
     } else {
-      return { image: imageMaterials, keyframe: [] };
+      return { image: imageMaterials, keyframe: [] as Asset[], virtualAvatar: [] as Asset[] };
     }
   };
   const filtered = getFilteredAssets();
@@ -995,6 +998,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       <TabsTrigger value="all" className="flex-1 text-xs" suppressHydrationWarning>全部</TabsTrigger>
                       <TabsTrigger value="keyframe" className="flex-1 text-xs" suppressHydrationWarning>关键帧</TabsTrigger>
                       <TabsTrigger value="image" className="flex-1 text-xs" suppressHydrationWarning>美术</TabsTrigger>
+                      <TabsTrigger value="virtual_avatar" className="flex-1 text-xs" suppressHydrationWarning>人像</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   {/* 上传按钮 */}
@@ -1062,8 +1066,30 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </DndContext>
                   )}
 
+                  {filtered.virtualAvatar.length > 0 && (
+                    <DndContext
+                      sensors={materialSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.virtualAvatar)}
+                    >
+                      <SortableContext items={filtered.virtualAvatar.map((a) => a.id)} strategy={rectSortingStrategy}>
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {filtered.virtualAvatar.map((asset) => (
+                            <SortableMaterialItem
+                              key={asset.id}
+                              asset={asset}
+                              isInPool={selectedAssets.some((s) => s.id === asset.id)}
+                              onClick={setSelectedDetailAsset}
+                              onRemove={handleDeleteMaterial}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
 
-                  {(filtered.image.length + filtered.keyframe.length) === 0 && (
+
+                  {(filtered.image.length + filtered.keyframe.length + filtered.virtualAvatar.length) === 0 && (
                     <div className="text-center py-6 text-muted-foreground text-xs">
                       <FolderOpen className="w-8 h-8 mx-auto mb-2" />
                       <p>暂无素材</p>
