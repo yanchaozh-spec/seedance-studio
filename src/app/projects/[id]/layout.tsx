@@ -829,7 +829,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 showRemove
                                 onRemove={handleDeleteMaterial}
                               />
-                              <p className="text-[10px] text-center mt-0.5 truncate max-w-20" title={asset.display_name || asset.name}>
+                              <p className="text-[10px] text-muted-foreground text-center mt-0.5 truncate max-w-20 px-0.5" title={asset.display_name || asset.name}>
                                 {asset.display_name || asset.name}
                               </p>
                             </div>
@@ -858,7 +858,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 showRemove
                                 onRemove={handleDeleteMaterial}
                               />
-                              <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
+                              <p className="text-[10px] text-muted-foreground text-center mt-0.5 truncate max-w-20 px-0.5" title={asset.display_name || asset.name}>
                                 {asset.display_name || asset.name}
                               </p>
                             </div>
