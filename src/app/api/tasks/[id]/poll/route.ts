@@ -128,6 +128,9 @@ export async function GET(
         } else if (externalTask.status === "queued") {
           updates.status = "queued";
           updates.queue_duration = task.queue_duration || 0;
+        } else if (externalTask.status === "pending") {
+          updates.status = "pending";
+          updates.progress = 0;
         }
 
         if (externalTask.data?.usage) {
