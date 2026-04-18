@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const DEFAULT_MODEL_ID = process.env.ARK_MODEL_ID || "";
@@ -266,30 +267,15 @@ export async function POST(request: NextRequest) {
     // 使用前端传入的 model_id 或默认值
     const modelId = body.model_id || DEFAULT_MODEL_ID;
 
-    // 检查是否为 seedance 2.0 模型（不支持 service_tier）
-    const isSeedance2 = modelId.toLowerCase().includes("seedance-2-0") || modelId.toLowerCase().includes("seedance-2.0");
-
-    // 构建请求参数 - 严格按照 API 文档格式
-    const requestBody: Record<string, unknown> = {
-      model: modelId,
-      content,
-      generate_audio: true,
+    // 构建请求参数 - 使用共享模块
+    const requestBody = buildSeedanceRequestBody(modelId, content as unknown as SeedanceContentItem[], {
       ratio: params.ratio,
       duration: params.duration,
       resolution: params.resolution,
-      watermark: false,
-      return_last_frame: params.return_last_frame ?? false,
-    };
-
-    // service_tier 仅非 seedance 2.0 模型支持
-    if (!isSeedance2 && params.service_tier) {
-      requestBody.service_tier = params.service_tier;
-    }
-
-    // 添加联网搜索工具（仅 seedance 2.0 & 2.0 fast 支持）
-    if (params.tools && params.tools.length > 0) {
-      requestBody.tools = params.tools;
-    }
+      return_last_frame: params.return_last_frame,
+      service_tier: params.service_tier,
+      tools: params.tools,
+    });
 
     try {
       // 调用 Seedance API 获取 task ID

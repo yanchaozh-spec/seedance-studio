@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
+import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
 
 // 选中的素材（带激活状态）
 export interface SelectedAsset extends Asset {
@@ -338,7 +339,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }
     }
 
-    const contentItems: Array<Record<string, unknown>> = [];
+    const contentItems: SeedanceContentItem[] = [];
 
     // 添加文本（放在最前面）
     if (textParts.length > 0) {
@@ -368,22 +369,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
 
     // 返回 JSON 格式预览
-    const isSeedance2 = (modelId || "").toLowerCase().includes("seedance-2-0") || (modelId || "").toLowerCase().includes("seedance-2.0");
-    const requestBody: Record<string, unknown> = {
-      model: modelId || "",
-      content: contentItems,
-      generate_audio: true,
+    const requestBody = buildSeedanceRequestBody(modelId || "", contentItems, {
       ratio: params_.ratio,
       duration: params_.duration,
       resolution: params_.resolution,
-      watermark: false,
-      return_last_frame: params_.return_last_frame ?? false,
-      tools: params_.tools?.length ? params_.tools : undefined,
-    };
-    // service_tier 仅非 seedance 2.0 模型支持
-    if (!isSeedance2 && params_.service_tier) {
-      requestBody.service_tier = params_.service_tier;
-    }
+      return_last_frame: params_.return_last_frame,
+      service_tier: params_.service_tier,
+      tools: params_.tools,
+    });
 
     return JSON.stringify(requestBody, null, 2);
   }, [promptBoxes, selectedAssets, params_]);
