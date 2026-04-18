@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 // GET /api/assets/[id]/download - 代理下载素材
 export async function GET(
@@ -12,34 +13,18 @@ export async function GET(
       return NextResponse.json({ error: "Missing asset id" }, { status: 400 });
     }
     
-    // 获取素材信息
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // 使用 Supabase 客户端查询素材信息
+    const client = getSupabaseClient();
     
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({ error: "Missing Supabase config" }, { status: 500 });
-    }
+    const { data: asset, error } = await client
+      .from("assets")
+      .select("*")
+      .eq("id", id)
+      .single();
     
-    const assetResponse = await fetch(
-      `${supabaseUrl}/rest/v1/assets?id=eq.${id}&select=*`,
-      {
-        headers: {
-          "apikey": supabaseKey,
-          "Authorization": `Bearer ${supabaseKey}`,
-        },
-      }
-    );
-    
-    if (!assetResponse.ok) {
-      return NextResponse.json({ error: "Failed to fetch asset" }, { status: 500 });
-    }
-    
-    const assets = await assetResponse.json();
-    if (!assets || assets.length === 0) {
+    if (error || !asset) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
-    
-    const asset = assets[0];
     
     if (!asset.url) {
       return NextResponse.json({ error: "Asset has no URL" }, { status: 400 });
@@ -58,12 +43,13 @@ export async function GET(
     // 获取文件扩展名
     const urlParts = asset.url.split(".");
     const ext = urlParts.length > 1 ? urlParts.pop() : "bin";
+    const filename = `${asset.name || "file"}.${ext}`;
     
     // 返回文件
     return new NextResponse(blob, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${asset.name || "file"}.${ext}"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {
