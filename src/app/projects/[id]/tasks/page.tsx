@@ -83,23 +83,35 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     loadData();
   }, [resolvedParams.id]);
 
-  // 轮询运行中的任务状态 - 使用 ref 跟踪需要轮询的任务 ID
+  // 轮询1：持续获取任务列表（检测新任务）
   useEffect(() => {
-    // 收集需要轮询的任务 ID
+    // 每 3 秒获取一次任务列表（检测新任务）
+    const listPollInterval = setInterval(async () => {
+      try {
+        const tasksData = await getTasks(resolvedParams.id);
+        setTasks(tasksData);
+      } catch (error) {
+        console.error("[列表轮询] 获取任务列表失败:", error);
+      }
+    }, 3000);
+
+    return () => clearInterval(listPollInterval);
+  }, [resolvedParams.id]);
+
+  // 轮询2：持续轮询运行中任务的状态（pending/queued/running）
+  useEffect(() => {
+    // 收集需要轮询的任务 ID（只轮询运行中的任务）
     const runningTaskIds = tasks
       .filter((t) => t.status === "pending" || t.status === "queued" || t.status === "running")
       .map((t) => t.id);
     
-    console.log("[轮询] 检查任务，当前 runningTaskIds:", runningTaskIds, "tasks 长度:", tasks.length);
-    
     if (runningTaskIds.length === 0) {
-      console.log("[轮询] 没有需要轮询的任务");
+      // 没有运行中的任务，停止轮询
       return;
     }
 
-    // 每3秒轮询一次
-    const pollInterval = setInterval(async () => {
-      console.log("[轮询] 开始轮询，任务 IDs:", runningTaskIds);
+    // 每3秒轮询一次运行中任务的状态
+    const statusPollInterval = setInterval(async () => {
       for (const taskId of runningTaskIds) {
         try {
           // 从设置中获取 API Key
@@ -113,7 +125,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           const response = await fetch(`/api/tasks/${taskId}/poll`, { headers });
           if (response.ok) {
             const updatedTask = await response.json();
-            console.log("[轮询] 任务更新:", taskId, "新状态:", updatedTask.status);
+            // 更新任务状态
             setTasks((prev) =>
               prev.map((t) => (t.id === taskId ? { ...t, ...updatedTask } : t))
             );
@@ -123,27 +135,21 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             }
           }
         } catch (error) {
-          console.error(`轮询任务 ${taskId} 失败:`, error);
+          console.error(`[状态轮询] 轮询任务 ${taskId} 失败:`, error);
         }
       }
     }, 3000);
 
-    return () => {
-      console.log("[轮询] 清除轮询 interval");
-      clearInterval(pollInterval);
-    };
-  }, [tasks, selectedTask]);
+    return () => clearInterval(statusPollInterval);
+  }, [tasks, selectedTask, resolvedParams.id]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log("[loadData] 开始加载数据...");
       const [tasksData, assetsData] = await Promise.all([
         getTasks(resolvedParams.id),
         getAssets(resolvedParams.id),
       ]);
-      console.log("[loadData] 任务数据加载完成，共", tasksData.length, "个任务");
-      console.log("[loadData] 任务详情:", tasksData.map(t => ({ id: t.id, status: t.status })));
       setTasks(tasksData);
       setAssets(assetsData);
     } catch (error) {
