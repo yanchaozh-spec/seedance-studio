@@ -627,6 +627,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
       toast.success("任务已创建");
       
+      // 立即恢复按钮，用户可以继续操作
+      setGenerating(false);
+      
       // 后台刷新任务列表（不等待）
       refreshTasks();
       
@@ -659,7 +662,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // 显示具体的错误消息
       const errorMessage = error instanceof Error ? error.message : "创建任务失败";
       toast.error(errorMessage);
-    } finally {
+      // 失败时也要恢复按钮
       setGenerating(false);
     }
   };
