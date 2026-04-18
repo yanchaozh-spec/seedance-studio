@@ -269,33 +269,50 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 按顺序收集所有图片（美术资产 + 关键帧）
     const allImageAssets = [...imageAssets, ...keyframeAssets];
 
-    // 构建素材定义行（使用 URL）
-    const assetRefParts: string[] = [];
-
-    for (let i = 0; i < allImageAssets.length; i++) {
-      const asset = allImageAssets[i];
-      const displayName = asset.display_name || asset.name;
+    // 构建序号映射
+    const imageRefMap = new Map<string, string>();
+    let imageIndex = 0;
+    for (const asset of allImageAssets) {
       const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
+      imageIndex++;
+      const refName = isKeyframe ? `[关键帧${imageIndex}]` : `[图片${imageIndex}]`;
+      imageRefMap.set(asset.id, refName);
+    }
 
-      if (isKeyframe) {
-        const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-        assetRefParts.push(`${desc}：${asset.url}`);
+    const audioRefMap = new Map<string, string>();
+    let audioIndex = 0;
+    for (const audio of audioAssets) {
+      audioIndex++;
+      const refName = `[音频${audioIndex}]`;
+      audioRefMap.set(audio.id, refName);
+    }
+
+    // 构建素材定义行（使用序号）
+    const assetDefParts: string[] = [];
+
+    // 添加美术资产（带声线绑定）
+    for (const asset of imageAssets) {
+      const refName = imageRefMap.get(asset.id)!;
+      const displayName = asset.display_name || asset.name;
+      
+      if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+        const audioRef = audioRefMap.get(asset.bound_audio_id)!;
+        assetDefParts.push(`${displayName}：${refName}，声线为：${audioRef}`);
       } else {
-        assetRefParts.push(`${displayName}：${asset.url}`);
-
-        // 检查是否绑定音频
-        if (asset.bound_audio_id) {
-          const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-          if (boundAudio) {
-            assetRefParts[assetRefParts.length - 1] += `，声线为：${boundAudio.url}`;
-          }
-        }
+        assetDefParts.push(`${displayName}：${refName}`);
       }
+    }
+    
+    // 添加关键帧
+    for (const asset of keyframeAssets) {
+      const refName = imageRefMap.get(asset.id)!;
+      const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
+      assetDefParts.push(`关键帧描述：${refName}`);
     }
 
     const contentItems: Array<Record<string, unknown>> = [];
 
-    // 添加所有图片
+    // 添加所有图片（使用 URL）
     for (const asset of allImageAssets) {
       const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
       contentItems.push({
@@ -305,25 +322,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       });
     }
 
-    // 添加所有绑定的音频（作为单独的 content item）
-    for (const asset of allImageAssets) {
-      if (asset.asset_category !== "keyframe" && asset.bound_audio_id) {
-        const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-        if (boundAudio) {
-          contentItems.push({
-            type: "audio_url",
-            audio_url: { url: boundAudio.url },
-            role: "reference_audio",
-          });
-        }
-      }
+    // 添加所有音频（使用 URL）
+    for (const audio of audioAssets) {
+      contentItems.push({
+        type: "audio_url",
+        audio_url: { url: audio.url },
+        role: "reference_audio",
+      });
     }
 
     // 构建文本内容
     const textParts: string[] = [];
 
-    // 第一行：素材定义
-    const assetDefLine = assetRefParts.join("；");
+    // 第一行：素材定义（使用序号）
+    const assetDefLine = assetDefParts.join("；");
     if (assetDefLine) {
       textParts.push(assetDefLine);
     }
