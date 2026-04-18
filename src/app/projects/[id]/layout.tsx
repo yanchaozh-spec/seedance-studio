@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, createContext, useContext, ReactNode, use, useRef } from "react";
+import { useEffect, useState, createContext, useContext, ReactNode, use, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -510,14 +510,14 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   };
 
   // 加载素材列表
-  const loadMaterials = async () => {
+  const loadMaterials = useCallback(async () => {
     try {
       const assets = await getAssets(resolvedParams.id);
       setMaterials(assets);
     } catch (error) {
       console.error("加载素材失败:", error);
     }
-  };
+  }, [resolvedParams.id]);
 
   // 上传图片素材
   const handleUpload = async (files: FileList | null) => {
