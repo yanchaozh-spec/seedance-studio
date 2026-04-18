@@ -143,6 +143,10 @@ export async function uploadAsset(
       endpointUrl = "https://" + endpointUrl;
     }
     
+    // 确保使用外网 endpoint（volces.com）而不是内网（ivolces.com）
+    // 因为浏览器需要从外网访问签名 URL
+    endpointUrl = endpointUrl.replace(".ivolces.com", ".volces.com");
+    
     s3Client = new S3Client({
       region: process.env.COZE_TOS_REGION || "cn-beijing",
       endpoint: endpointUrl,
@@ -193,21 +197,12 @@ export async function uploadAsset(
     });
     
     // 设置签名 URL 的自定义 endpoint（包含 bucket）
-    // 注意：ivolces.com 是内网，volces.com 是外网
-    // 沙箱环境需要使用外网地址访问
     const url = await getSignedUrl(s3Client, getCommand, { 
       expiresIn: 7 * 24 * 60 * 60,
     });
     
-    // 如果是内网地址，转换为外网地址供浏览器访问
-    let publicUrl = url;
-    if (url.includes(".ivolces.com")) {
-      publicUrl = url.replace(".ivolces.com", ".volces.com");
-      console.log("[TOS] Converted internal URL to public URL");
-    }
-    
     console.log("[TOS] Native presigned URL generated");
-    return { key: uploadResult, url: publicUrl };
+    return { key: uploadResult, url };
   }
   
   // 使用 SDK 上传（平台存储）
