@@ -5,14 +5,31 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import os from "os";
-import { uploadAsset, isTosConfigured } from "@/storage/tos/client";
+import { uploadAsset, isTosConfigured, isUserTosConfigured, type TosConfig } from "@/storage/tos/client";
 
 const execAsync = promisify(exec);
+
+// 从请求头获取用户 TOS 配置
+function getUserTosConfig(request: NextRequest): TosConfig | null {
+  const tosConfigHeader = request.headers.get("x-tos-config");
+  if (tosConfigHeader) {
+    try {
+      return JSON.parse(Buffer.from(tosConfigHeader, "base64").toString());
+    } catch (e) {
+      console.error("[ExtractFrame] Failed to parse TOS config from header:", e);
+    }
+  }
+  return null;
+}
 
 // POST /api/assets/extract-frame - 从视频提取帧并保存为素材
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get("content-type") || "";
+    
+    // 获取用户 TOS 配置
+    const userTosConfig = getUserTosConfig(request);
+    const useTos = isUserTosConfigured(userTosConfig) || isTosConfigured();
     
     // 判断是 JSON 还是 FormData
     if (contentType.includes("application/json")) {
@@ -27,7 +44,7 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      return await extractFrameFromUrl(video_url, project_id, task_id, timestamp);
+      return await extractFrameFromUrl(video_url, project_id, task_id, timestamp, userTosConfig);
     } else {
       // FormData 格式：直接上传图片
       const formData = await request.formData();
@@ -46,7 +63,7 @@ export async function POST(request: NextRequest) {
       }
       
       // 检查 TOS 是否配置
-      if (!isTosConfigured()) {
+      if (!useTos) {
         return NextResponse.json(
           { error: "TOS not configured. Please set up TOS in settings or configure environment variables." },
           { status: 500 }
@@ -62,7 +79,8 @@ export async function POST(request: NextRequest) {
         file.name || "frame.png",
         "image/png",
         projectId,
-        assetCategory === "keyframe" ? "keyframe" : "image"
+        assetCategory === "keyframe" ? "keyframe" : "image",
+        userTosConfig || undefined
       );
       
       const imageUrl = result.url;
@@ -104,7 +122,7 @@ export async function POST(request: NextRequest) {
 }
 
 // 通过视频 URL 抽帧
-async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?: string, timestamp: number = 0) {
+async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?: string, timestamp: number = 0, userConfig?: TosConfig | null) {
   const client = getSupabaseClient();
   
   // 创建临时目录
@@ -116,7 +134,7 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
   
   try {
     // 检查 TOS 是否配置
-    if (!isTosConfigured()) {
+    if (!isUserTosConfigured(userConfig) && !isTosConfigured()) {
       throw new Error("TOS not configured. Please set up TOS in settings or configure environment variables.");
     }
     
@@ -147,7 +165,8 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
       `frame-${Date.now()}.png`,
       "image/png",
       projectId,
-      "keyframe"
+      "keyframe",
+      userConfig || undefined
     );
     
     const imageUrl = result.url;

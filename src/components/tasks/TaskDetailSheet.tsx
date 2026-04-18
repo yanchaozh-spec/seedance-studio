@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Task, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { Asset, submitFrameFromCanvas } from "@/lib/assets";
+import { useSettingsStore } from "@/lib/settings";
 import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -189,11 +190,19 @@ export function TaskDetailSheet({
       } catch {
         // Canvas 被污染，降级到 API 方式
         toast.loading("正在抽帧...", { id: "extract-frame" });
+        
+        // 构建请求头
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        const { tosEnabled, tosSettings } = useSettingsStore.getState();
+        if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+          headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+        }
+        
         const response = await fetch("/api/assets/extract-frame", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             video_url: task.result!.video_url,
             project_id: projectId,

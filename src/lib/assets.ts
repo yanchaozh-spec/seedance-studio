@@ -1,5 +1,7 @@
 // 素材相关的 API 调用
 
+import { useSettingsStore } from "./settings";
+
 export type AssetType = "image" | "audio" | "keyframe";
 
 // 资产类别：关键帧（用于提示词拼接）| 美术资产（普通图片）
@@ -151,8 +153,16 @@ export async function extractFrameFromVideo(params: {
             formData.append("assetCategory", assetCategory);
             formData.append("name", name || `frame-${Date.now()}`);
 
+            // 构建请求头
+            const headers: Record<string, string> = {};
+            const { tosEnabled, tosSettings } = useSettingsStore.getState();
+            if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+              headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+            }
+
             const response = await fetch("/api/assets/extract-frame", {
               method: "POST",
+              headers,
               body: formData,
             });
 
@@ -211,8 +221,16 @@ export async function submitFrameFromCanvas(
           formData.append("assetCategory", options?.assetCategory || "image");
           formData.append("name", options?.name || `frame-${Date.now()}`);
 
+          // 构建请求头
+          const headers: Record<string, string> = {};
+          const { tosEnabled, tosSettings } = useSettingsStore.getState();
+          if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+            headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+          }
+
           const response = await fetch("/api/assets/extract-frame", {
             method: "POST",
+            headers,
             body: formData,
           });
 
