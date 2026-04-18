@@ -63,7 +63,7 @@ interface TaskDetailSheetProps {
   projectId: string;
   onClose: () => void;
   onRollback?: (task: Task) => void;
-  onDelete?: (taskId: string) => void;
+  onDelete?: (taskId: string, taskIdExternal?: string) => void;
   onAssetCreated?: () => void;
 }
 
@@ -136,9 +136,9 @@ export function TaskDetailSheet({
 
   const handleDeleteAction = () => {
     if (onDelete) {
-      onDelete(task.id);
+      onDelete(task.id, task.task_id_external);
     } else {
-      deleteTask(task.id).then(() => {
+      deleteTask(task.id, task.task_id_external).then(() => {
         toast.success("删除成功");
       }).catch(() => {
         toast.error("删除失败");

@@ -166,9 +166,9 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     }
   };
 
-  const handleDelete = async (taskId: string) => {
+  const handleDelete = async (taskId: string, taskIdExternal?: string) => {
     try {
-      await deleteTask(taskId);
+      await deleteTask(taskId, taskIdExternal);
       setTasks(tasks.filter((t) => t.id !== taskId));
       toast.success("删除成功");
     } catch (error) {
@@ -551,7 +551,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         variant="outline"
                         size="sm"
                         className="gap-1.5 text-xs h-8 text-destructive"
-                        onClick={() => handleDelete(task.id)}
+                        onClick={() => handleDelete(task.id, task.task_id_external)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         删除

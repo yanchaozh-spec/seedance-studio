@@ -111,8 +111,23 @@ export async function createTask(task: {
   return response.json();
 }
 
-// 删除任务
-export async function deleteTask(id: string): Promise<void> {
+// 删除任务（调用 Seedance API 取消/删除任务）
+export async function deleteTask(id: string, taskIdExternal?: string): Promise<void> {
+  // 如果有外部任务 ID，先调用 Seedance API 删除
+  if (taskIdExternal) {
+    const response = await fetch(`/api/seedance/tasks?id=${taskIdExternal}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok && response.status !== 204) {
+      // 忽略 404 等错误，继续删除本地记录
+      console.warn("[deleteTask] Seedance API delete failed:", response.status);
+    }
+  }
+
+  // 删除本地任务记录
   const response = await fetch(`/api/tasks/${id}`, {
     method: "DELETE",
   });
