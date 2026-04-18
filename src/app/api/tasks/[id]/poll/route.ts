@@ -67,17 +67,30 @@ export async function GET(
         const externalTask = await response.json();
         
         if (externalTask.error) {
+          console.log("[POLL] External API returned error, updating DB and returning failed");
+          // 更新数据库中的任务状态
+          await client.from("tasks").update({
+            status: "failed",
+            error_message: externalTask.error?.message || "Task failed",
+            updated_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+          }).eq("id", task.id);
+          
           return NextResponse.json({
             id: task.id,
             status: "failed",
             error_message: externalTask.error?.message || "Task failed",
           });
         }
-
+        
+        console.log("[POLL] Full external task response:", JSON.stringify(externalTask));
+        
         const updates: Record<string, unknown> = {
           updated_at: new Date().toISOString(),
         };
 
+        console.log("[POLL] External task status:", externalTask.status, "Task ID:", task.id, "DB Status:", task.status);
+        
         // 解析状态
         if (externalTask.status === "succeeded") {
           updates.status = "succeeded";
@@ -138,7 +151,10 @@ export async function GET(
           updates.total_tokens = externalTask.data.usage.total_tokens;
         }
 
-        await client.from("tasks").update(updates).eq("id", task.id);
+        console.log("[POLL] Updating DB with:", JSON.stringify(updates));
+        const { data: updateResult, error: updateError } = await client.from("tasks").update(updates).eq("id", task.id);
+        console.log("[POLL] DB update result:", updateResult, "error:", updateError);
+        console.log("[POLL] DB update completed");
 
         return NextResponse.json({
           id: task.id,
