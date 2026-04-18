@@ -44,6 +44,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setArkApiKey(localApiKey);
     setModelId(localModelId);
     setTosSettings(localTosSettings);
+    // tosEnabled 通过 Switch 组件的 onCheckedChange 实时更新，这里也保存一次确保一致性
+    setTosEnabled(tosEnabled);
     setSaving(true);
     setTimeout(() => {
       setSaving(false);
