@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { getFileUrl, isTosConfigured } from "@/storage/tos/client";
 
 // GET /api/projects/[id]/assets - 获取项目的所有素材
 export async function GET(
@@ -16,6 +17,31 @@ export async function GET(
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(`获取素材失败: ${error.message}`);
+    
+    // 如果 TOS 已配置，为有 storage_key 的素材生成签名 URL
+    if (isTosConfigured() && data && data.length > 0) {
+      const assetsWithUrls = await Promise.all(
+        data.map(async (asset: Record<string, unknown>) => {
+          // 如果有 storage_key，动态生成签名 URL
+          if (asset.storage_key) {
+            try {
+              const signedUrl = await getFileUrl(asset.storage_key as string);
+              return {
+                ...asset,
+                url: signedUrl,
+                thumbnail_url: asset.type === "image" ? signedUrl : asset.thumbnail_url,
+              };
+            } catch (err) {
+              console.error("Failed to generate signed URL for asset:", asset.id, err);
+              return asset;
+            }
+          }
+          return asset;
+        })
+      );
+      return NextResponse.json(assetsWithUrls);
+    }
+    
     return NextResponse.json(data || []);
   } catch (error) {
     console.error("GET /api/projects/[id]/assets error:", error);
@@ -47,6 +73,7 @@ export async function POST(
         thumbnail_url: body.thumbnail_url,
         size: body.size,
         duration: body.duration,
+        storage_key: body.storage_key,
       })
       .select()
       .single();
