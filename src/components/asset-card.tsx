@@ -44,11 +44,12 @@ export function AssetCard({
       {/* 删除按钮 */}
       {showRemove && (
         <button
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             onRemove?.();
           }}
-          className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer"
         >
           <X className={size === "sm" ? "w-2.5 h-2.5" : "w-3 h-3"} />
         </button>
@@ -98,12 +99,13 @@ export function AssetCard({
         {/* 激活按钮 */}
         {showActivation && (
           <button
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               onToggleActivation?.();
             }}
             className={cn(
-              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all",
+              "w-full flex items-center justify-center gap-0.5 py-0.5 rounded text-[9px] transition-all cursor-pointer",
               asset.isActivated 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30"
