@@ -965,7 +965,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 ref={(el) => {
                                   if (el) videoRefs.current.set(task.id, el);
                                 }}
-                                src={getVideoUrl(task) || null}
+                                src={getVideoUrl(task) || ""}
                                 className="max-h-full"
                               />
                             </div>
