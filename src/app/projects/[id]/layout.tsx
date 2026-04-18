@@ -65,10 +65,10 @@ interface DraggableAssetProps {
   onRemove?: (assetId: string) => void;
   onClick?: (asset: Asset) => void;
   size?: "small" | "large";
-  hideLabel?: boolean;
+  showLabel?: boolean;
 }
 
-function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", hideLabel }: DraggableAssetProps) {
+function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", showLabel = false }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -260,9 +260,21 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
               </button>
             )}
           </div>
-          {/* 底部信息 - 非隐藏时显示 */}
-          {!hideLabel && (
+          {/* 底部信息 */}
+          {(showLabel || asset.asset_category !== "keyframe") && (
             <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
+              {/* 名称显示 */}
+              {showLabel && (
+                <p 
+                  className={cn(
+                    "text-muted-foreground text-center truncate",
+                    size === "small" ? "text-[10px] px-0.5" : "text-xs"
+                  )}
+                  title={asset.display_name || asset.name}
+                >
+                  {asset.display_name || asset.name}
+                </p>
+              )}
               {/* 音频参考按钮 - 仅美术资产显示 */}
               {asset.asset_category !== "keyframe" && (
                 <div className={cn(
@@ -816,7 +828,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                         {filtered.image.map((asset) => {
                           const isInPool = selectedAssets.some(s => s.id === asset.id);
                           return (
-                            <div key={asset.id} className="flex flex-col items-center relative">
+                            <div key={asset.id} className="relative">
                               {isInPool && (
                                 <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
                                   <CheckCircle className="w-2.5 h-2.5" />
@@ -825,13 +837,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               <DraggableAsset
                                 asset={asset}
                                 size="small"
+                                showLabel
                                 onClick={setSelectedDetailAsset}
                                 showRemove
                                 onRemove={handleDeleteMaterial}
                               />
-                              <p className="text-[10px] text-muted-foreground text-center mt-0.5 truncate max-w-20 px-0.5" title={asset.display_name || asset.name}>
-                                {asset.display_name || asset.name}
-                              </p>
                             </div>
                           );
                         })}
@@ -845,7 +855,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                         {filtered.keyframe.map((asset) => {
                           const isInPool = selectedAssets.some(s => s.id === asset.id);
                           return (
-                            <div key={asset.id} className="flex flex-col items-center relative">
+                            <div key={asset.id} className="relative">
                               {isInPool && (
                                 <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
                                   <CheckCircle className="w-2.5 h-2.5" />
@@ -854,13 +864,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               <DraggableAsset
                                 asset={asset}
                                 size="small"
+                                showLabel
                                 onClick={setSelectedDetailAsset}
                                 showRemove
                                 onRemove={handleDeleteMaterial}
                               />
-                              <p className="text-[10px] text-muted-foreground text-center mt-0.5 truncate max-w-20 px-0.5" title={asset.display_name || asset.name}>
-                                {asset.display_name || asset.name}
-                              </p>
                             </div>
                           );
                         })}
