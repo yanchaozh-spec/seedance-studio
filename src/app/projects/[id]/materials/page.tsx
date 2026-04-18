@@ -171,6 +171,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       onClick={() => setSelectedAsset(asset)}
                       onRemove={() => handleDeleteAsset(asset.id)}
                       showRemove
+                      showName
                     />
                   ))}
                 </div>
@@ -191,6 +192,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       onClick={() => setSelectedAsset(asset)}
                       onRemove={() => handleDeleteAsset(asset.id)}
                       showRemove
+                      showName
                     />
                   ))}
                 </div>
