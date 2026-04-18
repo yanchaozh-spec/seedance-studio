@@ -19,6 +19,7 @@ import {
   Upload,
   Scissors,
   Loader2,
+  Download,
 } from "lucide-react";
 import { Asset, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
@@ -176,6 +177,30 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       toast.error("解除绑定失败");
     } finally {
       setBinding(false);
+    }
+  };
+
+  // 下载图片/关键帧
+  const handleDownload = async () => {
+    if (!asset || !asset.url) return;
+    
+    try {
+      const response = await fetch(asset.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      // 获取文件扩展名
+      const urlParts = asset.url.split(".");
+      const ext = urlParts.length > 1 ? urlParts.pop() : "png";
+      a.download = `${asset.name || "frame"}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("下载成功");
+    } catch {
+      toast.error("下载失败");
     }
   };
 
@@ -350,10 +375,19 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
         </div>
         
         <DialogFooter className="sm:justify-between">
-          <Button variant="destructive" onClick={handleDelete}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            删除
-          </Button>
+          <div className="flex gap-2">
+            {/* 下载按钮 - 仅图片类型显示 */}
+            {(asset.type === "image" || asset.type === "keyframe" || asset.asset_category === "keyframe") && (
+              <Button variant="outline" onClick={handleDownload}>
+                <Download className="w-4 h-4 mr-2" />
+                下载
+              </Button>
+            )}
+            <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              删除
+            </Button>
+          </div>
           <Button onClick={handleSave} disabled={binding}>
             保存
           </Button>
