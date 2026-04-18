@@ -12,7 +12,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets, deleteAsset } from "@/lib/assets";
-import { onAssetsChanged } from "@/lib/events";
+import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
+import { uploadFile } from "@/lib/upload";
 import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
@@ -513,6 +514,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
     setUploading(true);
     try {
+      let uploadCount = 0;
+      
       for (const file of files) {
         // 验证文件类型
         const isImage = file.type.startsWith("image/");
@@ -521,45 +524,27 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           continue;
         }
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("projectId", resolvedParams.id);
-        formData.append("type", "image");
-        formData.append("asset_category", "image");
-
-        const response = await fetch("/api/assets/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("上传失败");
+        try {
+          // 使用 uploadFile 函数，它会自动处理 TOS 配置
+          await uploadFile(file, {
+            projectId: resolvedParams.id,
+            type: "image",
+          });
+          uploadCount++;
+        } catch (uploadError) {
+          console.error("上传失败:", uploadError);
+          // 提取错误信息
+          const message = uploadError instanceof Error ? uploadError.message : "上传失败";
+          toast.error(`${file.name}: ${message}`);
         }
-
-        const result = await response.json();
-
-        // 检查返回的 id 是否有效
-        if (!result.id) {
-          throw new Error("素材记录创建失败");
-        }
-
-        // 创建素材记录
-        const newAsset: Asset = {
-          id: result.id,
-          project_id: resolvedParams.id,
-          name: file.name,
-          type: "image",
-          asset_category: "image",
-          url: result.url,
-          thumbnail_url: result.thumbnailUrl || result.url,
-          size: file.size,
-          created_at: new Date().toISOString(),
-        };
-
-        setMaterials((prev) => [newAsset, ...prev]);
       }
-
-      toast.success("上传成功");
+      
+      if (uploadCount > 0) {
+        toast.success(`成功上传 ${uploadCount} 个素材`);
+        // 刷新素材列表
+        loadMaterials();
+        emitAssetsChanged(resolvedParams.id, 'upload');
+      }
     } catch (error) {
       console.error("上传失败:", error);
       toast.error("上传失败");

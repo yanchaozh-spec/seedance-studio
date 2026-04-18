@@ -10,7 +10,7 @@ import {
   Image as ImageIcon,
   ImageOff,
 } from "lucide-react";
-import { Asset, getAssets, createAssetFromUrl, deleteAsset } from "@/lib/assets";
+import { Asset, getAssets, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
@@ -46,6 +46,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
     
     try {
       setUploading(true);
+      let uploadCount = 0;
       
       for (const file of Array.from(files)) {
         const isImage = file.type.startsWith("image/");
@@ -56,27 +57,21 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
         }
 
         try {
-          const result = await uploadFile(file, {
+          // uploadFile 内部会创建素材记录，不需要再调用 createAssetFromUrl
+          await uploadFile(file, {
             projectId: resolvedParams.id,
             type: "image",
           });
-          
-          await createAssetFromUrl({
-            project_id: resolvedParams.id,
-            name: file.name,
-            type: "image",
-            asset_category: "image",
-            url: result.url,
-            thumbnail_url: result.url,
-            size: file.size,
-          });
+          uploadCount++;
         } catch (uploadError) {
           console.error("上传失败:", uploadError);
           toast.error(`${file.name} 上传失败`);
         }
       }
       
-      toast.success("上传成功");
+      if (uploadCount > 0) {
+        toast.success(`成功上传 ${uploadCount} 个素材`);
+      }
       loadAssets();
       emitAssetsChanged(resolvedParams.id, 'upload');
     } catch (error) {
