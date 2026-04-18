@@ -64,7 +64,13 @@ function parseMentionSegments(
 /**
  * 带素材 @提及 的提示词输入框
  * - 输入 @ 时弹出已激活素材列表，选中后插入 @角色名
- * - @角色名 高亮显示 + 素材缩略图
+ * - @角色名 纯文本高亮显示（背景色 + 文字色，不插入缩略图等改变宽度的元素）
+ *
+ * 镜像层原理：
+ * - 底层 div 渲染高亮文本（textarea 文字透明）
+ * - 两层共享完全相同的字体、行高、内边距
+ * - 高亮 span 不添加任何改变文字宽度的元素（无 img、无额外 padding/margin）
+ *   以确保镜像层字符宽度与 textarea 完全一致
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -91,7 +97,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [forwardedRef]
     );
 
-    // 构建 mentionName → item 映射
+    // 构建 mentionName → item 映射（用于下拉列表显示缩略图）
     const mentionMap = useMemo(() => {
       const map = new Map<string, MentionItem>();
       for (const item of mentionItems) {
@@ -227,11 +233,19 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
     );
 
     // 共享的文本样式，确保 textarea 和 mirror 完全对齐
+    // 关键：font-family, font-size, line-height, letter-spacing, padding, border, word-break 必须完全一致
     const sharedTextStyle = "text-sm leading-[1.625rem] px-3 py-2 font-inherit";
 
     return (
       <div className="relative">
         {/* 高亮镜像层：渲染带样式的文本 */}
+        {/* 
+          关键约束：镜像层中不能有任何改变文字宽度的元素！
+          - 不插入 <img> 缩略图（会增加宽度）
+          - 不插入额外 padding/margin 的 span
+          - 只用 background-color + color 做纯文本高亮
+          这样镜像层每个字符的位置都与 textarea 完全一致
+        */}
         <div
           ref={mirrorRef}
           className={cn(
@@ -248,20 +262,14 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                 return (
                   <span
                     key={i}
-                    className="inline-flex items-center align-middle bg-primary/10 text-primary rounded px-0.5 py-px font-medium"
+                    className={cn(
+                      "rounded-sm font-medium",
+                      // 纯文本高亮：只改颜色，不加宽度
+                      item?.type === "audio"
+                        ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                        : "bg-primary/10 text-primary"
+                    )}
                   >
-                    {item?.thumbnail_url && (
-                      <img
-                        src={item.thumbnail_url}
-                        alt=""
-                        className="w-4 h-4 rounded-sm object-cover mr-0.5 flex-shrink-0"
-                      />
-                    )}
-                    {!item?.thumbnail_url && (
-                      <span className="w-4 h-4 rounded-sm bg-primary/20 flex items-center justify-center mr-0.5 flex-shrink-0 text-[8px] leading-none">
-                        {item?.type === "audio" ? "♪" : "🖼"}
-                      </span>
-                    )}
                     {seg.text}
                   </span>
                 );
@@ -273,7 +281,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
             <span className="text-muted-foreground">{placeholder}</span>
           )}
           {/* 末尾换行占位，确保高度对齐 */}
-          <span className="select-none"> </span>
+          <span className="select-none">{"\n"}</span>
         </div>
 
         {/* 实际输入层：文字透明，光标可见 */}
@@ -287,12 +295,14 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
             "relative z-10 bg-transparent caret-foreground",
             // 文字颜色透明，由镜像层渲染
             "text-transparent",
-            // 保持边框和聚焦样式
-            "border-input focus-visible:border-ring focus-visible:ring-ring/50",
+            // 保持边框和聚焦样式（与 Textarea 组件一致）
+            "border-input placeholder:text-muted-foreground",
+            "focus-visible:border-ring focus-visible:ring-ring/50",
             "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+            "dark:bg-input/30",
             "rounded-md border shadow-xs transition-[color,box-shadow] outline-none",
             "focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
-            "w-full flex field-sizing-content",
+            "w-full flex field-sizing-content min-h-16",
             sharedTextStyle,
             className
           )}
