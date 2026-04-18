@@ -113,6 +113,14 @@ function buildContent(
     imageRefMap.set(asset.id, refName);
   }
 
+  // 反向映射: displayName → refName，用于提示词中 @角色名 替换
+  const nameToRefMap = new Map<string, string>();
+  for (const asset of allImageAssets) {
+    const refName = imageRefMap.get(asset.id)!;
+    const displayName = asset.display_name || asset.name;
+    nameToRefMap.set(displayName, refName);
+  }
+
   const audioRefMap = new Map<string, string>();
   let audioIndex = 0;
   for (const audio of allAudioAssets) {
@@ -121,13 +129,30 @@ function buildContent(
     audioRefMap.set(audio.id, refName);
   }
 
+  /**
+   * 替换提示词中的 @角色名 为 @图片N(角色名) 格式
+   * 按名字长度降序替换，避免短名误替换长名
+   */
+  function replaceMentions(text: string): string {
+    const sortedNames = [...nameToRefMap.keys()].sort((a, b) => b.length - a.length);
+    let result = text;
+    for (const name of sortedNames) {
+      const ref = nameToRefMap.get(name)!;
+      // 只替换 @角色名 模式，不替换已经是 @图片N(角色名) 格式的
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`@(?!图片\\d+\\()${escaped}`, "g");
+      result = result.replace(regex, `@${ref}(${name})`);
+    }
+    return result;
+  }
+
   const textParts: string[] = [];
   const assetDefParts: string[] = [];
 
   for (const asset of keyframeAssets) {
     const refName = imageRefMap.get(asset.id)!;
     const desc = asset.keyframe_description || asset.display_name || asset.name;
-    assetDefParts.push(`@${refName}为${desc}`);
+    assetDefParts.push(`@${refName}为${desc}(资产ID:[${asset.id}])`);
   }
 
   for (const asset of imageAssets) {
@@ -136,9 +161,9 @@ function buildContent(
 
     if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
       const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-      assetDefParts.push(`@${refName}为${displayName}，声线为@${audioRef}`);
+      assetDefParts.push(`@${refName}为${displayName}(资产ID:[${asset.id}])，声线为@${audioRef}`);
     } else {
-      assetDefParts.push(`@${refName}为${displayName}`);
+      assetDefParts.push(`@${refName}为${displayName}(资产ID:[${asset.id}])`);
     }
   }
 
@@ -152,7 +177,7 @@ function buildContent(
 
   for (const box of sortedBoxes) {
     if (box.content.trim()) {
-      textParts.push(box.content.trim());
+      textParts.push(replaceMentions(box.content.trim()));
     }
   }
 

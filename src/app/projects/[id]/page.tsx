@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { use } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { PromptTextarea } from "@/components/prompt-textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -375,6 +375,35 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }
     }
 
+    // 反向映射: displayName → refName，用于提示词中 @角色名 替换
+    const nameToRefMap = new Map<string, string>();
+    for (const asset of activatedAssets) {
+      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
+      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      if (isImage || isKeyframe) {
+        const refIndex = imageRefMap.get(asset.id)!;
+        const refName = `图片${refIndex}`;
+        const displayName = asset.display_name || asset.name;
+        nameToRefMap.set(displayName, refName);
+      }
+    }
+
+    /**
+     * 替换提示词中的 @角色名 为 @图片N(角色名) 格式
+     * 按名字长度降序替换，避免短名误替换长名
+     */
+    function replaceMentions(text: string): string {
+      const sortedNames = [...nameToRefMap.keys()].sort((a, b) => b.length - a.length);
+      let result = text;
+      for (const name of sortedNames) {
+        const ref = nameToRefMap.get(name)!;
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`@(?!图片\\d+\\()${escaped}`, "g");
+        result = result.replace(regex, `@${ref}(${name})`);
+      }
+      return result;
+    }
+
     // 按图片绑定顺序收集音频，分配序号（与图片顺序一致）
     const audioRefMap = new Map<string, number>();
     let audioIndex = 0;
@@ -399,13 +428,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       
       if (isKeyframe) {
         const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-        assetDefParts.push(`@${refName}为${desc}`);
+        assetDefParts.push(`@${refName}为${desc}(资产ID:[${asset.id}])`);
       } else {
         if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
           const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-          assetDefParts.push(`@${refName}为${displayName}，声线为@${audioRef}`);
+          assetDefParts.push(`@${refName}为${displayName}(资产ID:[${asset.id}])，声线为@${audioRef}`);
         } else {
-          assetDefParts.push(`@${refName}为${displayName}`);
+          assetDefParts.push(`@${refName}为${displayName}(资产ID:[${asset.id}])`);
         }
       }
     }
@@ -418,7 +447,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
     for (const box of nonEmptyBoxes) {
       if (box.content.trim()) {
-        textParts.push(box.content.trim());
+        textParts.push(replaceMentions(box.content.trim()));
       }
     }
 
@@ -675,6 +704,16 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
   const imageAssets = selectedAssets.filter((a) => a.type === "image");
 
+  // 为 @提及 构建素材列表（已激活的图片+关键帧素材）
+  const mentionItems = selectedAssets
+    .filter((a) => a.isActivated && (a.type === "image" || a.type === "keyframe"))
+    .map((a) => ({
+      id: a.id,
+      name: a.display_name || a.name,
+      type: a.type,
+      thumbnail_url: a.thumbnail_url,
+    }));
+
   return (
     <div className="p-4 max-w-4xl mx-auto" suppressHydrationWarning>
       {/* 页面标题 */}
@@ -697,13 +736,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           {promptBoxes.map((box, index) => (
             <div key={box.id} className="space-y-1.5">
               <div className="flex gap-2">
-                <Textarea
+                <PromptTextarea
                   ref={setTextareaRef(box.id)}
-                  placeholder={`提示词 ${index + 1}...（按 TAB 跳到下一行）`}
                   value={box.content}
-                  onChange={(e) => updatePromptBox(box.id, e.target.value)}
+                  onChange={(val) => updatePromptBox(box.id, val)}
                   onKeyDown={(e) => handlePromptKeyDown(e, index)}
+                  placeholder={`提示词 ${index + 1}...（输入 @ 引用素材）`}
                   className="min-h-[48px] resize-none text-sm"
+                  mentionItems={mentionItems}
                 />
                 {promptBoxes.length > 1 && (
                   <Button
