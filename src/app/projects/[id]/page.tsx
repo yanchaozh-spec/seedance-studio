@@ -363,24 +363,29 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 只使用激活的素材
     const activatedAssets = selectedAssets.filter((a) => a.isActivated);
 
-    // 所有素材（包括 materials 和 selectedAssets）
-    const allAssetsList = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
-    // 音频素材：从所有素材中找出被激活图片引用的音频
-    const audioAssets = allAssetsList.filter((a) => 
-      a.type === "audio" && 
-      activatedAssets.some(img => img.bound_audio_id === a.id)
-    );
-
-
-    // 构建音频序号映射
-    const audioRefMap = new Map<string, string>();
-    let audioIndex = 0;
-    for (const audio of audioAssets) {
-      audioIndex++;
-      audioRefMap.set(audio.id, `音频${audioIndex}`);
+    // 按 activatedAssets 顺序收集所有图片，分配序号
+    const imageRefMap = new Map<string, number>();
+    let imageIndex = 0;
+    for (const asset of activatedAssets) {
+      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
+      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      if (isImage || isKeyframe) {
+        imageIndex++;
+        imageRefMap.set(asset.id, imageIndex);
+      }
     }
 
-    // 构建素材定义行（按 activatedAssets 的顺序，不使用图片序号）
+    // 按图片绑定顺序收集音频，分配序号（与图片顺序一致）
+    const audioRefMap = new Map<string, number>();
+    let audioIndex = 0;
+    for (const asset of activatedAssets) {
+      if (asset.bound_audio_id) {
+        audioIndex++;
+        audioRefMap.set(asset.bound_audio_id, audioIndex);
+      }
+    }
+
+    // 构建素材定义行（按 activatedAssets 顺序）
     const assetDefParts: string[] = [];
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
@@ -388,18 +393,19 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       
       if (!isImage && !isKeyframe) continue;
       
-      const isKeyframeType = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      const refIndex = imageRefMap.get(asset.id)!;
+      const refName = `图片${refIndex}`;
+      const displayName = asset.display_name || asset.name;
       
-      if (isKeyframeType) {
-        const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
-        assetDefParts.push(`${desc}`);
+      if (isKeyframe) {
+        const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
+        assetDefParts.push(`"${desc}"：${refName}`);
       } else {
-        const displayName = asset.display_name || asset.name;
         if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-          const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-          assetDefParts.push(`${displayName}，声线为：${audioRef}`);
+          const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
+          assetDefParts.push(`"${displayName}"：${refName}，声线为：${audioRef}`);
         } else {
-          assetDefParts.push(`${displayName}`);
+          assetDefParts.push(`"${displayName}"：${refName}`);
         }
       }
     }
@@ -437,13 +443,19 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }
     }
 
-    // 添加所有音频（使用 URL）
-    for (const audio of audioAssets) {
-      contentItems.push({
-        type: "audio_url",
-        audio_url: { url: audio.url },
-        role: "reference_audio",
-      });
+    // 按图片绑定顺序添加所有音频（与图片顺序对应）
+    for (const asset of activatedAssets) {
+      if (asset.bound_audio_id) {
+        const audioAsset = selectedAssets.find(a => a.id === asset.bound_audio_id) 
+          || materials.find(m => m.id === asset.bound_audio_id);
+        if (audioAsset) {
+          contentItems.push({
+            type: "audio_url",
+            audio_url: { url: audioAsset.url },
+            role: "reference_audio",
+          });
+        }
+      }
     }
 
     // 返回 JSON 格式预览
@@ -456,7 +468,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     });
 
     return JSON.stringify(requestBody, null, 2);
-  }, [promptBoxes, selectedAssets, params_]);
+  }, [promptBoxes, selectedAssets, materials, params_]);
 
   // 抽帧功能
   const extractFrame = async (task: Task, time: number = 0) => {
