@@ -227,16 +227,13 @@ export async function POST(request: NextRequest) {
     };
 
     try {
-      // 生成请求追踪 ID
-      const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-      
       // 调用 Seedance API 获取 task ID
       const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
-          "X-Client-Request-Id": requestId,
+          "X-Client-Request-Id": "Coze,Integrations",
         },
         body: JSON.stringify(requestBody),
       });

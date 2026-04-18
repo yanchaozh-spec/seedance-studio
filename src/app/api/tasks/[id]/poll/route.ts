@@ -45,15 +45,13 @@ export async function GET(
       }
       
       try {
-        const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-        
         const response = await fetch(
           `https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/${task.task_id_external}`,
           {
             headers: {
               "Authorization": `Bearer ${apiKey}`,
               "Content-Type": "application/json",
-              "X-Client-Request-Id": requestId,
+              "X-Client-Request-Id": "Coze,Integrations",
             },
           }
         );
