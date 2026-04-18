@@ -59,7 +59,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
 
-  // 恢复回滚数据（支持 history.state 和 sessionStorage）
+  // 恢复回滚数据（从 sessionStorage 读取）
   useEffect(() => {
     // 类型定义
     interface RollbackData {
@@ -79,28 +79,25 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       };
     }
 
-    // 优先从 history.state 读取（避免同步阻塞）
-    let rollbackData: RollbackData | null = window.history.state as RollbackData | null;
-    
-    // 如果 history.state 没有，尝试从 sessionStorage 读取（向后兼容）
-    if (!rollbackData?.prompt_boxes) {
-      const rollbackTask = sessionStorage.getItem("rollbackTask");
-      if (!rollbackTask) {
-        return;
-      }
-      try {
-        rollbackData = JSON.parse(rollbackTask);
-      } catch {
-        sessionStorage.removeItem("rollbackTask");
-        return;
-      }
-    } else {
-      // 从 history.state 读取后清除
-      window.history.replaceState(null, "", window.location.href);
+    // 从 sessionStorage 读取回滚数据
+    const rollbackTask = sessionStorage.getItem("rollbackTask");
+    if (!rollbackTask) {
+      return;
+    }
+
+    let rollbackData: RollbackData;
+    try {
+      rollbackData = JSON.parse(rollbackTask);
+    } catch {
+      sessionStorage.removeItem("rollbackTask");
+      return;
     }
 
     const task = rollbackData;
-    if (!task || !task.prompt_boxes) return;
+    if (!task || !task.prompt_boxes) {
+      sessionStorage.removeItem("rollbackTask");
+      return;
+    }
 
     // 如果 materials 还没加载好，保留数据等待下一次触发
     if (materials.length === 0) {
