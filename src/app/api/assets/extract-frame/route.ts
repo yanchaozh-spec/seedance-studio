@@ -1,25 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
-import { createClient } from "@supabase/supabase-js";
 import { writeFile, mkdir } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import os from "os";
+import { uploadAsset, isTosConfigured } from "@/storage/tos/client";
 
 const execAsync = promisify(exec);
-
-// 获取存储客户端
-function getStorageClient() {
-  const url = process.env.COZE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.COZE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!url || !key) {
-    throw new Error("Storage credentials not configured");
-  }
-  
-  return createClient(url, key);
-}
 
 // POST /api/assets/extract-frame - 从视频提取帧并保存为素材
 export async function POST(request: NextRequest) {
@@ -57,44 +45,42 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      const storage = getStorageClient();
-      const client = getSupabaseClient();
-      
-      // 生成唯一文件名
-      const fileName = `${projectId}/image/${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-      
-      // 上传到存储
-      const buffer = await file.arrayBuffer();
-      const { data: uploadData, error: uploadError } = await storage.storage
-        .from("materials")
-        .upload(fileName, buffer, {
-          contentType: "image/png",
-          upsert: true,
-        });
-      
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      // 检查 TOS 是否配置
+      if (!isTosConfigured()) {
+        return NextResponse.json(
+          { error: "TOS not configured. Please set up TOS in settings or configure environment variables." },
+          { status: 500 }
+        );
       }
       
-      // 获取公开 URL
-      const { data: urlData } = storage.storage
-        .from("materials")
-        .getPublicUrl(fileName);
+      const client = getSupabaseClient();
+      const buffer = Buffer.from(await file.arrayBuffer());
       
-      const imageUrl = urlData.publicUrl;
+      // 上传到 TOS
+      const result = await uploadAsset(
+        buffer,
+        file.name || "frame.png",
+        "image/png",
+        projectId,
+        assetCategory === "keyframe" ? "keyframe" : "image"
+      );
+      
+      const imageUrl = result.url;
+      // 去除扩展名
+      const displayName = name.replace(/\.[^/.]+$/, "");
       
       // 创建素材记录
       const { data: asset, error: assetError } = await client
         .from("assets")
         .insert({
           project_id: projectId,
-          name: name,
-          display_name: name,
+          name: displayName,
+          display_name: displayName,
           type: "image",
           asset_category: assetCategory,
           url: imageUrl,
           thumbnail_url: imageUrl,
+          storage_key: result.key,
           keyframe_description: timestamp ? `视频帧 @ ${timestamp}s` : null,
         })
         .select()
@@ -119,7 +105,6 @@ export async function POST(request: NextRequest) {
 
 // 通过视频 URL 抽帧
 async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?: string, timestamp: number = 0) {
-  const storage = getStorageClient();
   const client = getSupabaseClient();
   
   // 创建临时目录
@@ -130,6 +115,11 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
   const outputPath = path.join(tempDir, "frame.png");
   
   try {
+    // 检查 TOS 是否配置
+    if (!isTosConfigured()) {
+      throw new Error("TOS not configured. Please set up TOS in settings or configure environment variables.");
+    }
+    
     // 下载视频
     console.log("Downloading video from:", videoUrl);
     const videoResponse = await fetch(videoUrl);
@@ -151,29 +141,19 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
     const fs = await import("fs/promises");
     const frameBuffer = await fs.readFile(outputPath);
     
-    // 上传到存储
-    const fileName = `${projectId}/image/${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
-    const { data: uploadData, error: uploadError } = await storage.storage
-      .from("materials")
-      .upload(fileName, frameBuffer, {
-        contentType: "image/png",
-        upsert: true,
-      });
+    // 上传到 TOS
+    const result = await uploadAsset(
+      frameBuffer,
+      `frame-${Date.now()}.png`,
+      "image/png",
+      projectId,
+      "keyframe"
+    );
     
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      throw new Error(uploadError.message);
-    }
-    
-    // 获取公开 URL
-    const { data: urlData } = storage.storage
-      .from("materials")
-      .getPublicUrl(fileName);
-    
-    const imageUrl = urlData.publicUrl;
+    const imageUrl = result.url;
     const name = `关键帧_${Date.now()}`;
     
-    console.log("Frame extracted and uploaded:", imageUrl);
+    console.log("Frame extracted and uploaded to TOS:", imageUrl);
     
     // 创建素材记录
     const { data: asset, error: assetError } = await client
@@ -186,6 +166,7 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
         asset_category: "keyframe",
         url: imageUrl,
         thumbnail_url: imageUrl,
+        storage_key: result.key,
         keyframe_description: timestamp ? `视频帧 @ ${timestamp}s` : null,
       })
       .select()
@@ -218,5 +199,6 @@ function formatTime(seconds: number): string {
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
   const ms = Math.round((seconds % 1) * 100);
+  
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
 }

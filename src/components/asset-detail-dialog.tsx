@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Asset, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
+import { uploadFile } from "@/lib/upload";
 
 interface AssetDetailDialogProps {
   asset: Asset | null;
@@ -64,38 +65,30 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
     try {
       setUploadingAudio(true);
       
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("projectId", asset.project_id);
-      formData.append("type", "audio");
-
-      const response = await fetch("/api/assets/upload", {
-        method: "POST",
-        body: formData,
+      // 使用统一的 uploadFile 函数，会自动处理 TOS 配置
+      // uploadFile 内部会创建素材记录
+      await uploadFile(file, {
+        projectId: asset.project_id,
+        type: "audio",
       });
+      
+      // 获取音频素材列表，找到刚上传的
+      const response = await fetch(`/api/projects/${asset.project_id}/assets`);
+      const allAssets = await response.json();
+      const uploadedAudio = allAssets.find(
+        (a: Asset) => a.type === "audio" && a.name === file.name.replace(/\.[^/.]+$/, "")
+      );
+      
+      if (!uploadedAudio) {
+        toast.error("上传成功但未找到音频素材");
+        return;
+      }
 
-      if (!response.ok) throw new Error("上传失败");
-      const result = await response.json();
-
-      const createResponse = await fetch(`/api/projects/${asset.project_id}/assets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          type: "audio",
-          url: result.url,
-          duration: result.duration,
-        }),
-      });
-
-      if (!createResponse.ok) throw new Error("创建素材失败");
-      const audioAsset = await createResponse.json();
-
-      // 绑定音频并获取更新后的素材
+      // 绑定音频到当前图片
       const bindResponse = await fetch(`/api/assets/${asset.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bound_audio_id: audioAsset.id }),
+        body: JSON.stringify({ bound_audio_id: uploadedAudio.id }),
       });
       
       if (!bindResponse.ok) throw new Error("绑定失败");
@@ -105,7 +98,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       onUpdate(updatedAsset);
       setCurrentAsset(updatedAsset);
       onClose();
-    } catch {
+    } catch (error) {
+      console.error("上传失败:", error);
       toast.error("上传失败");
     } finally {
       setUploadingAudio(false);
