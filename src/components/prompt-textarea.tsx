@@ -64,13 +64,13 @@ function parseMentionSegments(
 /**
  * 带素材 @提及 的提示词输入框
  * - 输入 @ 时弹出已激活素材列表，选中后插入 @角色名
- * - @角色名 纯文本高亮显示（背景色 + 文字色，不插入缩略图等改变宽度的元素）
+ * - @角色名 高亮显示 + 缩略图徽章
  *
  * 镜像层原理：
  * - 底层 div 渲染高亮文本（textarea 文字透明）
  * - 两层共享完全相同的字体、行高、内边距
- * - 高亮 span 不添加任何改变文字宽度的元素（无 img、无额外 padding/margin）
- *   以确保镜像层字符宽度与 textarea 完全一致
+ * - 高亮 span 的文本内容与 textarea 完全一致（保证字符宽度对齐）
+ * - 缩略图使用 position: absolute 定位，脱离文本流，不影响 span 宽度
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -97,7 +97,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [forwardedRef]
     );
 
-    // 构建 mentionName → item 映射（用于下拉列表显示缩略图）
+    // 构建 mentionName → item 映射
     const mentionMap = useMemo(() => {
       const map = new Map<string, MentionItem>();
       for (const item of mentionItems) {
@@ -233,19 +233,11 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
     );
 
     // 共享的文本样式，确保 textarea 和 mirror 完全对齐
-    // 关键：font-family, font-size, line-height, letter-spacing, padding, border, word-break 必须完全一致
     const sharedTextStyle = "text-sm leading-[1.625rem] px-3 py-2 font-inherit";
 
     return (
       <div className="relative">
         {/* 高亮镜像层：渲染带样式的文本 */}
-        {/* 
-          关键约束：镜像层中不能有任何改变文字宽度的元素！
-          - 不插入 <img> 缩略图（会增加宽度）
-          - 不插入额外 padding/margin 的 span
-          - 只用 background-color + color 做纯文本高亮
-          这样镜像层每个字符的位置都与 textarea 完全一致
-        */}
         <div
           ref={mirrorRef}
           className={cn(
@@ -263,14 +255,38 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                   <span
                     key={i}
                     className={cn(
-                      "rounded-sm font-medium",
-                      // 纯文本高亮：只改颜色，不加宽度
+                      "relative inline rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
                         : "bg-primary/10 text-primary"
                     )}
                   >
                     {seg.text}
+                    {/*
+                      缩略图徽章：position: absolute 脱离文本流，
+                      不影响 span 的文本宽度，保证镜像层与 textarea 对齐。
+                      定位在 @ 符号左侧，垂直居中。
+                    */}
+                    {item?.thumbnail_url ? (
+                      <img
+                        src={item.thumbnail_url}
+                        alt=""
+                        className="absolute rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
+                        style={{ top: 5, left: -14, width: 16, height: 16 }}
+                      />
+                    ) : item ? (
+                      <span
+                        className={cn(
+                          "absolute rounded-sm flex items-center justify-center pointer-events-none",
+                          item.type === "audio"
+                            ? "bg-violet-200 dark:bg-violet-800/50"
+                            : "bg-primary/20"
+                        )}
+                        style={{ top: 5, left: -14, width: 16, height: 16, fontSize: 8, lineHeight: 1 }}
+                      >
+                        {item.type === "audio" ? "♪" : "🖼"}
+                      </span>
+                    ) : null}
                   </span>
                 );
               }
