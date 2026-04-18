@@ -137,20 +137,11 @@ export async function uploadAsset(
     // 使用用户配置创建 AWS S3 客户端
     userBucket = config.bucket;
     
-    // 确保 endpoint 有协议前缀
+    // 直接使用用户提供的 endpoint（不自动转换）
     let endpointUrl = config.endpoint || "";
     if (endpointUrl && !endpointUrl.startsWith("http://") && !endpointUrl.startsWith("https://")) {
       endpointUrl = "https://" + endpointUrl;
     }
-    
-    // 火山 TOS: 普通 endpoint 格式为 tos-cn-beijing.volces.com
-    // S3 兼容 endpoint 格式为 tos-s3-cn-beijing.volces.com
-    // 火山 TOS S3 接口使用虚拟主机风格 (bucket hostname)，不需要 forcePathStyle
-    endpointUrl = endpointUrl
-      .replace("://tos-cn-", "://tos-s3-cn-")
-      .replace("://tos-guangzhou-", "://tos-s3-guangzhou-")
-      .replace("://tos-shanghai-", "://tos-s3-shanghai-")
-      .replace("://tos-ap-", "://tos-s3-ap-");
     
     s3Client = new S3Client({
       region: process.env.COZE_TOS_REGION || "cn-beijing",
@@ -159,10 +150,9 @@ export async function uploadAsset(
         accessKeyId: config.accessKey!,
         secretAccessKey: config.secretKey!,
       },
-      // 不设置 forcePathStyle，使用虚拟主机风格 (bucket.s3.endpoint)
     });
     useNativeUpload = true;
-    console.log("[TOS] Using native AWS S3 SDK with S3 Endpoint:", endpointUrl, "bucket:", userBucket);
+    console.log("[TOS] Using native AWS S3 SDK with endpoint:", endpointUrl, "bucket:", userBucket);
   } else {
     // 使用环境变量配置的存储
     storage = getTosStorage();

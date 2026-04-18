@@ -211,13 +211,18 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 
                 {/* TOS 端点 */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">端点</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    S3 Endpoint（必填）
+                  </Label>
                   <Input
-                    placeholder="https://tos-cn-beijing.volces.com"
+                    placeholder="tos-s3-cn-beijing.volces.com"
                     value={localTosSettings.endpoint}
                     onChange={(e) => updateTosSetting('endpoint', e.target.value)}
                     className="text-sm"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    火山云 TOS S3 兼容接口地址，如：北京区域填 <code className="px-1 py-0.5 bg-muted rounded">tos-s3-cn-beijing.volces.com</code>
+                  </p>
                 </div>
                 
                 {/* Bucket 名称 */}
