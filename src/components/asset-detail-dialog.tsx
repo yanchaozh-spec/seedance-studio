@@ -182,25 +182,41 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
 
   // 下载图片/关键帧
   const handleDownload = async () => {
-    if (!asset || !asset.url) return;
+    if (!asset || !asset.id) return;
     
     try {
-      const response = await fetch(asset.url);
+      // 通过后端 API 代理下载，解决跨域问题
+      const response = await fetch(`/api/assets/${asset.id}/download`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "下载失败" }));
+        throw new Error(error.error || "下载失败");
+      }
+      
       const blob = await response.blob();
+      
+      // 获取文件名
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = asset.name || "frame";
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?(.+)"?/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      // 获取文件扩展名
-      const urlParts = asset.url.split(".");
-      const ext = urlParts.length > 1 ? urlParts.pop() : "png";
-      a.download = `${asset.name || "frame"}.${ext}`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast.success("下载成功");
-    } catch {
-      toast.error("下载失败");
+    } catch (error) {
+      console.error("下载失败:", error);
+      toast.error(error instanceof Error ? error.message : "下载失败");
     }
   };
 
