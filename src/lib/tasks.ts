@@ -120,7 +120,7 @@ export async function createTask(task: {
     // 否则抛出错误
     throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
   }
-  return response.json();
+  return data;
 }
 
 // 删除任务（调用 Seedance API 取消/删除任务）
