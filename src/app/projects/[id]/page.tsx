@@ -354,7 +354,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       contentItems.push({
         type: "image_url",
         image_url: { url: asset.url },
-        role: isKeyframe ? "first_frame" : "reference_image",
+        role: "reference_image",
       });
     }
 

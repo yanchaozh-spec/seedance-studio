@@ -193,7 +193,7 @@ function buildContent(
       image_url: {
         url: asset.url,
       },
-      role: asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe ? "first_frame" : "reference_image",
+      role: "reference_image",
     });
   }
 
