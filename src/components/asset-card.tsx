@@ -44,7 +44,6 @@ export function AssetCard({
       {/* 删除按钮 */}
       {showRemove && (
         <button
-          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             onRemove?.();
@@ -99,7 +98,6 @@ export function AssetCard({
         {/* 激活按钮 */}
         {showActivation && (
           <button
-            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               onToggleActivation?.();

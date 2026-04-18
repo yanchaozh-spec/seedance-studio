@@ -222,17 +222,26 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
     const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
 
+    // 处理点击事件 - 如果点击的是按钮元素则不触发拖拽
+    const handleClick = (e: React.MouseEvent) => {
+      // 检查点击目标是否是按钮或按钮内的元素
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) {
+        return; // 不触发任何操作，按钮有自己的处理
+      }
+      setSelectedDetailAsset(asset);
+    };
+
     return (
       <div 
         ref={setNodeRef} 
         style={style} 
         className="relative group cursor-grab active:cursor-grabbing"
-        {...attributes}
+        onClick={handleClick}
         {...listeners}
       >
         <AssetCard
           asset={asset}
-          onClick={() => setSelectedDetailAsset(asset)}
           onRemove={() => handleRemoveAsset(asset.id)}
           onToggleActivation={() => toggleAssetActivation(asset.id)}
           showRemove
