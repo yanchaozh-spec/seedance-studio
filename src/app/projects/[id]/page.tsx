@@ -815,10 +815,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* 素材池 */}
-      <div className={cn(
-        "bg-card border rounded-lg p-4 transition-all duration-200",
-        isDragging && !isOverDropZone && "ring-2 ring-primary/50 ring-offset-2 ring-offset-background"
-      )}>
+      <div className="bg-card border rounded-lg p-4 transition-all duration-200">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-medium flex items-center gap-2">
             素材池
