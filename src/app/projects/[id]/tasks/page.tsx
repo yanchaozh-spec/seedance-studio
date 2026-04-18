@@ -149,7 +149,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   };
 
   const handleRollback = (task: Task) => {
-    // 使用 sessionStorage 传递回滚数据，避免 history.pushState 在 App Router 中不工作的问题
+    // 使用 sessionStorage 传递回滚数据，使用 window.location.href 硬跳转确保 sessionStorage 保留
     if (task.prompt_boxes && task.prompt_boxes.length > 0) {
       const taskData = {
         id: task.id,
@@ -158,7 +158,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         params: task.params,
       };
       sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
-      router.push(`/projects/${resolvedParams.id}`);
+      window.location.href = `/projects/${resolvedParams.id}`;
     }
   };
 
