@@ -27,46 +27,37 @@ function log(tag, msg) {
 
 /**
  * 跨平台目录复制
- * Windows 下使用 robocopy 处理符号链接和权限问题
- * 其他系统使用 Node.js 递归复制
+ * Windows 下使用 xcopy（比 robocopy 更宽容）
+ * 其他系统使用 cp -r
  */
 function copyDirSync(src, dest) {
-  if (!fs.existsSync(src)) return;
+  if (!fs.existsSync(src)) {
+    log("!", `源目录不存在，跳过: ${src}`);
+    return;
+  }
+
+  log(" ", `${src} -> ${dest}`);
 
   if (IS_WINDOWS) {
-    // Windows: 使用 robocopy，/E 递归复制含空目录，/NFL/NDL/NJ/NP 静默输出
-    // /COPY:DAT 复制数据、属性、时间戳（不复制权限，避免 EPERM）
+    // Windows: 使用 xcopy，/E 递归，/I 假定目标是目录，/Y 静默覆盖，/H 复制隐藏文件
     const srcWin = src.replace(/\//g, "\\");
     const destWin = dest.replace(/\//g, "\\");
     try {
       execSync(
-        `robocopy "${srcWin}" "${destWin}" /E /NFL /NDL /NJ /NP /COPY:DAT`,
+        `xcopy "${srcWin}" "${destWin}\\" /E /I /Y /H /Q`,
         { stdio: "pipe", windowsHide: true }
       );
-      // robocopy 返回码 0-7 都是成功，8+ 才是错误
     } catch (err) {
-      // robocopy 返回 1 表示文件已复制，不是错误
-      if (err.status && err.status > 7) {
-        throw new Error(`robocopy 失败，退出码: ${err.status}`);
+      // xcopy 非零退出码可能是正常情况（如没有文件需要复制）
+      log("!", `xcopy 提示: 退出码 ${err.status || "unknown"}`);
+      // 检查目标是否已存在来判断是否真的失败
+      if (!fs.existsSync(dest)) {
+        throw new Error(`复制失败: ${src} -> ${dest}`);
       }
     }
   } else {
-    // 非 Windows: Node.js 递归复制
-    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-      const srcPath = path.join(src, entry.name);
-      const destPath = path.join(dest, entry.name);
-      if (entry.isDirectory()) {
-        copyDirSync(srcPath, destPath);
-      } else {
-        try {
-          fs.copyFileSync(srcPath, destPath);
-        } catch (e) {
-          // 跳过无法复制的文件（如符号链接目标不存在）
-          log("!", `跳过文件: ${srcPath} (${e.code})`);
-        }
-      }
-    }
+    // macOS/Linux
+    execSync(`cp -r "${src}/." "${dest}/"`, { stdio: "inherit" });
   }
 }
 
@@ -114,6 +105,7 @@ function downloadFile(url, dest) {
 
 async function main() {
   console.log("=== Tauri 构建脚本 ===\n");
+  console.log(`工作目录: ${ROOT}\n`);
 
   // [1/6] 安装依赖
   log("1/6", "安装依赖...");
@@ -146,15 +138,21 @@ async function main() {
   const staticSrc = path.join(ROOT, ".next", "static");
   const staticDest = path.join(standaloneDir, ".next", "static");
   if (fs.existsSync(staticSrc)) {
+    fs.mkdirSync(staticDest, { recursive: true });
     copyDirSync(staticSrc, staticDest);
     log("✓", "已复制 .next/static");
+  } else {
+    log("!", ".next/static 不存在，跳过");
   }
 
   const publicSrc = path.join(ROOT, "public");
   const publicDest = path.join(standaloneDir, "public");
   if (fs.existsSync(publicSrc)) {
+    fs.mkdirSync(publicDest, { recursive: true });
     copyDirSync(publicSrc, publicDest);
     log("✓", "已复制 public");
+  } else {
+    log("!", "public 目录不存在，跳过");
   }
 
   // [5/6] 下载 node.exe
@@ -180,8 +178,21 @@ async function main() {
   // [6/6] 复制到 Tauri 资源目录
   log("6/6", "复制资源到 Tauri 资源目录...");
   const tauriResources = path.join(ROOT, "src-tauri", "resources", "server");
+
+  // 先清理旧目录
   if (fs.existsSync(tauriResources)) {
-    fs.rmSync(tauriResources, { recursive: true, force: true });
+    try {
+      fs.rmSync(tauriResources, { recursive: true, force: true });
+    } catch (e) {
+      // Windows 下 rmSync 可能失败，用系统命令删除
+      if (IS_WINDOWS) {
+        try {
+          execSync(`rmdir /S /Q "${tauriResources.replace(/\//g, "\\")}"`, { windowsHide: true });
+        } catch (_) {
+          // 忽略
+        }
+      }
+    }
   }
   fs.mkdirSync(tauriResources, { recursive: true });
   copyDirSync(standaloneDir, tauriResources);
