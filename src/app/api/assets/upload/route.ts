@@ -102,6 +102,9 @@ export async function POST(request: NextRequest) {
     // 如果是图片，生成缩略图 URL（这里直接使用原图）
     const thumbnailUrl = type === "image" ? result.url : null;
 
+    // 去除文件名扩展名，用于显示
+    const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+
     // 创建数据库记录
     let assetId: string | null = null;
     try {
@@ -112,7 +115,7 @@ export async function POST(request: NextRequest) {
         .from("assets")
         .insert({
           project_id: projectId,
-          name: file.name,
+          name: fileNameWithoutExt,
           type: type,
           asset_category: assetCategory,
           url: result.url,

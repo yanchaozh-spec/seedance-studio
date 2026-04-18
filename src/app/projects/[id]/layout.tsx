@@ -613,6 +613,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       // 从已选中素材池中移除
       setSelectedAssets((prev) => prev.filter((a) => a.id !== assetId));
       toast.success("素材已删除");
+      // 通知其他组件素材已删除
+      emitAssetsChanged(resolvedParams.id, 'delete');
     } catch (error) {
       console.error("删除素材失败:", error);
       toast.error("删除失败");
