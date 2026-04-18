@@ -751,11 +751,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               {/* 素材库内容 */}
               {activeTab === "materials" && (
                 <>
-                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-2">
-                    <TabsList className="w-full h-7">
-                      <TabsTrigger value="all" className="flex-1 text-xs">全部</TabsTrigger>
-                      <TabsTrigger value="keyframe" className="flex-1 text-xs">关键帧</TabsTrigger>
-                      <TabsTrigger value="image" className="flex-1 text-xs">美术</TabsTrigger>
+                  <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-2" suppressHydrationWarning>
+                    <TabsList className="w-full h-7" suppressHydrationWarning>
+                      <TabsTrigger value="all" className="flex-1 text-xs" suppressHydrationWarning>全部</TabsTrigger>
+                      <TabsTrigger value="keyframe" className="flex-1 text-xs" suppressHydrationWarning>关键帧</TabsTrigger>
+                      <TabsTrigger value="image" className="flex-1 text-xs" suppressHydrationWarning>美术</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   {/* 上传按钮 */}

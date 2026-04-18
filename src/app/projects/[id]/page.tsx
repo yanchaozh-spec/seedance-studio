@@ -628,7 +628,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 value={params_.duration.toString()}
                 onValueChange={(v) => setParams({ ...params_, duration: parseInt(v) })}
               >
-                <SelectTrigger className="w-20 h-7 text-xs">
+                <SelectTrigger className="w-20 h-7 text-xs" suppressHydrationWarning>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -645,7 +645,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 value={params_.ratio}
                 onValueChange={(v) => setParams({ ...params_, ratio: v })}
               >
-                <SelectTrigger className="w-24 h-7 text-xs">
+                <SelectTrigger className="w-24 h-7 text-xs" suppressHydrationWarning>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -662,7 +662,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 value={params_.resolution}
                 onValueChange={(v) => setParams({ ...params_, resolution: v })}
               >
-                <SelectTrigger className="w-20 h-7 text-xs">
+                <SelectTrigger className="w-20 h-7 text-xs" suppressHydrationWarning>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
