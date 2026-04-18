@@ -22,6 +22,7 @@ interface CreateTaskRequest {
     resolution: string;
     service_tier?: "default" | "flex";
     return_last_frame?: boolean;
+    tools?: Array<{ type: "web_search" }>;
   };
   model_id?: string; // 可选，由前端传入
 }
@@ -277,6 +278,11 @@ export async function POST(request: NextRequest) {
       return_last_frame: params.return_last_frame ?? false,
       service_tier: params.service_tier || "default",
     };
+
+    // 添加联网搜索工具（仅 seedance 2.0 & 2.0 fast 支持）
+    if (params.tools && params.tools.length > 0) {
+      requestBody.tools = params.tools;
+    }
 
     try {
       // 调用 Seedance API 获取 task ID

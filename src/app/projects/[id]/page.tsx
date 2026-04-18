@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
 import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music } from "lucide-react";
@@ -38,6 +39,7 @@ interface GeneratorParams {
   resolution: string;
   service_tier?: "default" | "flex";
   return_last_frame?: boolean;
+  tools?: Array<{ type: "web_search" }>;
 }
 
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +59,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     resolution: "720p",
     service_tier: "default",
     return_last_frame: false,
+    tools: [],
   });
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
@@ -81,6 +84,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         resolution?: string;
         service_tier?: "default" | "flex";
         return_last_frame?: boolean;
+        tools?: Array<{ type: "web_search" }>;
       };
     }
 
@@ -132,6 +136,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         resolution: task.params.resolution || "720p",
         service_tier: task.params.service_tier || "default",
         return_last_frame: task.params.return_last_frame ?? false,
+        tools: task.params.tools || [],
       });
     }
 
@@ -373,6 +378,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       watermark: false,
       return_last_frame: params_.return_last_frame ?? false,
       service_tier: params_.service_tier || "default",
+      tools: params_.tools?.length ? params_.tools : undefined,
     };
 
     return JSON.stringify(requestBody, null, 2);
@@ -709,6 +715,22 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   <SelectItem value="flex">离线</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="web-search"
+                checked={params_.tools?.some(t => t.type === "web_search") ?? false}
+                onCheckedChange={(checked) => 
+                  setParams({ 
+                    ...params_, 
+                    tools: checked ? [{ type: "web_search" }] : [] 
+                  })
+                }
+              />
+              <label htmlFor="web-search" className="text-xs text-muted-foreground cursor-pointer">
+                联网搜索
+              </label>
             </div>
 
             <Button size="sm" onClick={handleGenerate} disabled={generating} className="ml-2">
