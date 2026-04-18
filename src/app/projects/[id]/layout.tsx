@@ -888,7 +888,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               </div>
               <div className={cn("flex flex-col", collapsed && "hidden")}>
                 <span className="font-semibold text-sm leading-tight">焱超</span>
-                <span className="text-[10px] text-muted-foreground leading-tight">SEEDANCE 工作台</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">Seedance 工作台</span>
               </div>
             </Link>
             <button

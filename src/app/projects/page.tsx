@@ -137,7 +137,7 @@ export default function ProjectsPage() {
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-semibold tracking-tight">焱超</span>
-              <span className="text-xs text-muted-foreground -mt-0.5">SEEDANCE 工作台</span>
+              <span className="text-xs text-muted-foreground -mt-0.5">Seedance 工作台</span>
             </div>
           </div>
 
