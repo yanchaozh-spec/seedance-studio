@@ -98,7 +98,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       toast.success("音频上传并绑定成功");
       onUpdate(updatedAsset);
       setCurrentAsset(updatedAsset);
-      onClose();
+      // 不关闭对话框，让用户看到更新后的状态
     } catch (error) {
       console.error("上传失败:", error);
       toast.error("上传失败");
@@ -172,7 +172,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       toast.success("已解除绑定");
       onUpdate(updatedAsset);
       setCurrentAsset(updatedAsset);
-      onClose();
+      // 不关闭对话框，让用户看到更新后的状态
     } catch {
       toast.error("解除绑定失败");
     } finally {
