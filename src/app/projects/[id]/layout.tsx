@@ -1076,6 +1076,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           onClose={() => setSelectedDetailAsset(null)}
           onUpdate={(updatedAsset) => {
             if (updatedAsset) {
+              // 更新当前选中的素材（用于详情对话框）
+              setSelectedDetailAsset(updatedAsset);
               // 更新 materials 中的素材
               setMaterials((prev) =>
                 prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
