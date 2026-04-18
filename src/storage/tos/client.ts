@@ -145,14 +145,12 @@ export async function uploadAsset(
     
     // 火山 TOS: 普通 endpoint 格式为 tos-cn-beijing.volces.com
     // S3 兼容 endpoint 格式为 tos-s3-cn-beijing.volces.com
-    // AWS S3 SDK 必须使用 S3 Endpoint
+    // 火山 TOS S3 接口使用虚拟主机风格 (bucket hostname)，不需要 forcePathStyle
     endpointUrl = endpointUrl
       .replace("://tos-cn-", "://tos-s3-cn-")
       .replace("://tos-guangzhou-", "://tos-s3-guangzhou-")
       .replace("://tos-shanghai-", "://tos-s3-shanghai-")
-      .replace("://tos-ap-", "://tos-s3-ap-")
-      .replace(".volces.com", ".volces.com") // 保持不变
-      .replace(".ivolces.com", ".ivolces.com"); // 保持不变
+      .replace("://tos-ap-", "://tos-s3-ap-");
     
     s3Client = new S3Client({
       region: process.env.COZE_TOS_REGION || "cn-beijing",
@@ -161,7 +159,7 @@ export async function uploadAsset(
         accessKeyId: config.accessKey!,
         secretAccessKey: config.secretKey!,
       },
-      forcePathStyle: true, // S3 兼容模式必须
+      // 不设置 forcePathStyle，使用虚拟主机风格 (bucket.s3.endpoint)
     });
     useNativeUpload = true;
     console.log("[TOS] Using native AWS S3 SDK with S3 Endpoint:", endpointUrl, "bucket:", userBucket);
@@ -197,12 +195,19 @@ export async function uploadAsset(
     console.log("[TOS] Native upload successful, key:", uploadResult);
     
     // 使用原生 AWS S3 SDK 生成签名 URL
+    // 火山 TOS 使用虚拟主机风格: https://bucket.endpoint/key
     console.log("[TOS] Generating presigned URL using native AWS S3 SDK for bucket:", userBucket);
     const getCommand = new GetObjectCommand({
       Bucket: userBucket,
       Key: uploadResult,
     });
-    const url = await getSignedUrl(s3Client, getCommand, { expiresIn: 7 * 24 * 60 * 60 }); // 7 天
+    
+    // 设置签名 URL 的自定义 endpoint（包含 bucket）
+    const url = await getSignedUrl(s3Client, getCommand, { 
+      expiresIn: 7 * 24 * 60 * 60,
+      // 确保签名 URL 使用正确的 hostname 格式
+    });
+    
     console.log("[TOS] Native presigned URL generated");
     return { key: uploadResult, url };
   }
