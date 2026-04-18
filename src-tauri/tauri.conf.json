@@ -46,6 +46,10 @@
       {
         "path": "resources/server/**/*",
         "target": "server/"
+      },
+      {
+        "path": "resources/node.exe",
+        "target": ""
       }
     ]
   },

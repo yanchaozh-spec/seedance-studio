@@ -72,23 +72,36 @@ fn list_files(dir: String) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
-/// 在生产模式下启动 Next.js standalone server
-fn start_nextjs_server(app_dir: &std::path::Path) -> Result<Child, String> {
-    let server_path = app_dir.join("server").join("server.js");
+/// 在生产模式下使用内嵌的 node.exe 启动 Next.js standalone server
+fn start_nextjs_server(resource_dir: &std::path::Path) -> Result<Child, String> {
+    // 使用内嵌的 node.exe（不需要用户安装 Node.js）
+    let node_path = resource_dir.join("node.exe");
+    let server_path = resource_dir.join("server").join("server.js");
+    
+    if !node_path.exists() {
+        return Err(format!(
+            "找不到内嵌的 Node.js 运行时: {:?}\n请重新安装应用。",
+            node_path
+        ));
+    }
     
     if !server_path.exists() {
-        return Err(format!("找不到服务器文件: {:?}", server_path));
+        return Err(format!(
+            "找不到服务器文件: {:?}\n请重新安装应用。",
+            server_path
+        ));
     }
     
     println!("[启动器] 正在启动 Next.js 服务器...");
-    println!("[启动器] 服务器路径: {:?}", server_path);
+    println!("[启动器] Node.js: {:?}", node_path);
+    println!("[启动器] 服务端: {:?}", server_path);
     
-    let child = Command::new("node")
+    let child = Command::new(&node_path)
         .arg(&server_path)
         .env("PORT", "5000")
         .env("HOSTNAME", "localhost")
         .env("COZE_PROJECT_ENV", "PROD")
-        .current_dir(app_dir.join("server"))
+        .current_dir(resource_dir.join("server"))
         .spawn()
         .map_err(|e| format!("启动服务器失败: {}", e))?;
     
@@ -104,7 +117,7 @@ fn wait_for_server() -> bool {
         std::thread::sleep(std::time::Duration::from_millis(500));
         
         if let Ok(resp) = reqwest::blocking::get("http://localhost:5000") {
-            if resp.status().is_success() {
+            if resp.status().is_success() || resp.status().as_u16() == 307 {
                 println!("[启动器] 服务器已就绪！耗时约 {}ms", (i + 1) * 500);
                 return true;
             }
@@ -146,7 +159,7 @@ pub fn run() {
                 }
             }
 
-            // 生产模式：启动 Next.js standalone server
+            // 生产模式：使用内嵌 node.exe 启动 Next.js standalone server
             if !cfg!(debug_assertions) {
                 let resolve_dir = app.path().resource_dir().expect("无法获取资源目录");
                 println!("[启动器] 资源目录: {:?}", resolve_dir);
@@ -170,18 +183,6 @@ pub fn run() {
                         eprintln!("[启动器] 启动服务器失败: {}", e);
                     }
                 }
-                
-                // 注册退出清理
-                let _ = ctrlc::set_handler(|| {
-                    println!("[启动器] 正在关闭...");
-                    unsafe {
-                        if let Some(ref mut child) = SERVER_PROCESS {
-                            let _ = child.kill();
-                            println!("[启动器] 服务器进程已终止");
-                        }
-                    }
-                    std::process::exit(0);
-                });
             }
             
             Ok(())
