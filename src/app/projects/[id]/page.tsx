@@ -274,7 +274,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     let imageIndex = 0;
     for (const asset of allImageAssets) {
       imageIndex++;
-      const refName = `[图片${imageIndex}]`;
+      const refName = `图片${imageIndex}`;
       imageRefMap.set(asset.id, refName);
     }
 
@@ -282,7 +282,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     let audioIndex = 0;
     for (const audio of audioAssets) {
       audioIndex++;
-      const refName = `[音频${audioIndex}]`;
+      const refName = `音频${audioIndex}`;
       audioRefMap.set(audio.id, refName);
     }
 
@@ -309,7 +309,31 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       assetDefParts.push(`${desc}：${refName}`);
     }
 
+    // 构建文本内容（放在 content 最前面，符合官方格式）
+    const textParts: string[] = [];
+
+    // 第一行：素材定义（使用序号）
+    const assetDefLine = assetDefParts.join("；");
+    if (assetDefLine) {
+      textParts.push(assetDefLine);
+    }
+
+    // 后续行：提示词
+    for (const box of nonEmptyBoxes) {
+      if (box.content.trim()) {
+        textParts.push(box.content.trim());
+      }
+    }
+
     const contentItems: Array<Record<string, unknown>> = [];
+
+    // 添加文本（放在最前面）
+    if (textParts.length > 0) {
+      contentItems.push({
+        type: "text",
+        text: textParts.join("\n"),
+      });
+    }
 
     // 添加所有图片（使用 URL）
     for (const asset of allImageAssets) {
@@ -327,29 +351,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         type: "audio_url",
         audio_url: { url: audio.url },
         role: "reference_audio",
-      });
-    }
-
-    // 构建文本内容
-    const textParts: string[] = [];
-
-    // 第一行：素材定义（使用序号）
-    const assetDefLine = assetDefParts.join("；");
-    if (assetDefLine) {
-      textParts.push(assetDefLine);
-    }
-
-    // 后续行：提示词
-    for (const box of nonEmptyBoxes) {
-      if (box.content.trim()) {
-        textParts.push(box.content.trim());
-      }
-    }
-
-    if (textParts.length > 0) {
-      contentItems.push({
-        type: "text",
-        text: textParts.join("\n"),
       });
     }
 

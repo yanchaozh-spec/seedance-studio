@@ -112,46 +112,27 @@ function buildContent(
     }
   }
 
-  // 第一步：添加所有图片（使用 URL）
-  // 序号规则：所有图片统一用 [图片N] 格式
-  const imageRefMap = new Map<string, string>(); // asset.id -> 引用名称
+  // 构建序号映射（无方括号，符合官方格式）
+  // 图片序号
+  const imageRefMap = new Map<string, string>();
   let imageIndex = 0;
-  
   for (const asset of allImageAssets) {
     imageIndex++;
-    const refName = `[图片${imageIndex}]`;
+    const refName = `图片${imageIndex}`;
     imageRefMap.set(asset.id, refName);
-
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: asset.url,
-      },
-      role: asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe ? "first_frame" : "reference_image",
-    });
   }
 
-  // 第二步：添加所有音频（使用 URL）
-  // 序号规则：所有音频按顺序编号，从1开始
-  const audioRefMap = new Map<string, string>(); // asset.id -> 引用名称
+  // 音频序号
+  const audioRefMap = new Map<string, string>();
   let audioIndex = 0;
-  
   for (const audio of allAudioAssets) {
     audioIndex++;
-    const refName = `[音频${audioIndex}]`;
+    const refName = `音频${audioIndex}`;
     audioRefMap.set(audio.id, refName);
-
-    content.push({
-      type: "audio_url",
-      audio_url: {
-        url: audio.url,
-      },
-      role: "reference_audio",
-    });
   }
 
-  // 第三步：构建文本内容
-  // 格式：素材定义行 + 提示词分行
+  // 第一步：添加文本（放在最前面，符合官方格式）
+  // 构建素材定义行（使用序号，无方括号）
   const textParts: string[] = [];
 
   // 构建素材定义行
@@ -194,11 +175,33 @@ function buildContent(
     }
   }
 
-  // 添加合并的文本
+  // 添加文本
   if (textParts.length > 0) {
     content.push({
       type: "text",
       text: textParts.join("\n"),
+    });
+  }
+
+  // 第二步：添加所有图片（使用 URL）
+  for (const asset of allImageAssets) {
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: asset.url,
+      },
+      role: asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe ? "first_frame" : "reference_image",
+    });
+  }
+
+  // 第三步：添加所有音频（使用 URL）
+  for (const audio of allAudioAssets) {
+    content.push({
+      type: "audio_url",
+      audio_url: {
+        url: audio.url,
+      },
+      role: "reference_audio",
     });
   }
 
