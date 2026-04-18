@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Task, TaskStatus, getVideoUrl } from "@/lib/tasks";
 import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { VideoPlayer } from "@/components/ui/video-player";
 
 // 任务状态配置
 const STATUS_CONFIG: Record<TaskStatus, {
@@ -282,12 +283,12 @@ export function TaskCard({
         {/* 视频预览 */}
         {task.status === "succeeded" && getVideoUrl(task) && !compact && (
           <div className="mt-3">
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              <video
-                src={getVideoUrl(task) || ""}
-                controls
-                className="w-full h-full"
+            {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
+            <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+              <VideoPlayer
+                src={getVideoUrl(task)}
                 poster={task.result?.last_frame_url}
+                className="max-h-[200px]"
               />
             </div>
           </div>
@@ -296,11 +297,11 @@ export function TaskCard({
         {/* 简短预览（紧凑模式） */}
         {task.status === "succeeded" && getVideoUrl(task) && compact && (
           <div className="mt-2">
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              <video
-                src={getVideoUrl(task) || ""}
-                controls
-                className="w-full h-full"
+            {/* 自适应视频播放器 */}
+            <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+              <VideoPlayer
+                src={getVideoUrl(task)}
+                className="max-h-[120px]"
               />
             </div>
           </div>
@@ -422,12 +423,13 @@ export function VideoPreviewDialog({ task, open, onClose }: VideoPreviewDialogPr
           </Button>
         </div>
         {getVideoUrl(task) && (
-          <video
-            src={getVideoUrl(task) || ""}
-            controls
-            autoPlay
-            className="w-full rounded"
-          />
+          <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+            <VideoPlayer
+              src={getVideoUrl(task)}
+              autoPlay
+              className="max-h-[70vh]"
+            />
+          </div>
         )}
         <div className="flex items-center gap-2 mt-4">
           {getVideoUrl(task) && (

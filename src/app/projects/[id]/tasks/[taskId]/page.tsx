@@ -55,6 +55,7 @@ import { formatDistanceToNow } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { VideoPlayer } from "@/components/ui/video-player";
 
 // 状态配置
 const STATUS_CONFIG: Record<TaskStatus, {
@@ -285,14 +286,14 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             <Card>
               <CardContent className="p-4">
                 <div className="space-y-4">
-                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                    <video
+                  {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
+                  <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                    <VideoPlayer
                       ref={videoRef}
-                      src={getVideoUrl(task) || ""}
-                      controls
-                      className="w-full h-full"
+                      src={getVideoUrl(task)}
                       muted={muted}
                       poster={task.result?.last_frame_url}
+                      className="max-h-[400px]"
                     />
                   </div>
                   

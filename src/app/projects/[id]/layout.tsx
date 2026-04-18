@@ -26,6 +26,7 @@ import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
+import { VideoPlayer } from "@/components/ui/video-player";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -959,15 +960,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           
                           {/* 视频/状态区域 */}
                           {task.status === "succeeded" && getVideoUrl(task) ? (
-                            <div className="aspect-video bg-black rounded overflow-hidden">
-                              <video
+                            <div className="bg-black rounded overflow-hidden flex items-center justify-center" style={{ height: "120px" }}>
+                              <VideoPlayer
                                 ref={(el) => {
                                   if (el) videoRefs.current.set(task.id, el);
                                 }}
-                                src={getVideoUrl(task) || undefined}
-                                controls
-                                className="w-full h-full object-cover"
-                                preload="metadata"
+                                src={getVideoUrl(task) || null}
+                                className="max-h-full"
                               />
                             </div>
                           ) : task.status === "running" ? (

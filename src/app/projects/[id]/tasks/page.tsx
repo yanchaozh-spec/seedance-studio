@@ -55,6 +55,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/settings";
 import { formatSeconds } from "@/components/tasks/TaskCard";
+import { VideoPlayer } from "@/components/ui/video-player";
 
 // 格式化时长
 
@@ -394,16 +395,14 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                 {/* 视频播放器区域 - 水平布局 */}
                 {task.status === "succeeded" && getVideoUrl(task) && (
                   <div className="flex gap-4 p-4 bg-black/5">
-                    {/* 左侧视频 */}
-                    <div className="relative w-56 h-32 bg-black rounded overflow-hidden flex-shrink-0">
-                      <video
+                    {/* 左侧视频 - 自适应显示，不变形 */}
+                    <div className="bg-black rounded overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: "140px", height: "80px" }}>
+                      <VideoPlayer
                         ref={(el) => {
                           if (el) videoRefs.current.set(task.id, el);
                         }}
-                        src={getVideoUrl(task) || ""}
-                        controls
-                        className="w-full h-full object-contain"
-                        preload="metadata"
+                        src={getVideoUrl(task)}
+                        className="max-h-full"
                       />
                     </div>
                     

@@ -34,6 +34,7 @@ import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { VideoPlayer } from "@/components/ui/video-player";
 
 const statusConfig: Record<TaskStatus, { icon: React.ElementType; label: string; color: string }> = {
   pending: { icon: Clock, label: "等待中", color: "text-gray-500" },
@@ -329,13 +330,13 @@ export function TaskDetailSheet({
           {/* 视频播放器 */}
           {task.status === "succeeded" && getVideoUrl(task) && (
             <div className="space-y-3">
-              <div className="bg-black rounded-lg overflow-hidden">
-                <video
+              {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
+              <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                <VideoPlayer
                   ref={videoRef}
-                  src={getVideoUrl(task) || ""}
-                  controls
-                  className="w-full aspect-video"
+                  src={getVideoUrl(task)}
                   muted={muted}
+                  className="max-h-[400px]"
                 />
               </div>
               {/* 音量控制 */}
