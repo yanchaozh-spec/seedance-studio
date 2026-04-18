@@ -58,46 +58,73 @@ export async function GET(
       }
       
       try {
+        // 生成请求追踪 ID
+        const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+        
         const response = await fetch(
           `https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/${task.task_id_external}`,
           {
             headers: {
               "Authorization": `Bearer ${apiKey}`,
               "Content-Type": "application/json",
+              "X-Client-Request-Id": requestId,
             },
           }
         );
 
-        if (response.ok) {
-          const externalTask = await response.json();
-          
-          // 更新本地任务状态
-          const updates: Record<string, unknown> = {
-            updated_at: new Date().toISOString(),
-          };
+        // 检查 HTTP 状态码
+        if (!response.ok) {
+          console.error(`[POLL] HTTP error: ${response.status}`);
+          return NextResponse.json({
+            id: task.id,
+            status: task.status,
+            progress: task.progress || 0,
+            error_message: `API returned ${response.status}`,
+          });
+        }
 
-          // 解析外部状态
-          if (externalTask.status === "succeeded") {
-            updates.status = "succeeded";
-            updates.progress = 100;
-            updates.completed_at = new Date().toISOString();
-            
-            // content 可能是对象 { video_url: "..." } 或数组 [{ type: "video_url", video_url: {...} }]
-            let videoUrl = "";
-            let lastFrameUrl = "";
-            
-            if (Array.isArray(externalTask.content)) {
-              // 数组格式
+        const externalTask = await response.json();
+        
+        // 检查业务错误
+        if (externalTask.error) {
+          console.error("[POLL] Business error:", externalTask.error);
+          return NextResponse.json({
+            id: task.id,
+            status: "failed",
+            error_message: externalTask.error?.message || "Task failed",
+          });
+        }
+
+        // 更新本地任务状态
+        const updates: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+        };
+
+        // 解析外部状态
+        if (externalTask.status === "succeeded") {
+          updates.status = "succeeded";
+          updates.progress = 100;
+          updates.completed_at = new Date().toISOString();
+          
+          // 解析 video_url 和 last_frame_url
+          // 优先按官方文档的对象格式解析，其次兼容数组格式
+          let videoUrl = "";
+          let lastFrameUrl = "";
+          
+          if (externalTask.content && typeof externalTask.content === "object") {
+            if (!Array.isArray(externalTask.content)) {
+              // 对象格式 { video_url: "...", last_frame_url: "..." } - 官方文档格式
+              videoUrl = (externalTask.content as { video_url?: string }).video_url || "";
+              lastFrameUrl = (externalTask.content as { last_frame_url?: string }).last_frame_url || "";
+            } else {
+              // 数组格式 - 兼容旧版 API
               const contentItem = externalTask.content as Array<{ type: string; role?: string; video_url?: { url: string }; image_url?: { url: string } }>;
               const videoItem = contentItem.find((c) => c.type === "video_url");
               const lastFrameItem = contentItem.find((c) => c.type === "image_url" && c.role === "last_frame");
               videoUrl = videoItem?.video_url?.url || "";
               lastFrameUrl = lastFrameItem?.image_url?.url || "";
-            } else if (externalTask.content) {
-              // 对象格式 { video_url: "...", last_frame_url: "..." }
-              videoUrl = externalTask.content.video_url || "";
-              lastFrameUrl = externalTask.content.last_frame_url || "";
             }
+          }
             
             updates.result = {
               video_url: videoUrl,

@@ -227,23 +227,43 @@ export async function POST(request: NextRequest) {
     };
 
     try {
+      // 生成请求追踪 ID
+      const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+      
       // 调用 Seedance API 获取 task ID
       const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
+          "X-Client-Request-Id": requestId,
         },
         body: JSON.stringify(requestBody),
       });
 
+      // 检查 HTTP 状态码
+      if (!response.ok) {
+        let errorMessage = "API request failed";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorData.error?.code || errorMessage;
+        } catch {
+          // 响应体不是 JSON
+        }
+        console.error("[CREATE TASK] API error:", response.status, errorMessage);
+        return NextResponse.json({ 
+          error: errorMessage 
+        }, { status: response.status });
+      }
+
       const data = await response.json();
 
-      if (!response.ok) {
-        console.error("[CREATE TASK] API error:", data);
+      // 检查业务错误
+      if (data.error) {
+        console.error("[CREATE TASK] Business error:", data.error);
         return NextResponse.json({ 
-          error: data.error?.message || data.error?.code || "API request failed" 
-        }, { status: response.status });
+          error: data.error?.message || data.error?.code || "Task creation failed" 
+        }, { status: 400 });
       }
 
       // 使用 API 返回的 task ID 保存任务到数据库
