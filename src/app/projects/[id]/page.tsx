@@ -368,7 +368,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
 
     // 返回 JSON 格式预览
-    const requestBody = {
+    const isSeedance2 = (modelId || "").toLowerCase().includes("seedance-2-0") || (modelId || "").toLowerCase().includes("seedance-2.0");
+    const requestBody: Record<string, unknown> = {
       model: modelId || "",
       content: contentItems,
       generate_audio: true,
@@ -377,9 +378,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       resolution: params_.resolution,
       watermark: false,
       return_last_frame: params_.return_last_frame ?? false,
-      service_tier: params_.service_tier || "default",
       tools: params_.tools?.length ? params_.tools : undefined,
     };
+    // service_tier 仅非 seedance 2.0 模型支持
+    if (!isSeedance2 && params_.service_tier) {
+      requestBody.service_tier = params_.service_tier;
+    }
 
     return JSON.stringify(requestBody, null, 2);
   }, [promptBoxes, selectedAssets, params_]);

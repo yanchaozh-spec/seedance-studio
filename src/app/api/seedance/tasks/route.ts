@@ -266,6 +266,9 @@ export async function POST(request: NextRequest) {
     // 使用前端传入的 model_id 或默认值
     const modelId = body.model_id || DEFAULT_MODEL_ID;
 
+    // 检查是否为 seedance 2.0 模型（不支持 service_tier）
+    const isSeedance2 = modelId.toLowerCase().includes("seedance-2-0") || modelId.toLowerCase().includes("seedance-2.0");
+
     // 构建请求参数 - 严格按照 API 文档格式
     const requestBody: Record<string, unknown> = {
       model: modelId,
@@ -276,8 +279,12 @@ export async function POST(request: NextRequest) {
       resolution: params.resolution,
       watermark: false,
       return_last_frame: params.return_last_frame ?? false,
-      service_tier: params.service_tier || "default",
     };
+
+    // service_tier 仅非 seedance 2.0 模型支持
+    if (!isSeedance2 && params.service_tier) {
+      requestBody.service_tier = params.service_tier;
+    }
 
     // 添加联网搜索工具（仅 seedance 2.0 & 2.0 fast 支持）
     if (params.tools && params.tools.length > 0) {
