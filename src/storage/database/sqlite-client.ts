@@ -123,6 +123,18 @@ function initTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_task_id_external ON tasks(task_id_external);
+
+    CREATE TABLE IF NOT EXISTS global_avatars (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      asset_id TEXT NOT NULL UNIQUE,
+      thumbnail_url TEXT,
+      description TEXT DEFAULT '',
+      source_project_id TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_global_avatars_asset_id ON global_avatars(asset_id);
   `);
 }
 
