@@ -73,7 +73,7 @@ export async function getTasks(projectId: string): Promise<Task[]> {
   if (!response.ok) {
     throw new Error("Failed to fetch tasks");
   }
-  return data;
+  return response.json();
 }
 
 // 获取单个任务
