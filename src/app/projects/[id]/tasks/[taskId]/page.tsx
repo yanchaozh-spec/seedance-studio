@@ -287,13 +287,13 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               <CardContent className="p-4">
                 <div className="space-y-4">
                   {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
-                  <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ maxHeight: "400px" }}>
+                  <div className="bg-black rounded-lg overflow-hidden relative" style={{ height: "400px" }}>
                     <VideoPlayer
                       ref={videoRef}
                       src={getVideoUrl(task)}
                       muted={muted}
                       poster={task.result?.last_frame_url}
-                      className="max-h-[400px]"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   </div>
                   

@@ -423,11 +423,11 @@ export function VideoPreviewDialog({ task, open, onClose }: VideoPreviewDialogPr
           </Button>
         </div>
         {getVideoUrl(task) && (
-          <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ maxHeight: "70vh" }}>
+          <div className="bg-black rounded-lg overflow-hidden relative" style={{ height: "70vh" }}>
             <VideoPlayer
               src={getVideoUrl(task)}
               autoPlay
-              className="max-h-[70vh]"
+              className="absolute inset-0 w-full h-full object-contain"
             />
           </div>
         )}
