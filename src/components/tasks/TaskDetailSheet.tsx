@@ -331,7 +331,7 @@ export function TaskDetailSheet({
           {task.status === "succeeded" && getVideoUrl(task) && (
             <div className="space-y-3">
               {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
-              <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+              <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ maxHeight: "400px" }}>
                 <VideoPlayer
                   ref={videoRef}
                   src={getVideoUrl(task)}
