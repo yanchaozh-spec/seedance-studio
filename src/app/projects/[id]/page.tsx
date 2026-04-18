@@ -864,6 +864,18 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-medium flex items-center gap-2">
             素材池
+            <span className="text-xs text-muted-foreground font-normal">
+              不支持真人素材，如需真人素材请使用
+              <a
+                href="https://www.volcengine.com/docs/82379/2223965"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-primary transition-colors"
+              >
+                官方虚拟人像库
+              </a>
+              获取 Asset ID
+            </span>
             {isOverDropZone && (
               <span className="text-xs text-primary animate-pulse">释放添加</span>
             )}
