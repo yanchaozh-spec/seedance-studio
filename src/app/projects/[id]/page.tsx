@@ -447,10 +447,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         const audioAsset = selectedAssets.find(a => a.id === asset.bound_audio_id) 
           || materials.find(m => m.id === asset.bound_audio_id);
         if (audioAsset) {
+          // 音频时长限制：取视频时长和15.2秒的较小值
+          const maxDuration = Math.min(params_.duration, 15.2);
           contentItems.push({
             type: "audio_url",
             audio_url: { url: audioAsset.url },
             role: "reference_audio",
+            duration: maxDuration, // 限制音频时长不超过 15.2 秒
           });
         }
       }
@@ -965,18 +968,37 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         allAssets={materials}
         onClose={() => setSelectedDetailAsset(null)}
         onUpdate={async (updatedAsset) => {
-          if (updatedAsset) {
-            // 更新 selectedAssets
-            setSelectedAssets((prev) =>
-              prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
-            );
-            // 更新 materials（侧边栏素材库）
-            setMaterials((prev) =>
-              prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
-            );
-          }
           // 重新加载所有素材（包括新上传的音频）
           await refreshMaterials();
+          // 更新 selectedAssets 和 materials
+          if (updatedAsset) {
+            setSelectedAssets((prev) => {
+              const updated = prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a));
+              // 如果更新的是音频资产（图片绑定了新音频），确保 selectedAssets 中的图片能关联到新音频
+              if (updatedAsset.type === "audio") {
+                return updated.map((a) => {
+                  // 查找是否有图片绑定了这个音频
+                  if (a.bound_audio_id === updatedAsset.id) {
+                    return { ...a, bound_audio_id: updatedAsset.id };
+                  }
+                  return a;
+                });
+              }
+              return updated;
+            });
+            // 更新 materials
+            setMaterials((prev) => {
+              const exists = prev.some((a) => a.id === updatedAsset.id);
+              if (exists) {
+                return prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a));
+              }
+              // 如果是新音频，添加到 materials
+              if (updatedAsset.type === "audio") {
+                return [...prev, updatedAsset];
+              }
+              return prev;
+            });
+          }
         }}
       />
     </div>
