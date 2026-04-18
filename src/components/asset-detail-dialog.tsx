@@ -40,7 +40,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
   const [localNewAudios, setLocalNewAudios] = useState<Asset[]>([]);
   const [keyframeDescription, setKeyframeDescription] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [assetCategory, setAssetCategory] = useState<"keyframe" | "image">("image");
+  const [assetCategory, setAssetCategory] = useState<"keyframe" | "image" | "audio" | "video">("image");
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
 
   // 合并 allAssets 和 localNewAudios 用于搜索

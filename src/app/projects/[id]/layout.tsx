@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { uploadFile } from "@/lib/upload";
+import { extractVideoThumbnail } from "@/lib/video-thumbnail";
 import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
@@ -219,6 +220,32 @@ export function DraggableAsset({
           }
         });
       }
+    } else if (asset.type === "video") {
+      // 视频使用图标作为拖拽图片
+      const canvas = document.createElement("canvas");
+      canvas.width = 80;
+      canvas.height = 80;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#1f2937";
+        ctx.fillRect(0, 0, 80, 80);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "40px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🎬", 40, 40);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const img = document.createElement("img");
+            img.onload = () => {
+              e.dataTransfer.setDragImage(img, 40, 40);
+              URL.revokeObjectURL(url);
+            };
+            img.src = url;
+          }
+        });
+      }
     }
   };
 
@@ -263,7 +290,7 @@ export function DraggableAsset({
           crossOrigin="anonymous"
         />
       )}
-      {asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar" ? (
+      {asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar" || asset.type === "audio" || asset.type === "video" ? (
         <div className="w-full">
           <div className={cn(
             "w-full flex items-center justify-center bg-muted",
@@ -289,6 +316,26 @@ export function DraggableAsset({
                 <span>虚拟人像</span>
               </div>
             )}
+            {/* 音频标识 */}
+            {asset.type === "audio" && (
+              <div className={cn(
+                "absolute top-1 left-1 bg-violet-600 text-white rounded flex items-center gap-0.5 z-10",
+                size === "small" ? "text-[8px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5"
+              )}>
+                <Music className={size === "small" ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                <span>音频</span>
+              </div>
+            )}
+            {/* 视频标识 */}
+            {asset.type === "video" && (
+              <div className={cn(
+                "absolute top-1 left-1 bg-cyan-600 text-white rounded flex items-center gap-0.5 z-10",
+                size === "small" ? "text-[8px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5"
+              )}>
+                <Video className={size === "small" ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                <span>视频</span>
+              </div>
+            )}
             {asset.thumbnail_url ? (
               <img
                 src={asset.thumbnail_url}
@@ -296,11 +343,28 @@ export function DraggableAsset({
                 className="max-w-full max-h-full object-contain"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
+              <div className="w-full h-full flex items-center justify-center">
                 {asset.type === "virtual_avatar" ? (
-                  <UserRound className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-purple-400")} />
+                  <div className="w-full h-full flex items-center justify-center bg-purple-500/10">
+                    <UserRound className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-purple-400")} />
+                  </div>
+                ) : asset.type === "audio" ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-500/10 to-indigo-500/10 gap-1">
+                    <Music className={cn(size === "small" ? "w-5 h-5" : "w-7 h-7", "text-violet-400")} />
+                    <div className="flex items-end gap-0.5 h-3">
+                      {[3,6,4,8,5,7,3,6].map((h, i) => (
+                        <div key={i} className={cn("bg-violet-400/50 rounded-full", size === "small" ? "w-[2px]" : "w-0.5")} style={{ height: `${h * (size === "small" ? 1.5 : 2)}px` }} />
+                      ))}
+                    </div>
+                  </div>
+                ) : asset.type === "video" ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyan-500/10 to-blue-500/10">
+                    <Video className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-cyan-400")} />
+                  </div>
                 ) : (
-                  <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
+                  <div className="w-full h-full flex items-center justify-center bg-muted">
+                    <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
+                  </div>
                 )}
               </div>
             )}
@@ -345,8 +409,8 @@ export function DraggableAsset({
                   {asset.keyframe_description || "-"}
                 </p>
               )}
-              {/* 音频参考按钮 - 仅美术资产显示（非关键帧） */}
-              {asset.asset_category !== "keyframe" && (
+              {/* 音频参考按钮 - 仅图片/虚拟人像资产显示（非关键帧/音频/视频） */}
+              {asset.asset_category !== "keyframe" && asset.type !== "audio" && asset.type !== "video" && (
                 <div className={cn(
                   "flex items-center justify-center gap-1 rounded text-xs",
                   asset.bound_audio_id 
@@ -356,6 +420,20 @@ export function DraggableAsset({
                 )}>
                   <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
                   <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
+                </div>
+              )}
+              {/* 音频时长显示 */}
+              {asset.type === "audio" && asset.duration != null && (
+                <div className="flex items-center justify-center gap-1 rounded text-xs bg-violet-500/10 text-violet-600 dark:text-violet-400 py-1">
+                  <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
+                  <span>{Math.floor(asset.duration / 60)}:{String(Math.floor(asset.duration % 60)).padStart(2, "0")}</span>
+                </div>
+              )}
+              {/* 视频时长显示 */}
+              {asset.type === "video" && asset.duration != null && (
+                <div className="flex items-center justify-center gap-1 rounded text-xs bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 py-1">
+                  <Video className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
+                  <span>{Math.floor(asset.duration / 60)}:{String(Math.floor(asset.duration % 60)).padStart(2, "0")}</span>
                 </div>
               )}
               {/* 激活按钮 */}
@@ -380,14 +458,7 @@ export function DraggableAsset({
             </div>
           )}
         </div>
-      ) : (
-        <div className="w-20 h-20 flex flex-col items-center justify-center bg-muted">
-          <Music className="w-8 h-8 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground mt-1 truncate w-full text-center px-1">
-            {asset.display_name || asset.name}
-          </span>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -463,7 +534,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [loading, setLoading] = useState(true);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"materials" | "tasks">("materials");
-  const [materialFilter, setMaterialFilter] = useState<"all" | "keyframe" | "image" | "virtual_avatar">("all");
+  const [materialFilter, setMaterialFilter] = useState<"all" | "keyframe" | "image" | "virtual_avatar" | "audio" | "video">("all");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
@@ -482,6 +553,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [virtualAvatarUploading, setVirtualAvatarUploading] = useState(false);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -707,8 +780,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   }, [resolvedParams.id]);
 
-  // 上传图片素材
-  const handleUpload = async (files: FileList | null) => {
+  // 上传素材（支持图片/音频/视频）
+  const handleUpload = async (files: FileList | null, assetType: "image" | "audio" | "video" = "image") => {
     if (!files || files.length === 0) return;
 
     setUploading(true);
@@ -717,30 +790,60 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       
       for (const file of files) {
         // 验证文件类型
-        const isImage = file.type.startsWith("image/");
-        if (!isImage) {
-          toast.error(`${file.name} 格式不支持`);
+        const isValidType = assetType === "image" ? file.type.startsWith("image/")
+          : assetType === "audio" ? file.type.startsWith("audio/")
+          : file.type.startsWith("video/");
+        if (!isValidType) {
+          toast.error(`${file.name} 格式不支持，请上传${assetType === "image" ? "图片" : assetType === "audio" ? "音频" : "视频"}文件`);
           continue;
         }
 
         try {
-          // 使用 uploadFile 函数，它会自动处理 TOS 配置
-          await uploadFile(file, {
+          // 视频类型：先截取第一帧作为缩略图
+          let thumbnailUrl: string | null = null;
+          if (assetType === "video") {
+            try {
+              const thumbBlob = await extractVideoThumbnail(file);
+              const thumbFile = new File([thumbBlob], `thumb_${file.name}.jpg`, { type: "image/jpeg" });
+              const thumbResult = await uploadFile(thumbFile, {
+                projectId: resolvedParams.id,
+                type: "image",
+              });
+              thumbnailUrl = thumbResult.url;
+            } catch (thumbErr) {
+              console.warn("视频截帧失败，将使用图标占位:", thumbErr);
+            }
+          }
+
+          // 上传主文件
+          const result = await uploadFile(file, {
             projectId: resolvedParams.id,
-            type: "image",
+            type: assetType,
           });
+
+          // 如果是视频且有缩略图，更新 asset 记录
+          if (thumbnailUrl && result.id) {
+            try {
+              await fetch(`/api/assets/${result.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ thumbnail_url: thumbnailUrl }),
+              });
+            } catch (patchErr) {
+              console.warn("更新视频缩略图失败:", patchErr);
+            }
+          }
+
           uploadCount++;
         } catch (uploadError) {
           console.error("上传失败:", uploadError);
-          // 提取错误信息
           const message = uploadError instanceof Error ? uploadError.message : "上传失败";
           toast.error(`${file.name}: ${message}`);
         }
       }
       
       if (uploadCount > 0) {
-        toast.success(`成功上传 ${uploadCount} 个素材`);
-        // 刷新素材列表
+        toast.success(`成功上传 ${uploadCount} 个${assetType === "image" ? "图片" : assetType === "audio" ? "音频" : "视频"}素材`);
         loadMaterials();
         emitAssetsChanged(resolvedParams.id, 'upload');
       }
@@ -782,8 +885,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const addAssetToPool = (asset: Asset) => {
     setSelectedAssets((prev) => {
       if (prev.find((a) => a.id === asset.id)) return prev;
-      // 图片、关键帧、虚拟人像默认激活，音频不激活
-      const isActivated = asset.type !== "audio";
+      // 所有类型默认激活
+      const isActivated = true;
       // 保留原始 display_name 或 name，不生成"图1"这种格式
       return [...prev, { ...asset, isActivated }];
     });
@@ -869,20 +972,26 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     return pathname === href || pathname.startsWith(href + "/");
   };
 
-  const imageMaterials = materials.filter((m) => m.type !== "audio" && m.type !== "virtual_avatar" && (m.asset_category === "image" || !m.asset_category));
+  const imageMaterials = materials.filter((m) => m.type !== "audio" && m.type !== "video" && m.type !== "virtual_avatar" && (m.asset_category === "image" || !m.asset_category));
   const keyframeMaterials = materials.filter((m) => m.asset_category === "keyframe");
   const virtualAvatarMaterials = materials.filter((m) => m.type === "virtual_avatar");
+  const audioMaterials = materials.filter((m) => m.type === "audio");
+  const videoMaterials = materials.filter((m) => m.type === "video");
 
   // 根据筛选条件获取显示的素材
   const getFilteredAssets = () => {
     if (materialFilter === "all") {
-      return { image: imageMaterials, keyframe: keyframeMaterials, virtualAvatar: virtualAvatarMaterials };
+      return { image: imageMaterials, keyframe: keyframeMaterials, virtualAvatar: virtualAvatarMaterials, audio: audioMaterials, video: videoMaterials };
     } else if (materialFilter === "keyframe") {
-      return { image: [] as Asset[], keyframe: keyframeMaterials, virtualAvatar: [] as Asset[] };
+      return { image: [] as Asset[], keyframe: keyframeMaterials, virtualAvatar: [] as Asset[], audio: [] as Asset[], video: [] as Asset[] };
     } else if (materialFilter === "virtual_avatar") {
-      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: virtualAvatarMaterials };
+      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: virtualAvatarMaterials, audio: [] as Asset[], video: [] as Asset[] };
+    } else if (materialFilter === "audio") {
+      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: [] as Asset[], audio: audioMaterials, video: [] as Asset[] };
+    } else if (materialFilter === "video") {
+      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: [] as Asset[], audio: [] as Asset[], video: videoMaterials };
     } else {
-      return { image: imageMaterials, keyframe: [] as Asset[], virtualAvatar: [] as Asset[] };
+      return { image: imageMaterials, keyframe: [] as Asset[], virtualAvatar: [] as Asset[], audio: [] as Asset[], video: [] as Asset[] };
     }
   };
   const filtered = getFilteredAssets();
@@ -1016,6 +1125,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       <TabsTrigger value="keyframe" className="flex-1 text-xs" suppressHydrationWarning>关键帧</TabsTrigger>
                       <TabsTrigger value="image" className="flex-1 text-xs" suppressHydrationWarning>美术</TabsTrigger>
                       <TabsTrigger value="virtual_avatar" className="flex-1 text-xs" suppressHydrationWarning>人像</TabsTrigger>
+                      <TabsTrigger value="audio" className="flex-1 text-xs" suppressHydrationWarning>音频</TabsTrigger>
+                      <TabsTrigger value="video" className="flex-1 text-xs" suppressHydrationWarning>视频</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   {/* 操作按钮 */}
@@ -1030,6 +1141,48 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                         <UserRound className="w-3.5 h-3.5" />
                         <span>添加人像</span>
                       </Button>
+                    ) : materialFilter === "audio" ? (
+                      <>
+                        <input
+                          ref={audioFileInputRef}
+                          type="file"
+                          multiple
+                          accept="audio/*"
+                          onChange={(e) => handleUpload(e.target.files, "audio")}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1"
+                          disabled={uploading}
+                          onClick={() => audioFileInputRef.current?.click()}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{uploading ? "上传中..." : "上传音频"}</span>
+                        </Button>
+                      </>
+                    ) : materialFilter === "video" ? (
+                      <>
+                        <input
+                          ref={videoFileInputRef}
+                          type="file"
+                          multiple
+                          accept="video/*"
+                          onChange={(e) => handleUpload(e.target.files, "video")}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1"
+                          disabled={uploading}
+                          onClick={() => videoFileInputRef.current?.click()}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{uploading ? "上传中..." : "上传视频"}</span>
+                        </Button>
+                      </>
                     ) : (
                       <>
                         <input
@@ -1037,7 +1190,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           type="file"
                           multiple
                           accept="image/*"
-                          onChange={(e) => handleUpload(e.target.files)}
+                          onChange={(e) => handleUpload(e.target.files, "image")}
                           className="hidden"
                         />
                         <Button
@@ -1119,8 +1272,52 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </DndContext>
                   )}
 
+                  {filtered.audio.length > 0 && (
+                    <DndContext
+                      sensors={materialSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.audio)}
+                    >
+                      <SortableContext items={filtered.audio.map((a) => a.id)} strategy={rectSortingStrategy}>
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {filtered.audio.map((asset) => (
+                            <SortableMaterialItem
+                              key={asset.id}
+                              asset={asset}
+                              isInPool={selectedAssets.some((s) => s.id === asset.id)}
+                              onClick={setSelectedDetailAsset}
+                              onRemove={handleDeleteMaterial}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
 
-                  {(filtered.image.length + filtered.keyframe.length + filtered.virtualAvatar.length) === 0 && (
+                  {filtered.video.length > 0 && (
+                    <DndContext
+                      sensors={materialSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.video)}
+                    >
+                      <SortableContext items={filtered.video.map((a) => a.id)} strategy={rectSortingStrategy}>
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {filtered.video.map((asset) => (
+                            <SortableMaterialItem
+                              key={asset.id}
+                              asset={asset}
+                              isInPool={selectedAssets.some((s) => s.id === asset.id)}
+                              onClick={setSelectedDetailAsset}
+                              onRemove={handleDeleteMaterial}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+
+
+                  {(filtered.image.length + filtered.keyframe.length + filtered.virtualAvatar.length + filtered.audio.length + filtered.video.length) === 0 && (
                     <div className="text-center py-6 text-muted-foreground text-xs">
                       <FolderOpen className="w-8 h-8 mx-auto mb-2" />
                       <p>暂无素材</p>

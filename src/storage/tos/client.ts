@@ -114,7 +114,7 @@ export function isUserTosConfigured(config: TosConfig | null): boolean {
  * @param fileName 文件名
  * @param contentType MIME 类型
  * @param projectId 项目 ID（用于组织文件路径）
- * @param type 素材类型（image/audio/keyframe）
+ * @param type 素材类型（image/audio/keyframe/video）
  * @param config 可选的用户配置
  */
 export async function uploadAsset(
@@ -122,7 +122,7 @@ export async function uploadAsset(
   fileName: string,
   contentType: string,
   projectId: string,
-  type: "image" | "audio" | "keyframe",
+  type: "image" | "audio" | "keyframe" | "video",
   config?: TosConfig
 ): Promise<{ key: string; url: string }> {
   // 详细日志：打印用户配置信息

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get("content-type") || "";
     let file: File;
     let projectId: string;
-    let type: "image" | "audio" | "keyframe";
+    let type: "image" | "audio" | "video" | "keyframe";
     let userTosConfig: TosConfig | null = null;
 
     // 检查是否是 multipart form data
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       file = formData.get("file") as File;
       projectId = formData.get("projectId") as string;
-      type = formData.get("type") as "image" | "audio" | "keyframe";
+      type = formData.get("type") as "image" | "audio" | "video" | "keyframe";
 
       // 从表单获取 TOS 配置（JSON 字符串）
       const tosConfigStr = formData.get("tosConfig") as string;
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     console.log("[TOS] Upload successful:", result.url);
 
-    // 如果是图片，生成缩略图 URL（这里直接使用原图）
+    // 如果是图片，使用原始 URL 作为缩略图；视频缩略图由前端截帧后单独上传
     const thumbnailUrl = type === "image" ? result.url : null;
 
     // 去除文件名扩展名，用于显示
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     let assetId: string | null = null;
     try {
       const db = getDb();
-      const assetCategory = type === "keyframe" ? "keyframe" : "image";
+      const assetCategory = type === "keyframe" ? "keyframe" : type === "video" ? "video" : "image";
 
       const row = db.prepare(`
         INSERT INTO assets (project_id, name, type, asset_category, url, thumbnail_url, size, storage_key)

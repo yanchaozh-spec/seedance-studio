@@ -252,7 +252,9 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                       "relative isolate inline rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
-                        : "bg-primary/10 text-primary"
+                        : item?.type === "video"
+                          ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
+                          : "bg-primary/10 text-primary"
                     )}
                   >
                     {/*
@@ -276,11 +278,13 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                           "absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
                           item.type === "audio"
                             ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
-                            : "bg-primary/20 text-primary"
+                            : item.type === "video"
+                              ? "bg-cyan-200 dark:bg-cyan-800/50 text-cyan-600 dark:text-cyan-300"
+                              : "bg-primary/20 text-primary"
                         )}
                         style={{ zIndex: -1, fontSize: 9, lineHeight: 1 }}
                       >
-                        {item.type === "audio" ? "♪" : "🖼"}
+                        {item.type === "audio" ? "♪" : item.type === "video" ? "▶" : "🖼"}
                       </span>
                     ) : null}
                     {seg.mentionName}
@@ -347,12 +351,12 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                 )}
                 {!item.thumbnail_url && (
                   <div className="w-6 h-6 rounded bg-muted flex items-center justify-center flex-shrink-0 text-xs">
-                    {item.type === "audio" ? "♪" : "🖼"}
+                    {item.type === "audio" ? "♪" : item.type === "video" ? "▶" : "🖼"}
                   </div>
                 )}
                 <span className="truncate">{item.name}</span>
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {item.type === "audio" ? "音频" : "图片"}
+                  {item.type === "audio" ? "音频" : item.type === "video" ? "视频" : "图片"}
                 </span>
               </button>
             ))}

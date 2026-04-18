@@ -2,10 +2,10 @@
 
 import { useSettingsStore } from "./settings";
 
-export type AssetType = "image" | "audio" | "keyframe" | "virtual_avatar";
+export type AssetType = "image" | "audio" | "video" | "keyframe" | "virtual_avatar";
 
-// 资产类别：关键帧（用于提示词拼接）| 美术资产（普通图片）
-export type AssetCategory = "keyframe" | "image";
+// 资产类别：关键帧（用于提示词拼接）| 美术资产（普通图片）| 音频 | 视频
+export type AssetCategory = "keyframe" | "image" | "audio" | "video";
 
 export interface Asset {
   id: string;

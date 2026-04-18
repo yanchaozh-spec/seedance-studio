@@ -7,7 +7,7 @@ import { useSettingsStore } from "./settings";
 
 export interface UploadOptions {
   projectId: string;
-  type: "image" | "audio" | "keyframe";
+  type: "image" | "audio" | "video" | "keyframe";
 }
 
 /**

@@ -80,7 +80,7 @@ function buildContent(
   const imageAssets = assets.filter((a) => (a.type === "image" || a.type === "virtual_avatar") && a.asset_category !== "keyframe");
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
-  const virtualAvatarAssets = assets.filter((a) => a.type === "virtual_avatar" && a.asset_category !== "keyframe");
+  const videoAssets = assets.filter((a) => a.type === "video");
 
   const allImageAssets: typeof imageAssets = [];
   allImageAssets.push(...keyframeAssets);
@@ -115,14 +115,6 @@ function buildContent(
     imageRefMap.set(asset.id, refName);
   }
 
-  // 反向映射: displayName → refName，用于提示词中 @角色名 替换
-  const nameToRefMap = new Map<string, string>();
-  for (const asset of allImageAssets) {
-    const refName = imageRefMap.get(asset.id)!;
-    const displayName = asset.display_name || asset.name;
-    nameToRefMap.set(displayName, refName);
-  }
-
   const audioRefMap = new Map<string, string>();
   let audioIndex = 0;
   for (const audio of allAudioAssets) {
@@ -131,8 +123,34 @@ function buildContent(
     audioRefMap.set(audio.id, refName);
   }
 
+  const videoRefMap = new Map<string, string>();
+  let videoIndex = 0;
+  for (const video of videoAssets) {
+    videoIndex++;
+    const refName = `视频${videoIndex}`;
+    videoRefMap.set(video.id, refName);
+  }
+
+  // 反向映射: displayName → refName，用于提示词中 @角色名 替换
+  const nameToRefMap = new Map<string, string>();
+  for (const asset of allImageAssets) {
+    const refName = imageRefMap.get(asset.id)!;
+    const displayName = asset.display_name || asset.name;
+    nameToRefMap.set(displayName, refName);
+  }
+  for (const audio of allAudioAssets) {
+    const refName = audioRefMap.get(audio.id)!;
+    const displayName = audio.display_name || audio.name;
+    nameToRefMap.set(displayName, refName);
+  }
+  for (const video of videoAssets) {
+    const refName = videoRefMap.get(video.id)!;
+    const displayName = video.display_name || video.name;
+    nameToRefMap.set(displayName, refName);
+  }
+
   /**
-   * 替换提示词中的 @角色名 为 图片N(角色名) 格式
+   * 替换提示词中的 @角色名 为 图片N(角色名)/音频N(名称)/视频N(名称) 格式
    * Seedance API 要求：提示词中使用"素材类型+序号"引用，不用 @ 前缀
    * 按名字长度降序替换，避免短名误替换长名
    */
@@ -177,6 +195,13 @@ function buildContent(
     }
   }
 
+  // 视频素材定义
+  for (const video of videoAssets) {
+    const refName = videoRefMap.get(video.id)!;
+    const displayName = video.display_name || video.name;
+    assetDefParts.push(`${refName}为${displayName}`);
+  }
+
   if (assetDefParts.length > 0) {
     textParts.push(assetDefParts.join("；"));
   }
@@ -209,6 +234,16 @@ function buildContent(
         url: imageUrl,
       },
       role: "reference_image",
+    });
+  }
+
+  for (const video of videoAssets) {
+    content.push({
+      type: "video_url",
+      video_url: {
+        url: video.url,
+      },
+      role: "reference_video",
     });
   }
 

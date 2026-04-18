@@ -380,7 +380,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 只使用激活的素材
     const activatedAssets = selectedAssets.filter((a) => a.isActivated);
 
-    // 按 activatedAssets 顺序收集所有图片（含虚拟人像），分配序号
+    // 三组序号分配：图片、音频、视频
     const imageRefMap = new Map<string, number>();
     let imageIndex = 0;
     for (const asset of activatedAssets) {
@@ -393,23 +393,51 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }
     }
 
-    // 反向映射: displayName → refName，用于提示词中 @角色名 替换
+    const audioRefMap = new Map<string, number>();
+    let audioIndex = 0;
+    for (const asset of activatedAssets) {
+      if (asset.type === "audio") {
+        audioIndex++;
+        audioRefMap.set(asset.id, audioIndex);
+      }
+    }
+
+    const videoRefMap = new Map<string, number>();
+    let videoIndex = 0;
+    for (const asset of activatedAssets) {
+      if (asset.type === "video") {
+        videoIndex++;
+        videoRefMap.set(asset.id, videoIndex);
+      }
+    }
+
+    // 反向映射: displayName → refName
     const nameToRefMap = new Map<string, string>();
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
       const isVirtualAvatar = asset.type === "virtual_avatar";
+
       if (isImage || isKeyframe || isVirtualAvatar) {
         const refIndex = imageRefMap.get(asset.id)!;
         const refName = `图片${refIndex}`;
+        const displayName = asset.display_name || asset.name;
+        nameToRefMap.set(displayName, refName);
+      } else if (asset.type === "audio") {
+        const refIndex = audioRefMap.get(asset.id)!;
+        const refName = `音频${refIndex}`;
+        const displayName = asset.display_name || asset.name;
+        nameToRefMap.set(displayName, refName);
+      } else if (asset.type === "video") {
+        const refIndex = videoRefMap.get(asset.id)!;
+        const refName = `视频${refIndex}`;
         const displayName = asset.display_name || asset.name;
         nameToRefMap.set(displayName, refName);
       }
     }
 
     /**
-     * 替换提示词中的 @角色名 为 图片N(角色名) 格式
-     * Seedance API 要求：提示词中使用"素材类型+序号"引用，不用 @ 前缀
+     * 替换提示词中的 @角色名 为对应引用格式
      * 按名字长度降序替换，避免短名误替换长名
      */
     function replaceMentions(text: string): string {
@@ -424,53 +452,49 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       return result;
     }
 
-    // 按图片绑定顺序收集音频，分配序号（与图片顺序一致）
-    const audioRefMap = new Map<string, number>();
-    let audioIndex = 0;
-    for (const asset of activatedAssets) {
-      if (asset.bound_audio_id) {
-        audioIndex++;
-        audioRefMap.set(asset.bound_audio_id, audioIndex);
-      }
-    }
-
-    // 构建素材定义行（按 activatedAssets 顺序）
+    // 构建素材定义行
     const assetDefParts: string[] = [];
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
       const isVirtualAvatar = asset.type === "virtual_avatar";
-      
-      if (!isImage && !isKeyframe && !isVirtualAvatar) continue;
-      
-      const refIndex = imageRefMap.get(asset.id)!;
-      const refName = `图片${refIndex}`;
-      const displayName = asset.display_name || asset.name;
-      
-      if (isKeyframe) {
-        const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-        assetDefParts.push(`${refName}为${desc}`);
-      } else if (isVirtualAvatar) {
-        // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式，支持声线
-        const assetId = (asset as { asset_id?: string }).asset_id;
-        if (assetId) {
-          let defPart = `@${refName} 为 ${displayName}（资产 ID: [${assetId}]）`;
+
+      if (isImage || isKeyframe || isVirtualAvatar) {
+        const refIndex = imageRefMap.get(asset.id)!;
+        const refName = `图片${refIndex}`;
+        const displayName = asset.display_name || asset.name;
+
+        if (isKeyframe) {
+          const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
+          assetDefParts.push(`${refName}为${desc}`);
+        } else if (isVirtualAvatar) {
+          const assetId = (asset as { asset_id?: string }).asset_id;
+          if (assetId) {
+            let defPart = `@${refName} 为 ${displayName}（资产 ID: [${assetId}]）`;
+            if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+              const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
+              defPart += `，声线为@${audioRef}`;
+            }
+            assetDefParts.push(defPart);
+          } else {
+            assetDefParts.push(`${refName}为${displayName}`);
+          }
+        } else {
+          // 普通图片
           if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
             const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-            defPart += `，声线为${audioRef}`;
+            assetDefParts.push(`${refName}为${displayName}，声线为@${audioRef}`);
+          } else {
+            assetDefParts.push(`${refName}为${displayName}`);
           }
-          assetDefParts.push(defPart);
-        } else {
-          assetDefParts.push(`${refName}为${displayName}`);
         }
-      } else {
-        if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-          const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-          assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);
-        } else {
-          assetDefParts.push(`${refName}为${displayName}`);
-        }
+      } else if (asset.type === "video") {
+        const refIndex = videoRefMap.get(asset.id)!;
+        const refName = `视频${refIndex}`;
+        const displayName = asset.display_name || asset.name;
+        assetDefParts.push(`@${refName} 为 ${displayName}`);
       }
+      // 独立音频不在定义行声明（它们通过声线绑定或@音频N引用）
     }
 
     // 构建文本内容
@@ -499,7 +523,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
       const isVirtualAvatar = asset.type === "virtual_avatar";
       if (isImage || isKeyframe || isVirtualAvatar) {
-        // 虚拟人像使用 asset:// 协议，普通素材使用原始 URL
         const imageUrl = isVirtualAvatar && (asset as { asset_id?: string }).asset_id
           ? `asset://${(asset as { asset_id?: string }).asset_id}`
           : asset.url;
@@ -507,6 +530,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           type: "image_url",
           image_url: { url: imageUrl },
           role: "reference_image",
+        });
+      }
+    }
+
+    // 按 activatedAssets 顺序添加所有视频
+    for (const asset of activatedAssets) {
+      if (asset.type === "video") {
+        contentItems.push({
+          type: "video_url",
+          video_url: { url: asset.url },
+          role: "reference_video",
         });
       }
     }
@@ -523,6 +557,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             role: "reference_audio",
           });
         }
+      }
+    }
+
+    // 添加独立音频（未被图片绑定但已激活的音频）
+    const boundAudioIds = new Set(
+      activatedAssets.filter(a => a.bound_audio_id).map(a => a.bound_audio_id!)
+    );
+    for (const asset of activatedAssets) {
+      if (asset.type === "audio" && !boundAudioIds.has(asset.id)) {
+        contentItems.push({
+          type: "audio_url",
+          audio_url: { url: asset.url },
+          role: "reference_audio",
+        });
       }
     }
 
@@ -747,9 +795,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const keyframeAssets = selectedAssets.filter((a) => a.type === "keyframe");
   const imageAssets = selectedAssets.filter((a) => a.type === "image");
 
-  // 为 @提及 构建素材列表（已激活的图片+关键帧素材）
+  // 为 @提及 构建素材列表（已激活的所有素材类型）
   const mentionItems = selectedAssets
-    .filter((a) => a.isActivated && (a.type === "image" || a.type === "keyframe"))
+    .filter((a) => a.isActivated)
     .map((a) => ({
       id: a.id,
       name: a.display_name || a.name,

@@ -13,12 +13,15 @@ import {
   Plus,
   X,
   Check,
+  Music,
+  Video,
 } from "lucide-react";
 import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
 import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { uploadFile } from "@/lib/upload";
+import { extractVideoThumbnail } from "@/lib/video-thumbnail";
 import { emitAssetsChanged } from "@/lib/events";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
@@ -129,7 +132,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
     }
   };
 
-  const handleUpload = async (files: FileList | null) => {
+  const handleUpload = async (files: FileList | null, assetType: "image" | "audio" | "video" = "image") => {
     if (!files || files.length === 0) return;
     
     try {
@@ -137,18 +140,50 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
       let uploadCount = 0;
       
       for (const file of Array.from(files)) {
-        const isImage = file.type.startsWith("image/");
+        const isValidType = assetType === "image" ? file.type.startsWith("image/")
+          : assetType === "audio" ? file.type.startsWith("audio/")
+          : file.type.startsWith("video/");
         
-        if (!isImage) {
-          toast.error(`${file.name} 格式不支持`);
+        if (!isValidType) {
+          toast.error(`${file.name} 格式不支持，请上传${assetType === "image" ? "图片" : assetType === "audio" ? "音频" : "视频"}文件`);
           continue;
         }
 
         try {
-          await uploadFile(file, {
+          // 视频类型：先截取第一帧作为缩略图
+          let thumbnailUrl: string | null = null;
+          if (assetType === "video") {
+            try {
+              const thumbBlob = await extractVideoThumbnail(file);
+              const thumbFile = new File([thumbBlob], `thumb_${file.name}.jpg`, { type: "image/jpeg" });
+              const thumbResult = await uploadFile(thumbFile, {
+                projectId: resolvedParams.id,
+                type: "image",
+              });
+              thumbnailUrl = thumbResult.url;
+            } catch (thumbErr) {
+              console.warn("视频截帧失败:", thumbErr);
+            }
+          }
+
+          const result = await uploadFile(file, {
             projectId: resolvedParams.id,
-            type: "image",
+            type: assetType,
           });
+
+          // 如果是视频且有缩略图，更新 asset 记录
+          if (thumbnailUrl && result.id) {
+            try {
+              await fetch(`/api/assets/${result.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ thumbnail_url: thumbnailUrl }),
+              });
+            } catch (patchErr) {
+              console.warn("更新视频缩略图失败:", patchErr);
+            }
+          }
+
           uploadCount++;
         } catch (uploadError) {
           console.error("上传失败:", uploadError);
@@ -157,7 +192,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
       }
       
       if (uploadCount > 0) {
-        toast.success(`成功上传 ${uploadCount} 个素材`);
+        toast.success(`成功上传 ${uploadCount} 个${assetType === "image" ? "图片" : assetType === "audio" ? "音频" : "视频"}素材`);
       }
       loadAssets();
       emitAssetsChanged(resolvedParams.id, 'upload');
@@ -182,9 +217,10 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
     }
   };
 
-  // 筛选图片素材（排除音频和虚拟人像）
+  // 筛选图片素材（排除音频、视频和虚拟人像）
   const imageAssets = assets.filter((a) => {
     if (a.type === "audio") return false;
+    if (a.type === "video") return false;
     if (a.type === "virtual_avatar") return false;
     const isImage = a.asset_category === "image" || !a.asset_category;
     return isImage;
@@ -192,12 +228,21 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
 
   const keyframeAssets = assets.filter((a) => {
     if (a.type === "audio") return false;
+    if (a.type === "video") return false;
     if (a.type === "virtual_avatar") return false;
     return a.asset_category === "keyframe";
   });
 
   const virtualAvatarAssets = assets.filter((a) => {
     return a.type === "virtual_avatar";
+  });
+
+  const audioAssets = assets.filter((a) => {
+    return a.type === "audio";
+  });
+
+  const videoAssets = assets.filter((a) => {
+    return a.type === "video";
   });
 
   // 拖拽排序传感器
@@ -249,11 +294,11 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
           </Button>
           <div>
             <h1 className="text-2xl font-semibold">素材库</h1>
-            <p className="text-sm text-muted-foreground">管理项目图片和音频素材</p>
+            <p className="text-sm text-muted-foreground">管理项目图片、音频和视频素材</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => setVirtualAvatarDialogOpen(true)}>
             <UserRound className="w-4 h-4 mr-2" />
             添加虚拟人像
@@ -262,8 +307,40 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
             <input
               type="file"
               multiple
+              accept="audio/*"
+              onChange={(e) => handleUpload(e.target.files, "audio")}
+              className="hidden"
+              disabled={uploading}
+            />
+            <Button asChild disabled={uploading} variant="outline">
+              <span>
+                <Music className="w-4 h-4 mr-2" />
+                上传音频
+              </span>
+            </Button>
+          </label>
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              multiple
+              accept="video/*"
+              onChange={(e) => handleUpload(e.target.files, "video")}
+              className="hidden"
+              disabled={uploading}
+            />
+            <Button asChild disabled={uploading} variant="outline">
+              <span>
+                <Video className="w-4 h-4 mr-2" />
+                上传视频
+              </span>
+            </Button>
+          </label>
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              multiple
               accept="image/*"
-              onChange={(e) => handleUpload(e.target.files)}
+              onChange={(e) => handleUpload(e.target.files, "image")}
               className="hidden"
               disabled={uploading}
             />
@@ -380,6 +457,102 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                     <Plus className="w-3.5 h-3.5 mr-1" />
                     添加虚拟人像
                   </Button>
+                </div>
+              )}
+            </div>
+
+            {/* 音频素材 */}
+            <div>
+              <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1">
+                <Music className="w-3.5 h-3.5" />
+                音频 ({audioAssets.length})
+              </h2>
+              {audioAssets.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, audioAssets)}
+                >
+                  <SortableContext items={audioAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {audioAssets.map((asset) => (
+                        <SortableAssetCard
+                          key={asset.id}
+                          asset={asset}
+                          onClick={() => setSelectedAsset(asset)}
+                          onRemove={() => handleDeleteAsset(asset.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground">
+                  <Music className="w-6 h-6 mx-auto mb-2 text-violet-400" />
+                  <p className="text-sm mb-2">暂无音频素材</p>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      multiple
+                      accept="audio/*"
+                      onChange={(e) => handleUpload(e.target.files, "audio")}
+                      className="hidden"
+                    />
+                    <Button size="sm" variant="outline" asChild>
+                      <span>
+                        <Upload className="w-3.5 h-3.5 mr-1" />
+                        上传音频
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* 视频素材 */}
+            <div>
+              <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1">
+                <Video className="w-3.5 h-3.5" />
+                视频 ({videoAssets.length})
+              </h2>
+              {videoAssets.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, videoAssets)}
+                >
+                  <SortableContext items={videoAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {videoAssets.map((asset) => (
+                        <SortableAssetCard
+                          key={asset.id}
+                          asset={asset}
+                          onClick={() => setSelectedAsset(asset)}
+                          onRemove={() => handleDeleteAsset(asset.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground">
+                  <Video className="w-6 h-6 mx-auto mb-2 text-cyan-400" />
+                  <p className="text-sm mb-2">暂无视频素材</p>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      multiple
+                      accept="video/*"
+                      onChange={(e) => handleUpload(e.target.files, "video")}
+                      className="hidden"
+                    />
+                    <Button size="sm" variant="outline" asChild>
+                      <span>
+                        <Upload className="w-3.5 h-3.5 mr-1" />
+                        上传视频
+                      </span>
+                    </Button>
+                  </label>
                 </div>
               )}
             </div>
