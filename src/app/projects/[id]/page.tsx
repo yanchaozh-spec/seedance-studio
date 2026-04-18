@@ -253,6 +253,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             onToggleActivation={() => toggleAssetActivation(asset.id)}
             showRemove={false}
             showActivation={true}
+            showName={true}
             className={cn(!asset.isActivated && "opacity-50 grayscale")}
           />
         </div>

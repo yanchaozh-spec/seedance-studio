@@ -11,6 +11,7 @@ interface AssetCardProps {
   onToggleActivation?: () => void;
   showRemove?: boolean;
   showActivation?: boolean;
+  showName?: boolean;
   size?: "sm" | "md";
   className?: string;
 }
@@ -27,6 +28,7 @@ export function AssetCard({
   onToggleActivation,
   showRemove = true,
   showActivation = false,
+  showName = false,
   size = "sm",
   className,
 }: AssetCardProps) {
@@ -82,6 +84,19 @@ export function AssetCard({
 
       {/* 底部信息栏 */}
       <div className={cn("p-1 space-y-0.5", size === "md" && "p-2")}>
+        {/* 名称显示 */}
+        {showName && (
+          <p 
+            className={cn(
+              "text-center truncate",
+              size === "sm" ? "text-[10px]" : "text-xs"
+            )}
+            title={asset.display_name || asset.name}
+          >
+            {asset.display_name || asset.name}
+          </p>
+        )}
+
         {/* 声音状态 - 仅美术资产显示 */}
         {!isKeyframe && (
           <div className={cn(
