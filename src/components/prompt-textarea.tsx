@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, forwardRef } from "react";
-import { Textarea } from "@/components/ui/textarea";
+import { useState, useRef, useCallback, useEffect, forwardRef, useMemo } from "react";
+import { cn } from "@/lib/utils";
 
 interface MentionItem {
   id: string;
@@ -20,8 +20,51 @@ interface PromptTextareaProps {
 }
 
 /**
+ * 将文本按 @mention 分割为高亮片段
+ * 匹配 @素材名 的模式（素材名来自 mentionItems）
+ */
+function parseMentionSegments(
+  text: string,
+  mentionNames: string[]
+): Array<{ text: string; isMention: boolean; mentionName?: string }> {
+  if (mentionNames.length === 0 || !text) {
+    return [{ text, isMention: false }];
+  }
+
+  // 按名字长度降序构建正则，避免短名误匹配
+  const sortedNames = [...mentionNames].sort((a, b) => b.length - a.length);
+  const escapedNames = sortedNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`@(${escapedNames.join("|")})`, "g");
+
+  const segments: Array<{ text: string; isMention: boolean; mentionName?: string }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  // 重置 lastIndex
+  pattern.lastIndex = 0;
+  while ((match = pattern.exec(text)) !== null) {
+    // match 之前的普通文本
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index), isMention: false });
+    }
+    // @mention 文本
+    const mentionName = match[1];
+    segments.push({ text: match[0], isMention: true, mentionName });
+    lastIndex = match.index + match[0].length;
+  }
+
+  // 剩余文本
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), isMention: false });
+  }
+
+  return segments;
+}
+
+/**
  * 带素材 @提及 的提示词输入框
- * 输入 @ 时弹出已激活素材列表，选中后插入 @角色名
+ * - 输入 @ 时弹出已激活素材列表，选中后插入 @角色名
+ * - @角色名 高亮显示 + 素材缩略图
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -33,6 +76,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
     const [mentionStartIndex, setMentionStartIndex] = useState(-1);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const internalRef = useRef<HTMLTextAreaElement>(null);
+    const mirrorRef = useRef<HTMLDivElement>(null);
 
     // 合并 ref：内部使用 + 外部转发
     const mergedRef = useCallback(
@@ -47,6 +91,20 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [forwardedRef]
     );
 
+    // 构建 mentionName → item 映射
+    const mentionMap = useMemo(() => {
+      const map = new Map<string, MentionItem>();
+      for (const item of mentionItems) {
+        map.set(item.name, item);
+      }
+      return map;
+    }, [mentionItems]);
+
+    const mentionNames = useMemo(
+      () => mentionItems.map((i) => i.name),
+      [mentionItems]
+    );
+
     // 过滤匹配的素材
     const filteredItems = mentionItems.filter((item) => {
       const search = mentionSearch.toLowerCase();
@@ -57,7 +115,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
     const checkMention = useCallback(
       (text: string, cursorPos: number) => {
         const textBeforeCursor = text.slice(0, cursorPos);
-        // 匹配 @ 符号及其后的文字（不含空格和换行）
         const atMatch = textBeforeCursor.match(/@([^@\s\n]*)$/);
         if (atMatch) {
           setMentionOpen(true);
@@ -75,7 +132,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newValue = e.target.value;
         onChange(newValue);
-        // 延迟检测，确保 value 已更新
         requestAnimationFrame(() => {
           const cursorPos = e.target.selectionStart;
           if (cursorPos !== null) {
@@ -100,7 +156,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
         setMentionSearch("");
         setMentionStartIndex(-1);
 
-        // 设置光标位置到插入文本之后
         requestAnimationFrame(() => {
           const newCursorPos = before.length + itemName.length + 1;
           textarea.focus();
@@ -155,16 +210,95 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       return () => document.removeEventListener("click", handleClickOutside);
     }, [mentionOpen]);
 
+    // 同步滚动到镜像层
+    const handleScroll = useCallback(() => {
+      const textarea = internalRef.current;
+      const mirror = mirrorRef.current;
+      if (textarea && mirror) {
+        mirror.scrollTop = textarea.scrollTop;
+        mirror.scrollLeft = textarea.scrollLeft;
+      }
+    }, []);
+
+    // 解析高亮片段
+    const segments = useMemo(
+      () => parseMentionSegments(value, mentionNames),
+      [value, mentionNames]
+    );
+
+    // 共享的文本样式，确保 textarea 和 mirror 完全对齐
+    const sharedTextStyle = "text-sm leading-[1.625rem] px-3 py-2 font-inherit";
+
     return (
       <div className="relative">
-        <Textarea
+        {/* 高亮镜像层：渲染带样式的文本 */}
+        <div
+          ref={mirrorRef}
+          className={cn(
+            "absolute inset-0 overflow-hidden whitespace-pre-wrap break-words pointer-events-none",
+            sharedTextStyle,
+            className
+          )}
+          aria-hidden="true"
+        >
+          {value ? (
+            segments.map((seg, i) => {
+              if (seg.isMention && seg.mentionName) {
+                const item = mentionMap.get(seg.mentionName);
+                return (
+                  <span
+                    key={i}
+                    className="inline-flex items-center align-middle bg-primary/10 text-primary rounded px-0.5 py-px font-medium"
+                  >
+                    {item?.thumbnail_url && (
+                      <img
+                        src={item.thumbnail_url}
+                        alt=""
+                        className="w-4 h-4 rounded-sm object-cover mr-0.5 flex-shrink-0"
+                      />
+                    )}
+                    {!item?.thumbnail_url && (
+                      <span className="w-4 h-4 rounded-sm bg-primary/20 flex items-center justify-center mr-0.5 flex-shrink-0 text-[8px] leading-none">
+                        {item?.type === "audio" ? "♪" : "🖼"}
+                      </span>
+                    )}
+                    {seg.text}
+                  </span>
+                );
+              }
+              return <span key={i}>{seg.text}</span>;
+            })
+          ) : (
+            // placeholder
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          {/* 末尾换行占位，确保高度对齐 */}
+          <span className="select-none"> </span>
+        </div>
+
+        {/* 实际输入层：文字透明，光标可见 */}
+        <textarea
           ref={mergedRef}
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className={className}
+          onScroll={handleScroll}
+          className={cn(
+            "relative z-10 bg-transparent caret-foreground",
+            // 文字颜色透明，由镜像层渲染
+            "text-transparent",
+            // 保持边框和聚焦样式
+            "border-input focus-visible:border-ring focus-visible:ring-ring/50",
+            "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+            "rounded-md border shadow-xs transition-[color,box-shadow] outline-none",
+            "focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+            "w-full flex field-sizing-content",
+            sharedTextStyle,
+            className
+          )}
         />
+
+        {/* @提及下拉列表 */}
         {mentionOpen && filteredItems.length > 0 && (
           <div
             className="absolute z-50 left-0 bottom-full mb-1 w-56 max-h-48 overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
@@ -177,9 +311,10 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
               <button
                 key={item.id}
                 type="button"
-                className={`flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm text-left hover:bg-accent hover:text-accent-foreground transition-colors ${
+                className={cn(
+                  "flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm text-left hover:bg-accent hover:text-accent-foreground transition-colors",
                   index === selectedIndex ? "bg-accent text-accent-foreground" : ""
-                }`}
+                )}
                 onClick={() => insertMention(item.name)}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
