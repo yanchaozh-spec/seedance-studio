@@ -31,7 +31,6 @@ function parseMentionSegments(
     return [{ text, isMention: false }];
   }
 
-  // 按名字长度降序构建正则，避免短名误匹配
   const sortedNames = [...mentionNames].sort((a, b) => b.length - a.length);
   const escapedNames = sortedNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`@(${escapedNames.join("|")})`, "g");
@@ -40,20 +39,16 @@ function parseMentionSegments(
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  // 重置 lastIndex
   pattern.lastIndex = 0;
   while ((match = pattern.exec(text)) !== null) {
-    // match 之前的普通文本
     if (match.index > lastIndex) {
       segments.push({ text: text.slice(lastIndex, match.index), isMention: false });
     }
-    // @mention 文本
     const mentionName = match[1];
     segments.push({ text: match[0], isMention: true, mentionName });
     lastIndex = match.index + match[0].length;
   }
 
-  // 剩余文本
   if (lastIndex < text.length) {
     segments.push({ text: text.slice(lastIndex), isMention: false });
   }
@@ -63,19 +58,17 @@ function parseMentionSegments(
 
 /**
  * 带素材 @提及 的提示词输入框
- * - 输入 @ 时弹出已激活素材列表，选中后插入 @角色名
- * - @角色名 高亮显示 + 缩略图徽章
  *
  * 镜像层原理：
  * - 底层 div 渲染高亮文本（textarea 文字透明）
- * - 两层共享完全相同的字体、行高、内边距
- * - 高亮 span 的文本内容与 textarea 完全一致（保证字符宽度对齐）
+ * - 两层共享完全相同的字体、行高、内边距 → 字符位置精确对齐
  *
- * 缩略图定位技巧：
- * - 给高亮 span 加 pl-[22px]（左内边距），为缩略图腾出空间
- * - 同时加 -ml-[22px]（负左外边距），抵消内边距导致的偏移
- * - 这样文字位置不变（与 textarea 对齐），但缩略图在 padding 区域内
- * - 缩略图使用 absolute 定位在 padding 区域，被高亮背景覆盖
+ * 缩略图定位策略：
+ * - 缩略图使用 absolute 定位，起始位置 left:0 与 @ 字符对齐
+ * - 缩略图覆盖 @ 字符（视觉替代，这是 mention UI 的常见模式）
+ * - 不使用 padding+负margin 技巧，避免缩略图向左侵占前文空间
+ * - span 使用 isolation:isolate 创建层叠上下文，z-[-1] 让缩略图
+ *   绘制在背景之上、文字之下 → 文字始终可读，缩略图作为底层装饰
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -89,7 +82,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
     const internalRef = useRef<HTMLTextAreaElement>(null);
     const mirrorRef = useRef<HTMLDivElement>(null);
 
-    // 合并 ref：内部使用 + 外部转发
     const mergedRef = useCallback(
       (el: HTMLTextAreaElement | null) => {
         (internalRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
@@ -102,7 +94,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [forwardedRef]
     );
 
-    // 构建 mentionName → item 映射
     const mentionMap = useMemo(() => {
       const map = new Map<string, MentionItem>();
       for (const item of mentionItems) {
@@ -116,13 +107,11 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [mentionItems]
     );
 
-    // 过滤匹配的素材
     const filteredItems = mentionItems.filter((item) => {
       const search = mentionSearch.toLowerCase();
       return item.name.toLowerCase().includes(search);
     });
 
-    // 检测 @提及 触发
     const checkMention = useCallback(
       (text: string, cursorPos: number) => {
         const textBeforeCursor = text.slice(0, cursorPos);
@@ -176,7 +165,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [value, onChange, mentionStartIndex]
     );
 
-    // 键盘导航
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (mentionOpen && filteredItems.length > 0) {
@@ -213,7 +201,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       [mentionOpen, filteredItems, selectedIndex, insertMention, onKeyDown]
     );
 
-    // 点击外部关闭
     useEffect(() => {
       if (!mentionOpen) return;
       const handleClickOutside = () => setMentionOpen(false);
@@ -221,7 +208,6 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       return () => document.removeEventListener("click", handleClickOutside);
     }, [mentionOpen]);
 
-    // 同步滚动到镜像层
     const handleScroll = useCallback(() => {
       const textarea = internalRef.current;
       const mirror = mirrorRef.current;
@@ -231,18 +217,16 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
       }
     }, []);
 
-    // 解析高亮片段
     const segments = useMemo(
       () => parseMentionSegments(value, mentionNames),
       [value, mentionNames]
     );
 
-    // 共享的文本样式，确保 textarea 和 mirror 完全对齐
     const sharedTextStyle = "text-sm leading-[1.625rem] px-3 py-2 font-inherit";
 
     return (
       <div className="relative flex-1 min-w-0">
-        {/* 高亮镜像层：渲染带样式的文本 */}
+        {/* 高亮镜像层 */}
         <div
           ref={mirrorRef}
           className={cn(
@@ -256,51 +240,54 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
             segments.map((seg, i) => {
               if (seg.isMention && seg.mentionName) {
                 const item = mentionMap.get(seg.mentionName);
+                const hasThumbnail = !!item?.thumbnail_url;
                 return (
                   <span
                     key={i}
                     className={cn(
                       /*
-                       * pl-[22px] -ml-[22px] 技巧：
-                       * pl-[22px]: 在 span 左侧腾出 22px 空间放缩略图
-                       * -ml-[22px]: 负 margin 抵消 padding 导致的偏移
-                       * 效果：文字位置不变（与 textarea 对齐），但缩略图在 padding 区域内
-                       * 高亮背景覆盖 padding + content，所以缩略图在高亮框内
+                       * isolate 创建层叠上下文，让子元素 z-[-1] 在背景之上、文字之下
+                       * 不使用 padding+负margin，避免缩略图向左侵占前文空间
                        */
-                      "relative inline-block pl-[22px] -ml-[22px] rounded-sm font-medium",
+                      "relative isolate inline rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
                         : "bg-primary/10 text-primary"
                     )}
                   >
-                    {seg.text}
-                    {/* 缩略图在 padding 区域内，被高亮背景覆盖 */}
-                    {item?.thumbnail_url ? (
+                    {/*
+                      缩略图/图标：absolute 定位在 @ 字符位置
+                      - z-[-1]：绘制在背景之上、文字之下 → 文字始终可读
+                      - left-0 与 @ 字符对齐，不向左侵占前文空间
+                      - 缩略图在文字底层作为装饰，透过文字间隙可见
+                    */}
+                    {hasThumbnail ? (
                       <img
-                        src={item.thumbnail_url}
+                        src={item!.thumbnail_url!}
                         alt=""
-                        className="absolute left-[3px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
+                        style={{ zIndex: -1 }}
                       />
                     ) : item ? (
                       <span
                         className={cn(
-                          "absolute left-[3px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
+                          "absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
                           item.type === "audio"
                             ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
                             : "bg-primary/20 text-primary"
                         )}
-                        style={{ fontSize: 9, lineHeight: 1 }}
+                        style={{ zIndex: -1, fontSize: 9, lineHeight: 1 }}
                       >
                         {item.type === "audio" ? "♪" : "🖼"}
                       </span>
                     ) : null}
+                    {seg.text}
                   </span>
                 );
               }
               return <span key={i}>{seg.text}</span>;
             })
           ) : (
-            // placeholder
             <span className="text-muted-foreground">{placeholder}</span>
           )}
           {/* 末尾换行占位，确保高度对齐 */}
@@ -316,9 +303,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
           onScroll={handleScroll}
           className={cn(
             "relative z-10 bg-transparent caret-foreground",
-            // 文字颜色透明，由镜像层渲染
             "text-transparent",
-            // 保持边框和聚焦样式（与 Textarea 组件一致）
             "border-input placeholder:text-muted-foreground",
             "focus-visible:border-ring focus-visible:ring-ring/50",
             "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
