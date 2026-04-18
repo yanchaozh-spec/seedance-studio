@@ -18,8 +18,8 @@ import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
-import { AssetCard } from "@/components/asset-card";
 import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
+import { DraggableAsset } from "./layout";
 
 // dnd-kit 导入
 import {
@@ -202,7 +202,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
   }, [setSelectedAssets]);
 
-  // 可排序的素材卡片组件 - 保留拖拽手柄
+  // 可排序的素材卡片组件 - 保留拖拽手柄，使用 DraggableAsset
   function SortableAssetCard({ asset }: { asset: SelectedAsset }) {
     const {
       attributes,
@@ -246,17 +246,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         >
           <X className="w-2.5 h-2.5" />
         </button>
-        {/* 中间可点击区域 */}
-        <div onClick={() => setSelectedDetailAsset(asset)}>
-          <AssetCard
-            asset={asset}
-            onToggleActivation={() => toggleAssetActivation(asset.id)}
-            showRemove={false}
-            showActivation={true}
-            showName={true}
-            className={cn(!asset.isActivated && "opacity-50 grayscale")}
-          />
-        </div>
+        {/* 使用 DraggableAsset 显示卡片 */}
+        <DraggableAsset
+          asset={asset}
+          showLabel
+          isActivated={asset.isActivated}
+          onToggleActivation={() => toggleAssetActivation(asset.id)}
+          onClick={setSelectedDetailAsset}
+        />
       </div>
     );
   }

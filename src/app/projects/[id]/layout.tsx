@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef,
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle, RotateCcw, Upload } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Check, Sparkles, Coins, AlertCircle, RotateCcw, Upload } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -66,9 +66,20 @@ interface DraggableAssetProps {
   onClick?: (asset: Asset) => void;
   size?: "small" | "large";
   showLabel?: boolean;
+  isActivated?: boolean;
+  onToggleActivation?: () => void;
 }
 
-function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", showLabel = false }: DraggableAssetProps) {
+export function DraggableAsset({ 
+  asset, 
+  showRemove, 
+  onRemove, 
+  onClick, 
+  size = "small", 
+  showLabel = false,
+  isActivated,
+  onToggleActivation,
+}: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -261,7 +272,7 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
             )}
           </div>
           {/* 底部信息 */}
-          {(showLabel || asset.asset_category !== "keyframe") && (
+          {(showLabel || isActivated !== undefined || asset.asset_category !== "keyframe") && (
             <div className={cn("space-y-1", size === "small" ? "p-1" : "p-2")}>
               {/* 名称显示 */}
               {showLabel && (
@@ -287,6 +298,25 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
                   <Music className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />
                   <span>{asset.bound_audio_id ? "有" : "无"}声音</span>
                 </div>
+              )}
+              {/* 激活按钮 */}
+              {isActivated !== undefined && onToggleActivation && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleActivation();
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-1 rounded text-xs cursor-pointer transition-all",
+                    isActivated 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30",
+                    size === "small" ? "py-0.5 px-1 text-[10px]" : "py-1"
+                  )}
+                >
+                  <span>{isActivated ? "激活" : "激活"}</span>
+                  {isActivated && <Check className={size === "small" ? "w-2 h-2" : "w-3 h-3"} />}
+                </button>
               )}
             </div>
           )}
