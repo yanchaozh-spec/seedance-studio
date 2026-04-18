@@ -5,6 +5,8 @@
  */
 
 import { S3Storage } from "coze-coding-dev-sdk";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // TOS 配置类型
 export interface TosConfig {
@@ -116,9 +118,40 @@ export async function uploadAsset(
   type: "image" | "audio" | "keyframe",
   config?: TosConfig
 ): Promise<{ key: string; url: string }> {
-  const storage = config 
-    ? createTosStorage(config) 
-    : getTosStorage();
+  // 详细日志：打印用户配置信息
+  console.log("[TOS] uploadAsset called with config:", {
+    hasConfig: !!config,
+    endpoint: config?.endpoint,
+    accessKey: config?.accessKey ? "***" + config.accessKey.slice(-4) : undefined,
+    bucket: config?.bucket,
+    hasSecretKey: !!config?.secretKey,
+  });
+
+  let storage: S3Storage | null = null;
+  let s3Client: S3Client | null = null;
+  let userBucket: string | undefined = undefined;
+  
+  if (config) {
+    // 使用用户配置创建存储客户端
+    storage = createTosStorage(config);
+    userBucket = config.bucket;
+    console.log("[TOS] Using user config - creating new storage client with bucket:", config.bucket);
+    
+    // 为用户配置创建 AWS S3 客户端用于生成签名 URL
+    s3Client = new S3Client({
+      region: process.env.COZE_TOS_REGION || "cn-beijing",
+      endpoint: config.endpoint,
+      credentials: {
+        accessKeyId: config.accessKey!,
+        secretAccessKey: config.secretKey!,
+      },
+      forcePathStyle: true, // S3 兼容模式必须
+    });
+  } else {
+    // 使用环境变量配置的存储
+    storage = getTosStorage();
+    console.log("[TOS] Using environment config");
+  }
   
   if (!storage) {
     throw new Error("TOS not configured");
@@ -126,19 +159,43 @@ export async function uploadAsset(
   
   // 生成路径：assets/{projectId}/{type}/{timestamp}-{uuid}.{ext}
   const ext = fileName.split(".").pop() || "bin";
-  const key = await storage.uploadFile({
+  const key = `assets/${projectId}/${type}/${Date.now()}.${ext}`;
+  
+  console.log("[TOS] Uploading to key:", key, "with contentType:", contentType);
+  
+  const uploadResult = await storage.uploadFile({
     fileContent: buffer,
-    fileName: `assets/${projectId}/${type}/${Date.now()}.${ext}`,
+    fileName: key,
     contentType,
+    bucket: userBucket,
   });
 
-  // 生成签名 URL（默认 7 天有效期）
-  const url = await storage.generatePresignedUrl({
-    key,
-    expireTime: 7 * 24 * 60 * 60, // 7 天
-  });
+  console.log("[TOS] Upload result key:", uploadResult);
 
-  return { key, url };
+  let url: string;
+  
+  if (s3Client && userBucket) {
+    // 对于用户配置的 bucket，使用 AWS S3 SDK 生成签名 URL
+    console.log("[TOS] Generating presigned URL using AWS S3 SDK for bucket:", userBucket);
+    const command = new GetObjectCommand({
+      Bucket: userBucket,
+      Key: uploadResult,
+    });
+    url = await getSignedUrl(s3Client, command, { expiresIn: 7 * 24 * 60 * 60 }); // 7 天
+    console.log("[TOS] AWS S3 presigned URL generated");
+  } else {
+    // 对于平台存储，使用 SDK 的 generatePresignedUrl
+    console.log("[TOS] Using SDK generatePresignedUrl for platform storage");
+    url = await storage.generatePresignedUrl({
+      key: uploadResult,
+      bucket: userBucket,
+      expireTime: 7 * 24 * 60 * 60,
+    });
+  }
+
+  console.log("[TOS] Generated URL:", url);
+
+  return { key: uploadResult, url };
 }
 
 /**
