@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminDb } from "@/storage/database/supabase-client";
-import { uploadAsset, isTosConfigured } from "@/storage/tos/client";
+import { uploadAsset, isUserTosConfigured, isTosConfigured } from "@/storage/tos/client";
+
+// TOS 配置类型
+interface TosConfig {
+  endpoint?: string;
+  accessKey?: string;
+  secretKey?: string;
+  bucket?: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // 检查 TOS 是否配置
-    if (!isTosConfigured()) {
-      return NextResponse.json({ 
-        error: "TOS not configured. Please set COZE_TOS_* environment variables." 
-      }, { status: 500 });
-    }
-
     const contentType = request.headers.get("content-type") || "";
     let file: File;
     let projectId: string;
     let type: "image" | "audio" | "keyframe";
+    let userTosConfig: TosConfig | null = null;
 
     // 检查是否是 multipart form data
     if (contentType.includes("multipart/form-data")) {
@@ -22,8 +24,18 @@ export async function POST(request: NextRequest) {
       file = formData.get("file") as File;
       projectId = formData.get("projectId") as string;
       type = formData.get("type") as "image" | "audio" | "keyframe";
+      
+      // 从表单获取 TOS 配置（JSON 字符串）
+      const tosConfigStr = formData.get("tosConfig") as string;
+      if (tosConfigStr) {
+        try {
+          userTosConfig = JSON.parse(tosConfigStr);
+        } catch {
+          console.error("Failed to parse tosConfig");
+        }
+      }
     } else if (contentType.includes("application/json")) {
-      // 如果是 JSON 格式（Coze 代理 URL）
+      // 如果是 JSON 格式
       const body = await request.json();
       
       // 如果 file 是字符串（可能是 URL），需要下载它
@@ -45,6 +57,7 @@ export async function POST(request: NextRequest) {
       
       projectId = body.projectId;
       type = body.type;
+      userTosConfig = body.tosConfig || null;
     } else {
       return NextResponse.json({ error: "Unsupported content type" }, { status: 400 });
     }
@@ -54,17 +67,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // 检查 TOS 配置
+    const hasUserConfig = isUserTosConfigured(userTosConfig);
+    const hasEnvConfig = isTosConfigured();
+    
+    if (!hasUserConfig && !hasEnvConfig) {
+      return NextResponse.json({ 
+        error: "TOS not configured. Please set up TOS in settings or configure environment variables." 
+      }, { status: 500 });
+    }
+
     console.log("Uploading file to TOS:", {
       name: file.name,
       size: file.size,
       type: file.type,
       projectId,
       assetType: type,
+      useUserConfig: hasUserConfig,
     });
 
     // 上传到 TOS
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadAsset(buffer, file.name, file.type || "application/octet-stream", projectId, type);
+    const result = await uploadAsset(
+      buffer, 
+      file.name, 
+      file.type || "application/octet-stream", 
+      projectId, 
+      type,
+      userTosConfig || undefined
+    );
     
     console.log("[TOS] Upload successful:", result.url);
 
@@ -87,7 +118,7 @@ export async function POST(request: NextRequest) {
           url: result.url,
           thumbnail_url: thumbnailUrl,
           size: file.size,
-          storage_key: result.key, // 存储 TOS key
+          storage_key: result.key,
         })
         .select("id")
         .single();

@@ -1,105 +1,103 @@
 /**
  * 火山云 TOS (对象存储) 客户端
  * 支持 S3 兼容接口
+ * 支持环境变量配置和用户动态配置
  */
 
 import { S3Storage } from "coze-coding-dev-sdk";
 
-// TOS 配置
-// 用户需要设置以下环境变量：
-// - COZE_TOS_ENDPOINT: TOS 端点，如 https://tos-cn-beijing.volces.com
-// - COZE_TOS_ACCESS_KEY: 访问密钥 ID
-// - COZE_TOS_SECRET_KEY: 访问密钥 Secret
-// - COZE_TOS_BUCKET: 存储桶名称
+// TOS 配置类型
+export interface TosConfig {
+  endpoint?: string;
+  accessKey?: string;
+  secretKey?: string;
+  bucket?: string;
+}
 
-let tosStorage: S3Storage | null = null;
+// 缓存的存储客户端
+let cachedStorage: S3Storage | null = null;
+let cachedConfig: TosConfig | null = null;
 
 /**
- * 获取 TOS 存储客户端（单例）
+ * 从环境变量获取配置
  */
-export function getTosStorage(): S3Storage {
-  if (tosStorage) {
-    return tosStorage;
-  }
+function getEnvConfig(): TosConfig {
+  return {
+    endpoint: process.env.COZE_TOS_ENDPOINT,
+    accessKey: process.env.COZE_TOS_ACCESS_KEY || process.env.COZE_TOS_ACCESS_KEY_ID,
+    secretKey: process.env.COZE_TOS_SECRET_KEY || process.env.COZE_TOS_SECRET_ACCESS_KEY,
+    bucket: process.env.COZE_TOS_BUCKET || process.env.COZE_BUCKET_NAME,
+  };
+}
 
-  const endpointUrl = process.env.COZE_TOS_ENDPOINT;
-  const accessKey = process.env.COZE_TOS_ACCESS_KEY || process.env.COZE_TOS_ACCESS_KEY_ID;
-  const secretKey = process.env.COZE_TOS_SECRET_KEY || process.env.COZE_TOS_SECRET_ACCESS_KEY;
-  const bucketName = process.env.COZE_TOS_BUCKET || process.env.COZE_BUCKET_NAME;
+/**
+ * 检查配置是否有效
+ */
+function isConfigValid(config: TosConfig): boolean {
+  return !!(config.endpoint && config.accessKey && config.secretKey && config.bucket);
+}
 
-  // 如果没有配置，返回 null
-  if (!endpointUrl || !accessKey || !secretKey || !bucketName) {
-    console.warn("[TOS] Storage not configured. Please set COZE_TOS_* environment variables.");
-    // 返回一个 mock 对象，避免代码崩溃
-    return createMockStorage();
-  }
-
-  tosStorage = new S3Storage({
-    endpointUrl,
-    accessKey,
-    secretKey,
-    bucketName,
+/**
+ * 创建存储客户端
+ */
+function createStorage(config: TosConfig): S3Storage {
+  return new S3Storage({
+    endpointUrl: config.endpoint!,
+    accessKey: config.accessKey!,
+    secretKey: config.secretKey!,
+    bucketName: config.bucket!,
     region: process.env.COZE_TOS_REGION || "cn-beijing",
   });
-
-  console.log("[TOS] Storage client initialized successfully");
-  return tosStorage;
 }
 
 /**
- * 检查 TOS 是否已配置
+ * 获取 TOS 存储客户端（单例，基于环境变量）
+ */
+export function getTosStorage(): S3Storage | null {
+  const config = getEnvConfig();
+  
+  if (!isConfigValid(config)) {
+    return null;
+  }
+
+  // 如果缓存的配置相同，返回缓存
+  if (cachedStorage && cachedConfig && 
+      cachedConfig.endpoint === config.endpoint &&
+      cachedConfig.accessKey === config.accessKey &&
+      cachedConfig.bucket === config.bucket) {
+    return cachedStorage;
+  }
+
+  // 创建新客户端
+  cachedStorage = createStorage(config);
+  cachedConfig = config;
+  console.log("[TOS] Storage client initialized from environment");
+  return cachedStorage;
+}
+
+/**
+ * 创建临时存储客户端（用于用户动态配置）
+ */
+export function createTosStorage(config: TosConfig): S3Storage {
+  if (!isConfigValid(config)) {
+    throw new Error("TOS 配置不完整，请填写所有必填项");
+  }
+  return createStorage(config);
+}
+
+/**
+ * 检查 TOS 是否已配置（基于环境变量）
  */
 export function isTosConfigured(): boolean {
-  const endpointUrl = process.env.COZE_TOS_ENDPOINT;
-  const accessKey = process.env.COZE_TOS_ACCESS_KEY || process.env.COZE_TOS_ACCESS_KEY_ID;
-  const secretKey = process.env.COZE_TOS_SECRET_KEY || process.env.COZE_TOS_SECRET_ACCESS_KEY;
-  const bucketName = process.env.COZE_TOS_BUCKET || process.env.COZE_BUCKET_NAME;
-  
-  return !!(endpointUrl && accessKey && secretKey && bucketName);
+  return isConfigValid(getEnvConfig());
 }
 
 /**
- * 创建 Mock Storage（当未配置时使用）
+ * 检查用户配置是否有效
  */
-function createMockStorage(): S3Storage {
-  console.warn("[TOS] Using mock storage - uploads will fail!");
-  // 返回一个 mock 实现，抛出错误提示未配置
-  return {
-    uploadFile: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    streamUploadFile: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    uploadFromUrl: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    generatePresignedUrl: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    readFile: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    deleteFile: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    fileExists: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    listFiles: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-    chunkUploadFile: async () => {
-      throw new Error("TOS not configured. Please set COZE_TOS_* environment variables.");
-    },
-  } as unknown as S3Storage;
+export function isUserTosConfigured(config: TosConfig | null): boolean {
+  return !!config && isConfigValid(config);
 }
-
-/**
- * 生成访问 URL 的有效期（秒）
- * 默认 7 天，方便用户查看
- */
-export const DEFAULT_URL_EXPIRE_SECONDS = 7 * 24 * 60 * 60; // 7 天
 
 /**
  * 上传素材文件
@@ -108,15 +106,23 @@ export const DEFAULT_URL_EXPIRE_SECONDS = 7 * 24 * 60 * 60; // 7 天
  * @param contentType MIME 类型
  * @param projectId 项目 ID（用于组织文件路径）
  * @param type 素材类型（image/audio/keyframe）
+ * @param config 可选的用户配置
  */
 export async function uploadAsset(
   buffer: Buffer,
   fileName: string,
   contentType: string,
   projectId: string,
-  type: "image" | "audio" | "keyframe"
+  type: "image" | "audio" | "keyframe",
+  config?: TosConfig
 ): Promise<{ key: string; url: string }> {
-  const storage = getTosStorage();
+  const storage = config 
+    ? createTosStorage(config) 
+    : getTosStorage();
+  
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
   
   // 生成路径：assets/{projectId}/{type}/{timestamp}-{uuid}.{ext}
   const ext = fileName.split(".").pop() || "bin";
@@ -129,7 +135,7 @@ export async function uploadAsset(
   // 生成签名 URL（默认 7 天有效期）
   const url = await storage.generatePresignedUrl({
     key,
-    expireTime: DEFAULT_URL_EXPIRE_SECONDS,
+    expireTime: 7 * 24 * 60 * 60, // 7 天
   });
 
   return { key, url };
@@ -140,13 +146,21 @@ export async function uploadAsset(
  * @param bufferOrUrl 视频内容或 URL
  * @param taskId 任务 ID（用于组织文件路径）
  * @param isUrl 是否为 URL（如果是 URL 则下载后上传）
+ * @param config 可选的用户配置
  */
 export async function uploadVideo(
   bufferOrUrl: Buffer | string,
   taskId: string,
-  isUrl: boolean = false
+  isUrl: boolean = false,
+  config?: TosConfig
 ): Promise<{ key: string; url: string }> {
-  const storage = getTosStorage();
+  const storage = config 
+    ? createTosStorage(config) 
+    : getTosStorage();
+  
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
   
   let key: string;
   
@@ -155,7 +169,7 @@ export async function uploadVideo(
     console.log("[TOS] Downloading video from URL:", bufferOrUrl);
     key = await storage.uploadFromUrl({
       url: bufferOrUrl,
-      timeout: 60000, // 60 秒超时
+      timeout: 60000,
     });
   } else {
     // 直接上传 buffer
@@ -170,7 +184,7 @@ export async function uploadVideo(
   // 生成签名 URL（默认 7 天有效期）
   const url = await storage.generatePresignedUrl({
     key,
-    expireTime: DEFAULT_URL_EXPIRE_SECONDS,
+    expireTime: 7 * 24 * 60 * 60,
   });
 
   return { key, url };
@@ -180,12 +194,21 @@ export async function uploadVideo(
  * 生成文件访问 URL
  * @param key 存储的 key
  * @param expireSeconds 过期时间（秒）
+ * @param config 可选的用户配置
  */
 export async function getFileUrl(
   key: string,
-  expireSeconds: number = DEFAULT_URL_EXPIRE_SECONDS
+  expireSeconds: number = 7 * 24 * 60 * 60,
+  config?: TosConfig
 ): Promise<string> {
-  const storage = getTosStorage();
+  const storage = config 
+    ? createTosStorage(config) 
+    : getTosStorage();
+  
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
+  
   return storage.generatePresignedUrl({
     key,
     expireTime: expireSeconds,
@@ -195,8 +218,16 @@ export async function getFileUrl(
 /**
  * 删除文件
  * @param key 存储的 key
+ * @param config 可选的用户配置
  */
-export async function deleteFile(key: string): Promise<boolean> {
-  const storage = getTosStorage();
+export async function deleteFile(key: string, config?: TosConfig): Promise<boolean> {
+  const storage = config 
+    ? createTosStorage(config) 
+    : getTosStorage();
+  
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
+  
   return storage.deleteFile({ fileKey: key });
 }
