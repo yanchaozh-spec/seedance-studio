@@ -64,11 +64,10 @@ function parseMentionSegments(
  * - 两层共享完全相同的字体、行高、内边距 → 字符位置精确对齐
  *
  * 缩略图定位策略：
- * - 缩略图使用 absolute 定位，起始位置 left:0 与 @ 字符对齐
- * - 缩略图覆盖 @ 字符（视觉替代，这是 mention UI 的常见模式）
- * - 不使用 padding+负margin 技巧，避免缩略图向左侵占前文空间
- * - span 使用 isolation:isolate 创建层叠上下文，z-[-1] 让缩略图
- *   绘制在背景之上、文字之下 → 文字始终可读，缩略图作为底层装饰
+ * - 将 @ 字符渲染为 invisible（占位但不可见），缩略图视觉替代 @
+ * - 缩略图 absolute; left:0 与 @ 对齐，不向左侵占前文空间
+ * - span 使用 isolation:isolate，缩略图 z-[-1] 绘制在背景之上、文字之下
+ * - 名字文字始终可读，缩略图在 @ 占位区可见、超出部分被文字覆盖
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -240,13 +239,12 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
             segments.map((seg, i) => {
               if (seg.isMention && seg.mentionName) {
                 const item = mentionMap.get(seg.mentionName);
-                const hasThumbnail = !!item?.thumbnail_url;
                 return (
                   <span
                     key={i}
                     className={cn(
                       /*
-                       * isolate 创建层叠上下文，让子元素 z-[-1] 在背景之上、文字之下
+                       * isolate 创建层叠上下文，让缩略图 z-[-1] 在背景之上、文字之下
                        * 不使用 padding+负margin，避免缩略图向左侵占前文空间
                        */
                       "relative isolate inline rounded-sm font-medium",
@@ -256,14 +254,14 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     )}
                   >
                     {/*
-                      缩略图/图标：absolute 定位在 @ 字符位置
-                      - z-[-1]：绘制在背景之上、文字之下 → 文字始终可读
-                      - left-0 与 @ 字符对齐，不向左侵占前文空间
-                      - 缩略图在文字底层作为装饰，透过文字间隙可见
+                      @ 字符：invisible 保留占位宽度（对齐 textarea），但不可见
+                      缩略图视觉替代 @，absolute; left:0 与 @ 对齐
+                      z-[-1] 让缩略图在名字文字下方，名字始终可读
                     */}
-                    {hasThumbnail ? (
+                    <span className="invisible">@</span>
+                    {item?.thumbnail_url ? (
                       <img
-                        src={item!.thumbnail_url!}
+                        src={item.thumbnail_url}
                         alt=""
                         className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
                         style={{ zIndex: -1 }}
@@ -281,7 +279,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                         {item.type === "audio" ? "♪" : "🖼"}
                       </span>
                     ) : null}
-                    {seg.text}
+                    {seg.mentionName}
                   </span>
                 );
               }
