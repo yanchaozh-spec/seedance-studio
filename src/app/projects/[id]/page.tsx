@@ -220,16 +220,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       zIndex: isDragging ? 50 : undefined,
     };
 
-    const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-
     return (
       <div 
         ref={setNodeRef} 
         style={style} 
         className="relative group"
       >
-        {/* 左上角拖拽手柄和关键帧标志 */}
-        <div className="absolute top-1 left-1 z-20 flex items-center gap-1">
+        {/* 左上角拖拽手柄 */}
+        <div className="absolute top-1 left-1 z-20">
           <div
             {...attributes}
             {...listeners}
@@ -237,12 +235,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           >
             <GripVertical className="w-3 h-3 text-muted-foreground" />
           </div>
-          {isKeyframe && (
-            <div className="flex items-center gap-0.5 text-[8px] bg-primary text-primary-foreground px-1 py-0.5 rounded">
-              <Scissors className="w-2.5 h-2.5" />
-              <span>关键帧</span>
-            </div>
-          )}
         </div>
         {/* 右上角删除按钮 */}
         <button
