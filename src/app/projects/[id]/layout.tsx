@@ -458,7 +458,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   };
 
-  // 右侧侧边栏回滚 - 直接在当前页面恢复数据，不跳转
+  // 右侧侧边栏回滚 - 使用 window.location.href 刷新当前页面，比 window.location.reload() 更快
   const handleRollbackInline = (task: Task) => {
     // 恢复提示词
     if (task.prompt_boxes && task.prompt_boxes.length > 0) {
@@ -470,8 +470,10 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       };
       // 使用 sessionStorage 传递回滚数据
       sessionStorage.setItem("rollbackTask", JSON.stringify(taskData));
-      // 触发页面重新检测回滚数据
-      window.location.reload();
+      // 关闭任务详情抽屉
+      setSelectedTaskDetail(null);
+      // 刷新当前页面，比 window.location.reload() 更快
+      window.location.href = window.location.href;
     }
   };
 
