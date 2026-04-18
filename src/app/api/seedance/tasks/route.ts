@@ -5,6 +5,25 @@ import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const DEFAULT_MODEL_ID = process.env.ARK_MODEL_ID || "";
 
+/**
+ * 将 Seedance API 英文错误翻译为用户友好的中文提示
+ */
+function translateApiError(message: string): string {
+  if (/contain.*real.*person|真人/i.test(message)) {
+    return "素材中可能包含真人面部，无法生成视频。请替换为非真人图片后重试。";
+  }
+  if (/content.*violation|内容违规|sensitive/i.test(message)) {
+    return "素材内容未通过安全审核，请更换素材后重试。";
+  }
+  if (/quota|rate.*limit|限流/i.test(message)) {
+    return "请求过于频繁或配额不足，请稍后重试。";
+  }
+  if (/invalid.*model|model.*not.*found/i.test(message)) {
+    return "模型 ID 无效，请检查模型配置。";
+  }
+  return message;
+}
+
 // 请求体类型
 interface CreateTaskRequest {
   project_id: string;
@@ -275,7 +294,7 @@ export async function POST(request: NextRequest) {
         }
         console.error("[CREATE TASK] API error:", response.status, errorMessage);
         return NextResponse.json({
-          error: errorMessage
+          error: translateApiError(errorMessage)
         }, { status: response.status });
       }
 
@@ -283,8 +302,9 @@ export async function POST(request: NextRequest) {
 
       if (data.error) {
         console.error("[CREATE TASK] Business error:", data.error);
+        const msg = data.error?.message || data.error?.code || "Task creation failed";
         return NextResponse.json({
-          error: data.error?.message || data.error?.code || "Task creation failed"
+          error: translateApiError(msg)
         }, { status: 400 });
       }
 

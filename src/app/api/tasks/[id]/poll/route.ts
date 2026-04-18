@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, parseJsonField, toJsonField } from "@/storage/database/sqlite-client";
 import { uploadVideo, isTosConfigured, isUserTosConfigured, type TosConfig } from "@/storage/tos/client";
 
+/**
+ * 将 Seedance API 英文错误翻译为用户友好的中文提示
+ */
+function translateApiError(message: string): string {
+  if (/contain.*real.*person|真人/i.test(message)) {
+    return "素材中可能包含真人面部，无法生成视频。请替换为非真人图片后重试。";
+  }
+  if (/content.*violation|内容违规|sensitive/i.test(message)) {
+    return "素材内容未通过安全审核，请更换素材后重试。";
+  }
+  if (/quota|rate.*limit|限流/i.test(message)) {
+    return "请求过于频繁或配额不足，请稍后重试。";
+  }
+  if (/invalid.*model|model.*not.*found/i.test(message)) {
+    return "模型 ID 无效，请检查模型配置。";
+  }
+  return message;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -86,13 +105,14 @@ export async function GET(
 
         if (externalTask.error) {
           console.log("[POLL] External API returned error, updating DB and returning failed");
+          const errorMsg = translateApiError(externalTask.error?.message || "Task failed");
           db.prepare(`UPDATE tasks SET status = 'failed', error_message = ?, updated_at = datetime('now', 'localtime'), completed_at = datetime('now', 'localtime') WHERE id = ?`)
-            .run(externalTask.error?.message || "Task failed", task.id);
+            .run(errorMsg, task.id);
 
           return NextResponse.json({
             id: task.id,
             status: "failed",
-            error_message: externalTask.error?.message || "Task failed",
+            error_message: errorMsg,
           });
         }
 
