@@ -627,25 +627,29 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
       toast.success("任务已创建");
       
-      // 刷新任务列表
+      // 后台刷新任务列表（不等待）
       refreshTasks();
       
-      // 保存当前任务数据到 sessionStorage，供回滚使用
-      const taskData = {
-        prompt_boxes: promptBoxes.map((box) => ({
-          id: box.id,
-          content: box.content,
-          is_activated: box.isActivated,
-          activated_asset_id: box.activatedAssetId,
-          keyframe_description: box.keyframeDescription,
-        })),
-        params: {
-          duration: params_.duration,
-          ratio: params_.ratio,
-          resolution: params_.resolution,
-        },
-      };
-      sessionStorage.setItem("lastTask", JSON.stringify(taskData));
+      // 异步保存任务数据到 sessionStorage
+      try {
+        const taskData = {
+          prompt_boxes: promptBoxes.map((box) => ({
+            id: box.id,
+            content: box.content,
+            is_activated: box.isActivated,
+            activated_asset_id: box.activatedAssetId,
+            keyframe_description: box.keyframeDescription,
+          })),
+          params: {
+            duration: params_.duration,
+            ratio: params_.ratio,
+            resolution: params_.resolution,
+          },
+        };
+        sessionStorage.setItem("lastTask", JSON.stringify(taskData));
+      } catch (e) {
+        console.warn("保存任务数据失败:", e);
+      }
       
       // 生成后不清空，用户可继续调整
       // clearPool();
