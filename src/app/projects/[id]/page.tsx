@@ -442,30 +442,18 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
 
     // 按图片绑定顺序添加所有音频（与图片顺序对应）
-    // 收集所有需要添加的音频
-    const audioItems: { url: string; index: number }[] = [];
     for (const asset of activatedAssets) {
       if (asset.bound_audio_id) {
         const audioAsset = selectedAssets.find(a => a.id === asset.bound_audio_id) 
           || materials.find(m => m.id === asset.bound_audio_id);
         if (audioAsset) {
-          audioItems.push({ url: audioAsset.url, index: audioItems.length });
+          contentItems.push({
+            type: "audio_url",
+            audio_url: { url: audioAsset.url },
+            role: "reference_audio",
+          });
         }
       }
-    }
-    
-    // 音频总时长限制：15.2 秒，多个音频时平均分配
-    const maxTotalDuration = 15.2;
-    const audioCount = audioItems.length;
-    const durationPerAudio = audioCount > 0 ? maxTotalDuration / audioCount : 0;
-    
-    for (const item of audioItems) {
-      contentItems.push({
-        type: "audio_url",
-        audio_url: { url: item.url },
-        role: "reference_audio",
-        duration: durationPerAudio, // 平均分配总时长
-      });
     }
 
     // 返回 JSON 格式预览
@@ -664,7 +652,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // setPromptBoxes([{ id: "1", content: "", isActivated: true }]);
     } catch (error) {
       console.error("创建任务失败:", error);
-      toast.error("创建任务失败");
+      // 显示具体的错误消息
+      const errorMessage = error instanceof Error ? error.message : "创建任务失败";
+      toast.error(errorMessage);
     } finally {
       setGenerating(false);
     }
