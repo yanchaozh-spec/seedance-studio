@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Asset, getAssets } from "@/lib/assets";
+import { Asset, getAssets, deleteAsset } from "@/lib/assets";
 import { onAssetsChanged } from "@/lib/events";
 import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
@@ -619,6 +619,21 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     );
   };
 
+  // 删除素材（从数据库中彻底删除）
+  const handleDeleteMaterial = async (assetId: string) => {
+    try {
+      await deleteAsset(assetId);
+      // 从素材库中移除
+      setMaterials((prev) => prev.filter((a) => a.id !== assetId));
+      // 从已选中素材池中移除
+      setSelectedAssets((prev) => prev.filter((a) => a.id !== assetId));
+      toast.success("素材已删除");
+    } catch (error) {
+      console.error("删除素材失败:", error);
+      toast.error("删除失败");
+    }
+  };
+
   const navItems = [
     { href: `/projects/${resolvedParams.id}`, icon: Video, label: "视频生成", exact: true },
     { href: `/projects/${resolvedParams.id}/long-video`, icon: Film, label: "长视频", exact: true },
@@ -801,6 +816,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               asset={asset}
                               size="small"
                               onClick={setSelectedDetailAsset}
+                              showRemove
+                              onRemove={handleDeleteMaterial}
                             />
                             <p className="text-[10px] text-center mt-0.5 truncate max-w-20" title={asset.display_name || asset.name}>
                               {asset.display_name || asset.name}
@@ -820,6 +837,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               asset={asset}
                               size="small"
                               onClick={setSelectedDetailAsset}
+                              showRemove
+                              onRemove={handleDeleteMaterial}
                             />
                             <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
                               {asset.display_name || asset.name}

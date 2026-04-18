@@ -10,7 +10,7 @@ import {
   Image as ImageIcon,
   ImageOff,
 } from "lucide-react";
-import { Asset, getAssets, createAssetFromUrl } from "@/lib/assets";
+import { Asset, getAssets, createAssetFromUrl, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
@@ -84,6 +84,19 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
       toast.error("上传失败");
     } finally {
       setUploading(false);
+    }
+  };
+
+  // 删除素材
+  const handleDeleteAsset = async (assetId: string) => {
+    try {
+      await deleteAsset(assetId);
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+      toast.success("素材已删除");
+      emitAssetsChanged(resolvedParams.id, 'delete');
+    } catch (error) {
+      console.error("删除素材失败:", error);
+      toast.error("删除失败");
     }
   };
 
@@ -161,6 +174,8 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       key={asset.id}
                       asset={asset}
                       onClick={() => setSelectedAsset(asset)}
+                      onRemove={() => handleDeleteAsset(asset.id)}
+                      showRemove
                     />
                   ))}
                 </div>
@@ -179,6 +194,8 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                       key={asset.id}
                       asset={asset}
                       onClick={() => setSelectedAsset(asset)}
+                      onRemove={() => handleDeleteAsset(asset.id)}
+                      showRemove
                     />
                   ))}
                 </div>
