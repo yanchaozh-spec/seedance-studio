@@ -1,21 +1,88 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ChevronLeft,
   Upload,
   Image as ImageIcon,
   ImageOff,
+  GripVertical,
 } from "lucide-react";
-import { Asset, getAssets, deleteAsset } from "@/lib/assets";
+import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
 import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { uploadFile } from "@/lib/upload";
 import { emitAssetsChanged } from "@/lib/events";
+
+// dnd-kit 拖拽排序
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+// 可排序的素材卡片（用于总素材库页面）
+function SortableAssetCard({
+  asset,
+  onClick,
+  onRemove,
+}: {
+  asset: Asset;
+  onClick: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: asset.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group">
+      {/* 拖拽手柄 */}
+      <div className="absolute top-1 left-1 z-20">
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-1 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        </div>
+      </div>
+      <AssetCard
+        asset={asset}
+        onClick={onClick}
+        onRemove={onRemove}
+        showRemove
+        showName
+      />
+    </div>
+  );
+}
 
 export default function MaterialsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -57,7 +124,6 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
         }
 
         try {
-          // uploadFile 内部会创建素材记录，不需要再调用 createAssetFromUrl
           await uploadFile(file, {
             projectId: resolvedParams.id,
             type: "image",
@@ -106,6 +172,45 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
     if (a.type === "audio") return false;
     return a.asset_category === "keyframe";
   });
+
+  // 拖拽排序传感器
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // 拖拽排序处理
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent, assetList: Asset[]) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = assetList.findIndex((a) => a.id === active.id);
+      const newIndex = assetList.findIndex((a) => a.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // 乐观更新
+      const reordered = [...assetList];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      // 更新 assets：保持其他素材不变，替换当前分组的排序
+      const movedIds = new Set(assetList.map((a) => a.id));
+      const otherAssets = assets.filter((m) => !movedIds.has(m.id));
+      setAssets([...otherAssets, ...reordered]);
+
+      // 持久化排序到后端
+      const items = reordered.map((a, i) => ({ id: a.id, sort_order: i }));
+      reorderAssets(items).then(() => {
+        // 通知其他组件（如右侧侧边栏）素材顺序已变更
+        emitAssetsChanged(resolvedParams.id, 'reorder');
+      }).catch((err) => {
+        console.error("保存排序失败:", err);
+        toast.error("排序保存失败");
+      });
+    },
+    [assets]
+  );
 
   return (
     <div className="p-6 h-full flex flex-col" suppressHydrationWarning>
@@ -163,18 +268,24 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                 <h2 className="text-sm font-medium text-muted-foreground mb-3">
                   美术资产 ({imageAssets.length})
                 </h2>
-                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                  {imageAssets.map((asset) => (
-                    <AssetCard
-                      key={asset.id}
-                      asset={asset}
-                      onClick={() => setSelectedAsset(asset)}
-                      onRemove={() => handleDeleteAsset(asset.id)}
-                      showRemove
-                      showName
-                    />
-                  ))}
-                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, imageAssets)}
+                >
+                  <SortableContext items={imageAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {imageAssets.map((asset) => (
+                        <SortableAssetCard
+                          key={asset.id}
+                          asset={asset}
+                          onClick={() => setSelectedAsset(asset)}
+                          onRemove={() => handleDeleteAsset(asset.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
             
@@ -184,18 +295,24 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                 <h2 className="text-sm font-medium text-muted-foreground mb-3">
                   关键帧 ({keyframeAssets.length})
                 </h2>
-                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                  {keyframeAssets.map((asset) => (
-                    <AssetCard
-                      key={asset.id}
-                      asset={asset}
-                      onClick={() => setSelectedAsset(asset)}
-                      onRemove={() => handleDeleteAsset(asset.id)}
-                      showRemove
-                      showName
-                    />
-                  ))}
-                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, keyframeAssets)}
+                >
+                  <SortableContext items={keyframeAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {keyframeAssets.map((asset) => (
+                        <SortableAssetCard
+                          key={asset.id}
+                          asset={asset}
+                          onClick={() => setSelectedAsset(asset)}
+                          onRemove={() => handleDeleteAsset(asset.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
           </div>

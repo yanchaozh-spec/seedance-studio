@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Asset, getAssets, deleteAsset } from "@/lib/assets";
+import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
 import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
 import { uploadFile } from "@/lib/upload";
 import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
@@ -27,6 +27,25 @@ import { AssetCard } from "@/components/asset-card";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
 import { VideoPlayer } from "@/components/ui/video-player";
+
+// dnd-kit 拖拽排序
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
 interface ProjectDetailContextType {
   project: Project | null;
@@ -330,6 +349,63 @@ export function DraggableAsset({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// 可排序的素材项（用于右侧侧边栏素材库）
+function SortableMaterialItem({
+  asset,
+  isInPool,
+  onClick,
+  onRemove,
+}: {
+  asset: Asset;
+  isInPool: boolean;
+  onClick: (asset: Asset) => void;
+  onRemove: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: asset.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group">
+      {/* 拖拽手柄 */}
+      <div className="absolute top-0.5 left-0.5 z-20">
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-0.5 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        </div>
+      </div>
+      {isInPool && (
+        <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
+          <CheckCircle className="w-2.5 h-2.5" />
+        </div>
+      )}
+      <DraggableAsset
+        asset={asset}
+        size="small"
+        showLabel
+        onClick={onClick}
+        showRemove
+        onRemove={onRemove}
+      />
     </div>
   );
 }
@@ -691,6 +767,44 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   };
 
+  // 素材库拖拽排序传感器
+  const materialSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // 素材库拖拽排序处理
+  const handleMaterialDragEnd = useCallback(
+    (event: DragEndEvent, assetList: Asset[]) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = assetList.findIndex((a) => a.id === active.id);
+      const newIndex = assetList.findIndex((a) => a.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // 乐观更新：立即调整本地顺序
+      const reordered = [...assetList];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      // 更新 materials：保持其他素材不变，替换当前分组的排序
+      const movedIds = new Set(assetList.map((a) => a.id));
+      const otherAssets = materials.filter((m) => !movedIds.has(m.id));
+      setMaterials([...otherAssets, ...reordered]);
+
+      // 持久化排序到后端（只保存当前分组的排序）
+      const items = reordered.map((a, i) => ({ id: a.id, sort_order: i }));
+      reorderAssets(items).then(() => {
+        emitAssetsChanged(resolvedParams.id, 'reorder');
+      }).catch((err) => {
+        console.error("保存排序失败:", err);
+        toast.error("排序保存失败");
+      });
+    },
+    [materials]
+  );
+
   const navItems = [
     { href: `/projects/${resolvedParams.id}`, icon: Video, label: "视频生成", exact: true },
     { href: `/projects/${resolvedParams.id}/materials`, icon: FolderOpen, label: "素材库" },
@@ -866,57 +980,47 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </Button>
                   </div>
                   {filtered.image.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {filtered.image.map((asset) => {
-                          const isInPool = selectedAssets.some(s => s.id === asset.id);
-                          return (
-                            <div key={asset.id} className="relative">
-                              {isInPool && (
-                                <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                                  <CheckCircle className="w-2.5 h-2.5" />
-                                </div>
-                              )}
-                              <DraggableAsset
-                                asset={asset}
-                                size="small"
-                                showLabel
-                                onClick={setSelectedDetailAsset}
-                                showRemove
-                                onRemove={handleDeleteMaterial}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <DndContext
+                      sensors={materialSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.image)}
+                    >
+                      <SortableContext items={filtered.image.map((a) => a.id)} strategy={rectSortingStrategy}>
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {filtered.image.map((asset) => (
+                            <SortableMaterialItem
+                              key={asset.id}
+                              asset={asset}
+                              isInPool={selectedAssets.some((s) => s.id === asset.id)}
+                              onClick={setSelectedDetailAsset}
+                              onRemove={handleDeleteMaterial}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
                   )}
 
                   {filtered.keyframe.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {filtered.keyframe.map((asset) => {
-                          const isInPool = selectedAssets.some(s => s.id === asset.id);
-                          return (
-                            <div key={asset.id} className="relative">
-                              {isInPool && (
-                                <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                                  <CheckCircle className="w-2.5 h-2.5" />
-                                </div>
-                              )}
-                              <DraggableAsset
-                                asset={asset}
-                                size="small"
-                                showLabel
-                                onClick={setSelectedDetailAsset}
-                                showRemove
-                                onRemove={handleDeleteMaterial}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <DndContext
+                      sensors={materialSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.keyframe)}
+                    >
+                      <SortableContext items={filtered.keyframe.map((a) => a.id)} strategy={rectSortingStrategy}>
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {filtered.keyframe.map((asset) => (
+                            <SortableMaterialItem
+                              key={asset.id}
+                              asset={asset}
+                              isInPool={selectedAssets.some((s) => s.id === asset.id)}
+                              onClick={setSelectedDetailAsset}
+                              onRemove={handleDeleteMaterial}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
                   )}
 
 

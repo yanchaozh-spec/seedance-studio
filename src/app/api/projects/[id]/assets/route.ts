@@ -14,6 +14,7 @@ export async function GET(
       .from("assets")
       .select("*")
       .eq("project_id", resolvedParams.id)
+      .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(`获取素材失败: ${error.message}`);
@@ -59,6 +60,16 @@ export async function POST(
     const body = await request.json();
     
     const client = getSupabaseClient();
+    
+    // 获取当前项目最大的 sort_order，新素材排在最后
+    const { data: maxOrderResult } = await client
+      .from("assets")
+      .select("sort_order")
+      .eq("project_id", resolvedParams.id)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    const nextSortOrder = (maxOrderResult?.[0]?.sort_order ?? -1) + 1;
+    
     const { data, error } = await client
       .from("assets")
       .insert({
@@ -74,6 +85,7 @@ export async function POST(
         size: body.size,
         duration: body.duration,
         storage_key: body.storage_key,
+        sort_order: nextSortOrder,
       })
       .select()
       .single();

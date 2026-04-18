@@ -8,7 +8,7 @@ export const ASSETS_CHANGED_EVENT = 'assets-changed';
 
 export interface AssetsChangedEvent {
   projectId: string;
-  type: 'upload' | 'delete' | 'update';
+  type: 'upload' | 'delete' | 'update' | 'reorder';
   assetId?: string;
 }
 

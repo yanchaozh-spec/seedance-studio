@@ -21,6 +21,7 @@ export interface Asset {
   thumbnail_url?: string;
   size?: number;
   duration?: number; // 音频时长（秒）
+  sort_order?: number; // 排序序号
   created_at: string;
 }
 
@@ -41,6 +42,20 @@ export async function getAsset(id: string): Promise<Asset | null> {
   }
   const data = await response.json();
   return data || null;
+}
+
+// 批量更新素材排序
+export async function reorderAssets(
+  items: Array<{ id: string; sort_order: number }>
+): Promise<void> {
+  const response = await fetch("/api/assets/reorder", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to reorder assets");
+  }
 }
 
 // 创建素材记录
