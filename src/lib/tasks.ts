@@ -110,8 +110,16 @@ export async function createTask(task: {
     body: JSON.stringify(task),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create task");
+    // 尝试解析 JSON 错误，如果失败则使用状态文本
+    let errorMessage = "Failed to create task";
+    try {
+      const error = await response.json();
+      errorMessage = error.error || errorMessage;
+    } catch {
+      // 响应不是 JSON，使用状态文本
+      errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 }
