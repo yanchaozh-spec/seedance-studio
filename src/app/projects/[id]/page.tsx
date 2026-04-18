@@ -296,10 +296,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       audioRefMap.set(audio.id, refName);
     }
 
-    // 构建素材定义行（使用序号）
+    // 构建素材定义行（使用序号，与 UI 和 contentItems 顺序一致）
     const assetDefParts: string[] = [];
 
-    // 添加美术资产（带声线绑定）
+    // 先添加关键帧（使用 keyframe_description 作为名称）
+    for (const asset of keyframeAssets) {
+      const refName = imageRefMap.get(asset.id)!;
+      const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
+      assetDefParts.push(`${desc}：${refName}`);
+    }
+
+    // 再添加美术资产（带声线绑定）
     for (const asset of imageAssets) {
       const refName = imageRefMap.get(asset.id)!;
       const displayName = asset.display_name || asset.name;
@@ -310,13 +317,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       } else {
         assetDefParts.push(`${displayName}：${refName}`);
       }
-    }
-    
-    // 添加关键帧（使用 keyframe_description 作为名称）
-    for (const asset of keyframeAssets) {
-      const refName = imageRefMap.get(asset.id)!;
-      const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
-      assetDefParts.push(`${desc}：${refName}`);
     }
 
     // 构建文本内容（放在 content 最前面，符合官方格式）

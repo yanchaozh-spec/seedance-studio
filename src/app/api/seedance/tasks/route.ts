@@ -138,10 +138,17 @@ function buildContent(
   // 构建素材定义行（使用序号，无方括号）
   const textParts: string[] = [];
 
-  // 构建素材定义行
+  // 构建素材定义行（使用序号，与前端 UI 和 contentItems 顺序一致）
   const assetDefParts: string[] = [];
   
-  // 添加美术资产（带声线绑定）
+  // 先添加关键帧（使用 keyframe_description 作为名称）
+  for (const asset of keyframeAssets) {
+    const refName = imageRefMap.get(asset.id)!;
+    const desc = asset.keyframe_description || asset.display_name || asset.name;
+    assetDefParts.push(`${desc}：${refName}`);
+  }
+
+  // 再添加美术资产（带声线绑定）
   for (const asset of imageAssets) {
     const refName = imageRefMap.get(asset.id)!;
     const displayName = asset.display_name || asset.name;
@@ -152,13 +159,6 @@ function buildContent(
     } else {
       assetDefParts.push(`${displayName}：${refName}`);
     }
-  }
-  
-  // 添加关键帧（使用 keyframe_description 作为名称）
-  for (const asset of keyframeAssets) {
-    const refName = imageRefMap.get(asset.id)!;
-    const desc = asset.keyframe_description || asset.display_name || asset.name;
-    assetDefParts.push(`${desc}：${refName}`);
   }
 
   // 添加素材定义行（第一行）
