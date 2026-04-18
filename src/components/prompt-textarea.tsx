@@ -64,10 +64,11 @@ function parseMentionSegments(
  * - 两层共享完全相同的字体、行高、内边距 → 字符位置精确对齐
  *
  * 缩略图定位策略：
- * - 将 @ 字符渲染为 invisible（占位但不可见），缩略图视觉替代 @
- * - 缩略图 absolute; left:0 与 @ 对齐，不向左侵占前文空间
- * - span 使用 isolation:isolate，缩略图 z-[-1] 绘制在背景之上、文字之下
- * - 名字文字始终可读，缩略图在 @ 占位区可见、超出部分被文字覆盖
+ * - 将 @ 字符渲染为 invisible（占位但不可见），保留字符宽度以对齐 textarea
+ * - 缩略图 absolute; left:0; top:1/2;-translate-y-1/2 覆盖在 @ 位置，垂直居中
+ * - 缩略图(w-4=16px)宽于 @(~8px)，向右延伸部分在名字文字下方(z-[-1])
+ * - span 使用 inline（非 inline-flex），保持文本基线对齐与 textarea 精确匹配
+ * - isolate 创建层叠上下文，缩略图 z-[-1] 绘制在背景之上、文字之下
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -245,6 +246,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     className={cn(
                       /*
                        * isolate 创建层叠上下文，让缩略图 z-[-1] 在背景之上、文字之下
+                       * inline 保持文本基线对齐，确保与 textarea 字符位置精确匹配
                        * 不使用 padding+负margin，避免缩略图向左侵占前文空间
                        */
                       "relative isolate inline rounded-sm font-medium",
@@ -255,8 +257,10 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                   >
                     {/*
                       @ 字符：invisible 保留占位宽度（对齐 textarea），但不可见
-                      缩略图视觉替代 @，absolute; left:0 与 @ 对齐
+                      缩略图 absolute 覆盖在 @ 位置，视觉替代 @
                       z-[-1] 让缩略图在名字文字下方，名字始终可读
+                      缩略图 w-4 宽于 @ 字符，但 extend-to-right 部分在名字文字之后 (z-1)，
+                      视觉上只露出 @ 占位区内的部分
                     */}
                     <span className="invisible">@</span>
                     {item?.thumbnail_url ? (

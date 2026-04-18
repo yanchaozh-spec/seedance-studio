@@ -389,7 +389,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
 
     /**
-     * 替换提示词中的 @角色名 为 @图片N(角色名) 格式
+     * 替换提示词中的 @角色名 为 图片N(角色名) 格式
+     * Seedance API 要求：提示词中使用"素材类型+序号"引用，不用 @ 前缀
      * 按名字长度降序替换，避免短名误替换长名
      */
     function replaceMentions(text: string): string {
@@ -398,8 +399,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       for (const name of sortedNames) {
         const ref = nameToRefMap.get(name)!;
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`@(?!图片\\d+\\()${escaped}`, "g");
-        result = result.replace(regex, `@${ref}(${name})`);
+        const regex = new RegExp(`@${escaped}`, "g");
+        result = result.replace(regex, `${ref}(${name})`);
       }
       return result;
     }
@@ -428,13 +429,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       
       if (isKeyframe) {
         const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-        assetDefParts.push(`@${refName}为${desc}(资产ID:[${asset.id}])`);
+        assetDefParts.push(`${refName}为${desc}`);
       } else {
         if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
           const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-          assetDefParts.push(`@${refName}为${displayName}(资产ID:[${asset.id}])，声线为@${audioRef}`);
+          assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);
         } else {
-          assetDefParts.push(`@${refName}为${displayName}(资产ID:[${asset.id}])`);
+          assetDefParts.push(`${refName}为${displayName}`);
         }
       }
     }
