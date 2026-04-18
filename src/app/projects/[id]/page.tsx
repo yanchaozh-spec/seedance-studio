@@ -64,7 +64,7 @@ interface GeneratorParams {
 
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { selectedAssets, setSelectedAssets, materials, setMaterials, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation, refreshTasks } = useProjectDetail();
+  const { selectedAssets, setSelectedAssets, materials, setMaterials, refreshMaterials, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation, refreshTasks } = useProjectDetail();
   const isDragging = useIsDragging();
   const setOverDropZone = useDragStore((state) => state.setOverDropZone);
   const isOverDropZone = useDragStore((state) => state.isOverDropZone);
@@ -964,9 +964,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       {/* 素材详情对话框 */}
       <AssetDetailDialog
         asset={selectedDetailAsset}
-        allAssets={[...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))]}
+        allAssets={materials}
         onClose={() => setSelectedDetailAsset(null)}
-        onUpdate={(updatedAsset) => {
+        onUpdate={async (updatedAsset) => {
           if (updatedAsset) {
             // 更新 selectedAssets
             setSelectedAssets((prev) =>
@@ -977,6 +977,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               prev.map((a) => (a.id === updatedAsset.id ? { ...a, ...updatedAsset } : a))
             );
           }
+          // 重新加载所有素材（包括新上传的音频）
+          await refreshMaterials();
         }}
       />
     </div>
