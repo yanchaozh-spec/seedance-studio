@@ -27,6 +27,8 @@ import {
   AlertCircle,
   XCircle,
   Ban,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Task, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { Asset, submitFrameFromCanvas } from "@/lib/assets";
@@ -84,6 +86,18 @@ export function TaskDetailSheet({
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyId = async () => {
+    if (!task) return;
+    try {
+      await navigator.clipboard.writeText(task.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("复制失败");
+    }
+  };
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
@@ -245,7 +259,18 @@ export function TaskDetailSheet({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <span>任务详情</span>
-            <span className="text-sm font-normal text-muted-foreground font-mono">{task.id.slice(0, 20)}...</span>
+            <span className="text-sm font-normal text-muted-foreground font-mono break-all select-all">{task.id}</span>
+            <button
+              onClick={handleCopyId}
+              className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
+              title="复制任务ID"
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-green-500" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+              )}
+            </button>
           </SheetTitle>
         </SheetHeader>
 
