@@ -128,28 +128,32 @@ function DraggableAsset({ asset, showRemove, onRemove, onClick, size = "small", 
 
     // 设置自定义拖拽图片（使用缩略图）
     if (asset.thumbnail_url && imageRef.current) {
-      // 创建临时 canvas 来绘制缩略图
-      const canvas = document.createElement("canvas");
-      canvas.width = 80;
-      canvas.height = 80;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // 绘制背景
-        ctx.fillStyle = "#1f2937";
-        ctx.fillRect(0, 0, 80, 80);
-        // 绘制图片（模拟）
-        ctx.drawImage(imageRef.current, 0, 0, 80, 80);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            const img = document.createElement("img");
-            img.onload = () => {
-              e.dataTransfer.setDragImage(img, 40, 40);
-              URL.revokeObjectURL(url);
-            };
-            img.src = url;
-          }
-        });
+      // 检查图片是否已加载且状态正常
+      const img = imageRef.current;
+      if (img.complete && img.naturalWidth > 0) {
+        // 创建临时 canvas 来绘制缩略图
+        const canvas = document.createElement("canvas");
+        canvas.width = 80;
+        canvas.height = 80;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          // 绘制背景
+          ctx.fillStyle = "#1f2937";
+          ctx.fillRect(0, 0, 80, 80);
+          // 绘制图片
+          ctx.drawImage(img, 0, 0, 80, 80);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              const dragImg = document.createElement("img");
+              dragImg.onload = () => {
+                e.dataTransfer.setDragImage(dragImg, 40, 40);
+                URL.revokeObjectURL(url);
+              };
+              dragImg.src = url;
+            }
+          });
+        }
       }
     } else if (asset.type === "audio") {
       // 音频使用图标作为拖拽图片
