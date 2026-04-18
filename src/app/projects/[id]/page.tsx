@@ -202,7 +202,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
   }, [setSelectedAssets]);
 
-  // 可排序的素材卡片组件 - 整个卡片可直接拖拽
+  // 可排序的素材卡片组件 - 保留拖拽手柄
   function SortableAssetCard({ asset }: { asset: SelectedAsset }) {
     const {
       attributes,
@@ -222,36 +222,45 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
     const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
 
-    // 处理点击事件 - 如果点击的是按钮元素则不触发拖拽
-    const handleClick = (e: React.MouseEvent) => {
-      // 检查点击目标是否是按钮或按钮内的元素
-      const target = e.target as HTMLElement;
-      if (target.closest('button')) {
-        return; // 不触发任何操作，按钮有自己的处理
-      }
-      setSelectedDetailAsset(asset);
-    };
-
     return (
       <div 
         ref={setNodeRef} 
         style={style} 
-        className="relative group cursor-grab active:cursor-grabbing"
-        onClick={handleClick}
-        {...listeners}
+        className="relative group"
       >
-        <AssetCard
-          asset={asset}
-          onRemove={() => handleRemoveAsset(asset.id)}
-          onToggleActivation={() => toggleAssetActivation(asset.id)}
-          showRemove
-          showActivation
-          className={cn(!asset.isActivated && "opacity-50 grayscale")}
-        />
-        {/* 类型标签 */}
+        {/* 左上角拖拽手柄 */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="absolute top-1 left-1 z-20 p-1 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        </div>
+        {/* 右上角删除按钮 */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRemoveAsset(asset.id);
+          }}
+          className="absolute top-1 right-1 z-20 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+        >
+          <X className="w-2.5 h-2.5" />
+        </button>
+        {/* 中间可点击区域 */}
+        <div onClick={() => setSelectedDetailAsset(asset)}>
+          <AssetCard
+            asset={asset}
+            onToggleActivation={() => toggleAssetActivation(asset.id)}
+            showRemove={false}
+            showActivation={true}
+            className={cn(!asset.isActivated && "opacity-50 grayscale")}
+          />
+        </div>
+        {/* 右下角关键帧标志 */}
         {isKeyframe && (
-          <div className="absolute top-1 right-1 z-10">
-            <Scissors className="w-3 h-3 text-primary" />
+          <div className="absolute bottom-8 right-1 z-10 flex items-center gap-0.5 text-[8px] bg-primary text-primary-foreground px-1 py-0.5 rounded">
+            <Scissors className="w-2.5 h-2.5" />
+            <span>关键帧</span>
           </div>
         )}
       </div>
