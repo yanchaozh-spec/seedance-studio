@@ -72,6 +72,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const poolDropRef = useRef<HTMLDivElement>(null);
   const [promptBoxes, setPromptBoxes] = useState<PromptBox[]>([
     { id: "1", content: "", isActivated: true },
+    { id: "2", content: "", isActivated: true },
+    { id: "3", content: "", isActivated: true },
   ]);
   const [params_, setParams] = useState<GeneratorParams>({
     duration: 5,

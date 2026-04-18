@@ -886,7 +886,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
               </div>
-              <span className={cn("font-semibold text-sm", collapsed && "hidden")}>焱超</span>
+              <span className={cn("font-semibold text-sm", collapsed && "hidden")}>Seedance 工作台</span>
             </Link>
             <button
               onClick={() => setCollapsed(!collapsed)}
