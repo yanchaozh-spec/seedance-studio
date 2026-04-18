@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
-import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music } from "lucide-react";
+import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task, createTask, getVideoUrl } from "@/lib/tasks";
@@ -20,6 +20,25 @@ import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
+
+// dnd-kit 导入
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // 选中的素材（带激活状态）
 export interface SelectedAsset extends Asset {
@@ -160,6 +179,80 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
     toast.success("已恢复任务数据");
   }, [resolvedParams.id, materials, setSelectedAssets, setPromptBoxes, setParams]);
+
+  // 拖拽排序传感器
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // 拖拽排序结束处理
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setSelectedAssets((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }, [setSelectedAssets]);
+
+  // 可排序的素材卡片组件
+  function SortableAssetCard({ asset, index }: { asset: SelectedAsset; index: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: asset.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 50 : undefined,
+    };
+
+    const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+
+    return (
+      <div ref={setNodeRef} style={style} className="relative group">
+        {/* 序号标签 */}
+        <div className="absolute -top-2 -left-2 z-10 bg-background border rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium shadow-sm">
+          {index + 1}
+        </div>
+        {/* 拖拽手柄 */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="absolute top-1 left-1 z-10 p-1 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        </div>
+        <AssetCard
+          asset={asset}
+          onClick={() => setSelectedDetailAsset(asset)}
+          onRemove={() => handleRemoveAsset(asset.id)}
+          onToggleActivation={() => toggleAssetActivation(asset.id)}
+          showRemove
+          showActivation
+          className={cn(!asset.isActivated && "opacity-50 grayscale")}
+        />
+        {/* 类型标签 */}
+        {isKeyframe && (
+          <div className="absolute top-1 right-1 z-10">
+            <Scissors className="w-3 h-3 text-primary" />
+          </div>
+        )}
+      </div>
+    );
+  }
   
   // 素材池拖放区域
   const { dropZoneProps: poolDropZoneProps } = useDropZone({
@@ -264,10 +357,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 只使用激活的素材
     const activatedAssets = selectedAssets.filter((a) => a.isActivated);
 
-    // 分类素材（只使用激活的）
-    const imageAssets = activatedAssets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
-    const keyframeAssets = activatedAssets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe");
-    
     // 所有素材（包括 materials 和 selectedAssets）
     const allAssetsList = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
     // 音频素材：从所有素材中找出被激活图片引用的音频
@@ -276,59 +365,59 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       activatedAssets.some(img => img.bound_audio_id === a.id)
     );
 
-    // 按顺序收集所有图片（关键帧在前，美术资产在后，与前端显示一致）
-    const allImageAssets = [...keyframeAssets, ...imageAssets];
 
-    // 构建序号映射 - 所有图片统一用 [图片N] 格式
-    const imageRefMap = new Map<string, string>();
-    let imageIndex = 0;
-    for (const asset of allImageAssets) {
-      imageIndex++;
-      const refName = `图片${imageIndex}`;
-      imageRefMap.set(asset.id, refName);
-    }
-
+    // 构建音频序号映射
     const audioRefMap = new Map<string, string>();
     let audioIndex = 0;
     for (const audio of audioAssets) {
       audioIndex++;
-      const refName = `音频${audioIndex}`;
-      audioRefMap.set(audio.id, refName);
+      audioRefMap.set(audio.id, `音频${audioIndex}`);
     }
 
-    // 构建素材定义行（使用序号，与 UI 和 contentItems 顺序一致）
-    const assetDefParts: string[] = [];
-
-    // 先添加关键帧（使用 keyframe_description 作为名称）
-    for (const asset of keyframeAssets) {
-      const refName = imageRefMap.get(asset.id)!;
-      const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
-      assetDefParts.push(`${desc}：${refName}`);
-    }
-
-    // 再添加美术资产（带声线绑定）
-    for (const asset of imageAssets) {
-      const refName = imageRefMap.get(asset.id)!;
-      const displayName = asset.display_name || asset.name;
-      
-      if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-        const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-        assetDefParts.push(`${displayName}：${refName}，声线为：${audioRef}`);
-      } else {
-        assetDefParts.push(`${displayName}：${refName}`);
+    // 按 selectedAssets 的顺序收集所有图片，分配序号
+    const assetRefMap = new Map<string, number>();
+    let imageIndex = 0;
+    for (const asset of activatedAssets) {
+      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
+      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      if (isImage || isKeyframe) {
+        imageIndex++;
+        assetRefMap.set(asset.id, imageIndex);
       }
     }
 
-    // 构建文本内容（放在 content 最前面，符合官方格式）
-    const textParts: string[] = [];
+    // 构建素材定义行（按 activatedAssets 的顺序）
+    const assetDefParts: string[] = [];
+    for (const asset of activatedAssets) {
+      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
+      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      
+      if (!isImage && !isKeyframe) continue;
+      
+      const refIndex = assetRefMap.get(asset.id)!;
+      const refName = `图片${refIndex}`;
+      const isKeyframeType = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      
+      if (isKeyframeType) {
+        const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
+        assetDefParts.push(`${desc}：${refName}`);
+      } else {
+        const displayName = asset.display_name || asset.name;
+        if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+          const audioRef = audioRefMap.get(asset.bound_audio_id)!;
+          assetDefParts.push(`${displayName}：${refName}，声线为：${audioRef}`);
+        } else {
+          assetDefParts.push(`${displayName}：${refName}`);
+        }
+      }
+    }
 
-    // 第一行：素材定义（使用序号）
+    // 构建文本内容
+    const textParts: string[] = [];
     const assetDefLine = assetDefParts.join("；");
     if (assetDefLine) {
       textParts.push(assetDefLine);
     }
-
-    // 后续行：提示词
     for (const box of nonEmptyBoxes) {
       if (box.content.trim()) {
         textParts.push(box.content.trim());
@@ -336,8 +425,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
 
     const contentItems: SeedanceContentItem[] = [];
-
-    // 添加文本（放在最前面）
     if (textParts.length > 0) {
       contentItems.push({
         type: "text",
@@ -345,14 +432,17 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       });
     }
 
-    // 添加所有图片（使用 URL）
-    for (const asset of allImageAssets) {
-      const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
-      contentItems.push({
-        type: "image_url",
-        image_url: { url: asset.url },
-        role: "reference_image",
-      });
+    // 按 activatedAssets 顺序添加所有图片
+    for (const asset of activatedAssets) {
+      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
+      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      if (isImage || isKeyframe) {
+        contentItems.push({
+          type: "image_url",
+          image_url: { url: asset.url },
+          role: "reference_image",
+        });
+      }
     }
 
     // 添加所有音频（使用 URL）
@@ -751,65 +841,26 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               <p className="text-xs">从右侧素材库拖拽素材到这里</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {/* 关键帧 */}
-              {keyframeAssets.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                    <Scissors className="w-3 h-3" />
-                    {keyframeAssets.map((asset, idx) => (
-                      <span key={asset.id}>
-                        {asset.display_name || asset.name}
-                        {idx < keyframeAssets.length - 1 && "、"}
-                      </span>
-                    ))}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {keyframeAssets.map((asset) => (
-                      <AssetCard
-                        key={asset.id}
-                        asset={asset}
-                        onClick={() => setSelectedDetailAsset(asset)}
-                        onRemove={() => handleRemoveAsset(asset.id)}
-                        onToggleActivation={() => toggleAssetActivation(asset.id)}
-                        showRemove
-                        showActivation
-                        className={cn(!asset.isActivated && "opacity-50 grayscale")}
-                      />
-                    ))}
-                  </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={selectedAssets.map(a => a.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-wrap gap-3">
+                  {selectedAssets.map((asset, idx) => (
+                    <SortableAssetCard
+                      key={asset.id}
+                      asset={asset}
+                      index={idx}
+                    />
+                  ))}
                 </div>
-              )}
-
-              {/* 图片 */}
-              {imageAssets.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                    <Image className="w-3 h-3" />
-                    {imageAssets.map((asset, idx) => (
-                      <span key={asset.id}>
-                        {asset.display_name || asset.name}
-                        {idx < imageAssets.length - 1 && "、"}
-                      </span>
-                    ))}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {imageAssets.map((asset) => (
-                      <AssetCard
-                        key={asset.id}
-                        asset={asset}
-                        onClick={() => setSelectedDetailAsset(asset)}
-                        onRemove={() => handleRemoveAsset(asset.id)}
-                        onToggleActivation={() => toggleAssetActivation(asset.id)}
-                        showRemove
-                        showActivation
-                        className={cn(!asset.isActivated && "opacity-50 grayscale")}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>
