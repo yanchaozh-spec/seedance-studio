@@ -11,8 +11,8 @@
     "ts-check": "tsc -p tsconfig.json",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "bash scripts/build-tauri.sh && tauri build",
-    "tauri:build:debug": "bash scripts/build-tauri.sh && tauri build --debug"
+    "tauri:build": "node scripts/build-tauri.js && tauri build",
+    "tauri:build:debug": "node scripts/build-tauri.js && tauri build --debug"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",
