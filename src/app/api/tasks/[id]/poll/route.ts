@@ -123,17 +123,25 @@ export async function GET(
             last_frame_url: lastFrameUrl,
           };
           
-          // 计算生成耗时
+          // 计算排队耗时（从排队到开始生成）
+          if (task.queued_at && updates.started_at) {
+            updates.queue_duration = Math.round(
+              (new Date(updates.started_at as string).getTime() - new Date(task.queued_at).getTime()) / 1000
+            );
+          }
+          
+          // 计算生成耗时（从开始生成到完成）
           if (task.started_at && updates.completed_at) {
             updates.generation_duration = Math.round(
               (new Date(updates.completed_at as string).getTime() - new Date(task.started_at).getTime()) / 1000
             );
-          } else if (!task.generation_duration && updates.completed_at) {
-            // 如果数据库中没有 generation_duration 但有 completed_at，尝试计算
-            // 使用 completed_at 减去 queued_at 作为估算
+          } else if (!task.generation_duration && updates.completed_at && task.queued_at) {
+            // 如果没有 started_at 但有 completed_at 和 queued_at，总时间作为生成耗时
             const completedTime = new Date(updates.completed_at as string).getTime();
-            const queuedTime = task.queued_at ? new Date(task.queued_at).getTime() : completedTime - 180000; // 默认3分钟
+            const queuedTime = new Date(task.queued_at).getTime();
             updates.generation_duration = Math.max(0, Math.round((completedTime - queuedTime) / 1000));
+            // 如果没有 started_at，排队耗时设为 null（无法确定）
+            updates.queue_duration = null;
           }
         } else if (externalTask.status === "failed") {
           updates.status = "failed";
