@@ -20,6 +20,8 @@ interface CreateTaskRequest {
     duration: number;
     ratio: string;
     resolution: string;
+    service_tier?: "default" | "flex";
+    return_last_frame?: boolean;
   };
   model_id?: string; // 可选，由前端传入
 }
@@ -272,7 +274,8 @@ export async function POST(request: NextRequest) {
       duration: params.duration,
       resolution: params.resolution,
       watermark: false,
-      return_last_frame: true,
+      return_last_frame: params.return_last_frame ?? false,
+      service_tier: params.service_tier || "default",
     };
 
     try {
