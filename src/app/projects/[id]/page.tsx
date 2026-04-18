@@ -228,13 +228,21 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         style={style} 
         className="relative group"
       >
-        {/* 左上角拖拽手柄 */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="absolute top-1 left-1 z-20 p-1 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
-        >
-          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        {/* 左上角拖拽手柄和关键帧标志 */}
+        <div className="absolute top-1 left-1 z-20 flex items-center gap-1">
+          <div
+            {...attributes}
+            {...listeners}
+            className="p-1 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="w-3 h-3 text-muted-foreground" />
+          </div>
+          {isKeyframe && (
+            <div className="flex items-center gap-0.5 text-[8px] bg-primary text-primary-foreground px-1 py-0.5 rounded">
+              <Scissors className="w-2.5 h-2.5" />
+              <span>关键帧</span>
+            </div>
+          )}
         </div>
         {/* 右上角删除按钮 */}
         <button
@@ -256,13 +264,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             className={cn(!asset.isActivated && "opacity-50 grayscale")}
           />
         </div>
-        {/* 右下角关键帧标志 */}
-        {isKeyframe && (
-          <div className="absolute bottom-8 right-1 z-10 flex items-center gap-0.5 text-[8px] bg-primary text-primary-foreground px-1 py-0.5 rounded">
-            <Scissors className="w-2.5 h-2.5" />
-            <span>关键帧</span>
-          </div>
-        )}
       </div>
     );
   }
