@@ -7,6 +7,24 @@ export type AssetType = "image" | "audio" | "video" | "keyframe" | "virtual_avat
 // 资产类别：关键帧（用于提示词拼接）| 美术资产（普通图片）| 音频 | 视频
 export type AssetCategory = "keyframe" | "image" | "audio" | "video";
 
+/**
+ * 素材逻辑分类（综合 type + asset_category 判断）
+ * - image: 普通图片（type=image 且 asset_category 不是 keyframe）
+ * - keyframe: 关键帧（type=keyframe 或 asset_category=keyframe）
+ * - virtualAvatar: 虚拟人像（type=virtual_avatar）
+ * - audio: 音频（type=audio）
+ * - video: 视频（type=video）
+ */
+export type AssetKind = "image" | "keyframe" | "virtualAvatar" | "audio" | "video";
+
+export function getAssetKind(asset: Asset): AssetKind {
+  if (asset.type === "virtual_avatar") return "virtualAvatar";
+  if (asset.type === "audio") return "audio";
+  if (asset.type === "video") return "video";
+  if (asset.type === "keyframe" || asset.asset_category === "keyframe") return "keyframe";
+  return "image";
+}
+
 export interface Asset {
   id: string;
   project_id: string;

@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
+import { Asset, getAssets, deleteAsset, reorderAssets, getAssetKind } from "@/lib/assets";
 import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
@@ -124,7 +124,7 @@ export function DraggableAsset({
     if (isDragging.current) return;
     e.preventDefault();
     e.stopPropagation();
-    if (onClick && (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar")) {
+    if (onClick) {
       onClick(asset);
     }
   };
@@ -260,7 +260,7 @@ export function DraggableAsset({
     if (isDragging.current) return;
     e.preventDefault();
     e.stopPropagation();
-    if (onClick && (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar")) {
+    if (onClick) {
       onClick(asset);
     }
   };
@@ -276,7 +276,7 @@ export function DraggableAsset({
       onClick={handleCardClick}
       className={cn(
         "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
-        (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && onClick && "cursor-pointer hover:ring-2 hover:ring-primary transition-all",
+        onClick && "cursor-pointer hover:ring-2 hover:ring-primary transition-all",
         size === "small" ? "w-20" : "w-full"
       )}
     >
@@ -808,6 +808,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               const thumbResult = await uploadFile(thumbFile, {
                 projectId: resolvedParams.id,
                 type: "image",
+                skipDb: true, // 缩略图不需要创建素材记录
               });
               thumbnailUrl = thumbResult.url;
             } catch (thumbErr) {
@@ -972,27 +973,27 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     return pathname === href || pathname.startsWith(href + "/");
   };
 
-  const imageMaterials = materials.filter((m) => m.type !== "audio" && m.type !== "video" && m.type !== "virtual_avatar" && (m.asset_category === "image" || !m.asset_category));
-  const keyframeMaterials = materials.filter((m) => m.asset_category === "keyframe");
-  const virtualAvatarMaterials = materials.filter((m) => m.type === "virtual_avatar");
-  const audioMaterials = materials.filter((m) => m.type === "audio");
-  const videoMaterials = materials.filter((m) => m.type === "video");
+  const imageMaterials = materials.filter((m) => getAssetKind(m) === "image");
+  const keyframeMaterials = materials.filter((m) => getAssetKind(m) === "keyframe");
+  const virtualAvatarMaterials = materials.filter((m) => getAssetKind(m) === "virtualAvatar");
+  const audioMaterials = materials.filter((m) => getAssetKind(m) === "audio");
+  const videoMaterials = materials.filter((m) => getAssetKind(m) === "video");
 
   // 根据筛选条件获取显示的素材
-  const getFilteredAssets = () => {
-    if (materialFilter === "all") {
-      return { image: imageMaterials, keyframe: keyframeMaterials, virtualAvatar: virtualAvatarMaterials, audio: audioMaterials, video: videoMaterials };
-    } else if (materialFilter === "keyframe") {
-      return { image: [] as Asset[], keyframe: keyframeMaterials, virtualAvatar: [] as Asset[], audio: [] as Asset[], video: [] as Asset[] };
-    } else if (materialFilter === "virtual_avatar") {
-      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: virtualAvatarMaterials, audio: [] as Asset[], video: [] as Asset[] };
-    } else if (materialFilter === "audio") {
-      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: [] as Asset[], audio: audioMaterials, video: [] as Asset[] };
-    } else if (materialFilter === "video") {
-      return { image: [] as Asset[], keyframe: [] as Asset[], virtualAvatar: [] as Asset[], audio: [] as Asset[], video: videoMaterials };
-    } else {
-      return { image: imageMaterials, keyframe: [] as Asset[], virtualAvatar: [] as Asset[], audio: [] as Asset[], video: [] as Asset[] };
-    }
+  const allMaterialGroups = {
+    image: imageMaterials,
+    virtualAvatar: virtualAvatarMaterials,
+    keyframe: keyframeMaterials,
+    audio: audioMaterials,
+    video: videoMaterials,
+  };
+
+  const getFilteredAssets = (): typeof allMaterialGroups => {
+    const empty = { image: [] as Asset[], virtualAvatar: [] as Asset[], keyframe: [] as Asset[], audio: [] as Asset[], video: [] as Asset[] };
+    if (materialFilter === "all") return allMaterialGroups;
+    const key = materialFilter === "virtual_avatar" ? "virtualAvatar" : materialFilter as keyof typeof empty;
+    if (key in empty) return { ...empty, [key]: allMaterialGroups[key] };
+    return allMaterialGroups;
   };
   const filtered = getFilteredAssets();
 

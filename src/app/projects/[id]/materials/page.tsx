@@ -16,7 +16,7 @@ import {
   Music,
   Video,
 } from "lucide-react";
-import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
+import { Asset, getAssets, deleteAsset, reorderAssets, getAssetKind } from "@/lib/assets";
 import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
@@ -159,6 +159,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
               const thumbResult = await uploadFile(thumbFile, {
                 projectId: resolvedParams.id,
                 type: "image",
+                skipDb: true, // 缩略图不需要创建素材记录
               });
               thumbnailUrl = thumbResult.url;
             } catch (thumbErr) {
@@ -217,33 +218,12 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
     }
   };
 
-  // 筛选图片素材（排除音频、视频和虚拟人像）
-  const imageAssets = assets.filter((a) => {
-    if (a.type === "audio") return false;
-    if (a.type === "video") return false;
-    if (a.type === "virtual_avatar") return false;
-    const isImage = a.asset_category === "image" || !a.asset_category;
-    return isImage;
-  });
-
-  const keyframeAssets = assets.filter((a) => {
-    if (a.type === "audio") return false;
-    if (a.type === "video") return false;
-    if (a.type === "virtual_avatar") return false;
-    return a.asset_category === "keyframe";
-  });
-
-  const virtualAvatarAssets = assets.filter((a) => {
-    return a.type === "virtual_avatar";
-  });
-
-  const audioAssets = assets.filter((a) => {
-    return a.type === "audio";
-  });
-
-  const videoAssets = assets.filter((a) => {
-    return a.type === "video";
-  });
+  // 筛选素材按分类
+  const imageAssets = assets.filter((a) => getAssetKind(a) === "image");
+  const keyframeAssets = assets.filter((a) => getAssetKind(a) === "keyframe");
+  const virtualAvatarAssets = assets.filter((a) => getAssetKind(a) === "virtualAvatar");
+  const audioAssets = assets.filter((a) => getAssetKind(a) === "audio");
+  const videoAssets = assets.filter((a) => getAssetKind(a) === "video");
 
   // 拖拽排序传感器
   const sensors = useSensors(

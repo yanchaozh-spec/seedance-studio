@@ -42,6 +42,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
   const [displayName, setDisplayName] = useState("");
   const [assetCategory, setAssetCategory] = useState<"keyframe" | "image" | "audio" | "video">("image");
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
+  const [showAudioPicker, setShowAudioPicker] = useState(false);
 
   // 合并 allAssets 和 localNewAudios 用于搜索
   const allAssetsWithNew = [...allAssets, ...localNewAudios];
@@ -199,6 +200,31 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
     }
   };
 
+  // 从已有音频列表选择绑定
+  const handleSelectAudio = async (audioId: string) => {
+    if (!asset) return;
+    try {
+      setBinding(true);
+      const response = await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bound_audio_id: audioId }),
+      });
+
+      if (!response.ok) throw new Error("绑定失败");
+      const updatedAsset = await response.json();
+
+      toast.success("音频绑定成功");
+      onUpdate(updatedAsset);
+      setCurrentAsset(updatedAsset);
+      setShowAudioPicker(false);
+    } catch {
+      toast.error("绑定失败");
+    } finally {
+      setBinding(false);
+    }
+  };
+
   // 下载图片/关键帧
   const handleDownload = async () => {
     if (!asset || !asset.id) return;
@@ -329,6 +355,17 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
+          {asset.type === "video" && (
+            <div className="bg-muted rounded-lg overflow-hidden">
+              <video
+                src={asset.url}
+                controls
+                className="w-full max-h-64"
+                poster={asset.thumbnail_url || undefined}
+              />
+            </div>
+          )}
+
           {/* 音频参考（仅美术资产显示） */}
           {assetCategory === "image" && (
             <div className="space-y-3">
@@ -350,11 +387,46 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                   </div>
                   <audio src={boundAudio.url} controls className="w-full mt-2" />
                 </div>
+              ) : showAudioPicker ? (
+                <div className="space-y-2">
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {allAssetsWithNew.filter(a => a.type === "audio").length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-3">暂无可用音频素材</p>
+                    ) : (
+                      allAssetsWithNew
+                        .filter(a => a.type === "audio")
+                        .map((audio) => (
+                          <button
+                            key={audio.id}
+                            className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-muted/80 transition-colors text-left"
+                            onClick={() => handleSelectAudio(audio.id)}
+                            disabled={binding}
+                          >
+                            <Music className="w-4 h-4 text-primary shrink-0" />
+                            <span className="text-sm truncate">{audio.display_name || audio.name}</span>
+                            {audio.duration != null && (
+                              <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                                {Math.floor(audio.duration / 60)}:{String(Math.floor(audio.duration % 60)).padStart(2, "0")}
+                              </span>
+                            )}
+                          </button>
+                        ))
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowAudioPicker(false)}
+                  >
+                    返回上传
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-2">
                   <label
                     htmlFor="audio-upload-dialog"
-                    className="flex items-center justify-center gap-2 w-full h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-center gap-2 w-full h-16 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
                   >
                     {uploadingAudio ? (
                       <>
@@ -364,7 +436,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                     ) : (
                       <>
                         <Upload className="w-5 h-5 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">点击上传音频</span>
+                        <span className="text-sm text-muted-foreground">上传新音频</span>
                       </>
                     )}
                   </label>
@@ -376,6 +448,15 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                     onChange={(e) => handleUploadAudio(e.target.files)}
                     disabled={uploadingAudio}
                   />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowAudioPicker(true)}
+                  >
+                    <Music className="w-4 h-4 mr-2" />
+                    从已有音频选择
+                  </Button>
                   <p className="text-xs text-muted-foreground text-center">
                     支持 MP3、WAV、AAC 等格式
                   </p>
@@ -384,7 +465,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 素材类型选择 */}
+          {/* 素材类型选择（音频/视频不需要切换） */}
+          {asset.type !== "audio" && asset.type !== "video" && (
           <div className="space-y-3">
             <label className="text-sm font-medium">素材类型</label>
             <div className="flex gap-2">
@@ -405,6 +487,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
               </Button>
             </div>
           </div>
+          )}
 
           {/* 关键帧描述编辑 */}
           {assetCategory === "keyframe" && (

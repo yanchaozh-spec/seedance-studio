@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { Image as ImageIcon, Music, Video, X, Check, Scissors, UserRound } from "lucide-react";
 import type { Asset } from "@/lib/assets";
+import { getAssetKind } from "@/lib/assets";
 
 interface AssetCardProps {
   asset: Asset & { isActivated?: boolean };
@@ -16,11 +17,6 @@ interface AssetCardProps {
   className?: string;
 }
 
-// 检查是否为关键帧类型
-function isKeyframeAsset(asset: Asset): boolean {
-  return asset.asset_category === "keyframe";
-}
-
 export function AssetCard({
   asset,
   onClick,
@@ -32,7 +28,7 @@ export function AssetCard({
   size = "sm",
   className,
 }: AssetCardProps) {
-  const isKeyframe = isKeyframeAsset(asset);
+  const isKeyframe = getAssetKind(asset) === "keyframe";
 
   return (
     <div
@@ -200,5 +196,5 @@ export function AssetCard({
   );
 }
 
-// 导出类型检查函数供外部使用
-export { isKeyframeAsset };
+// 重新导出 getAssetKind 供外部使用
+export { getAssetKind } from "@/lib/assets";

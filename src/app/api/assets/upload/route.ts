@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     let projectId: string;
     let type: "image" | "audio" | "video" | "keyframe";
     let userTosConfig: TosConfig | null = null;
+    let skipDb = false;
 
     // 检查是否是 multipart form data
     if (contentType.includes("multipart/form-data")) {
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
       file = formData.get("file") as File;
       projectId = formData.get("projectId") as string;
       type = formData.get("type") as "image" | "audio" | "video" | "keyframe";
+      skipDb = formData.get("skipDb") === "true";
 
       // 从表单获取 TOS 配置（JSON 字符串）
       const tosConfigStr = formData.get("tosConfig") as string;
@@ -105,11 +107,12 @@ export async function POST(request: NextRequest) {
     // 去除文件名扩展名，用于显示
     const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
 
-    // 创建数据库记录
+    // 创建数据库记录（skipDb 时跳过，如缩略图上传）
     let assetId: string | null = null;
+    if (!skipDb) {
     try {
       const db = getDb();
-      const assetCategory = type === "keyframe" ? "keyframe" : type === "video" ? "video" : "image";
+      const assetCategory = type === "keyframe" ? "keyframe" : type === "video" ? "video" : type === "audio" ? "audio" : "image";
 
       const row = db.prepare(`
         INSERT INTO assets (project_id, name, type, asset_category, url, thumbnail_url, size, storage_key)
@@ -129,6 +132,7 @@ export async function POST(request: NextRequest) {
       console.log("Asset record created:", assetId);
     } catch (dbError) {
       console.error("Database error:", dbError);
+    }
     }
 
     return NextResponse.json({

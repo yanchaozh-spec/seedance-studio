@@ -11,7 +11,7 @@ import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
 import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music, GripVertical, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Asset } from "@/lib/assets";
+import { Asset, getAssetKind } from "@/lib/assets";
 import { Task, createTask, getVideoUrl } from "@/lib/tasks";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
@@ -21,7 +21,7 @@ import { uploadFile } from "@/lib/upload";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
-import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
+import { buildSeedanceRequestBody, buildSeedanceContent } from "@/lib/seedance";
 import { DraggableAsset } from "./layout";
 
 // dnd-kit 导入
@@ -375,206 +375,20 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
   // 生成最终提示词预览（显示实际 API 调用格式）
   const generateFinalPrompt = useCallback(() => {
-    const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
+    // 使用共享的 buildSeedanceContent 构建内容
+    const promptBoxesForApi = promptBoxes.map((box, idx) => ({
+      content: box.content,
+      order: idx,
+      keyframeDescription: box.keyframeDescription,
+      assetId: box.activatedAssetId,
+    }));
 
-    // 只使用激活的素材
-    const activatedAssets = selectedAssets.filter((a) => a.isActivated);
-
-    // 三组序号分配：图片、音频、视频
-    const imageRefMap = new Map<string, number>();
-    let imageIndex = 0;
-    for (const asset of activatedAssets) {
-      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
-      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      const isVirtualAvatar = asset.type === "virtual_avatar";
-      if (isImage || isKeyframe || isVirtualAvatar) {
-        imageIndex++;
-        imageRefMap.set(asset.id, imageIndex);
-      }
-    }
-
-    const audioRefMap = new Map<string, number>();
-    let audioIndex = 0;
-    for (const asset of activatedAssets) {
-      if (asset.type === "audio") {
-        audioIndex++;
-        audioRefMap.set(asset.id, audioIndex);
-      }
-    }
-
-    const videoRefMap = new Map<string, number>();
-    let videoIndex = 0;
-    for (const asset of activatedAssets) {
-      if (asset.type === "video") {
-        videoIndex++;
-        videoRefMap.set(asset.id, videoIndex);
-      }
-    }
-
-    // 反向映射: displayName → refName
-    const nameToRefMap = new Map<string, string>();
-    for (const asset of activatedAssets) {
-      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
-      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      const isVirtualAvatar = asset.type === "virtual_avatar";
-
-      if (isImage || isKeyframe || isVirtualAvatar) {
-        const refIndex = imageRefMap.get(asset.id)!;
-        const refName = `图片${refIndex}`;
-        const displayName = asset.display_name || asset.name;
-        nameToRefMap.set(displayName, refName);
-      } else if (asset.type === "audio") {
-        const refIndex = audioRefMap.get(asset.id)!;
-        const refName = `音频${refIndex}`;
-        const displayName = asset.display_name || asset.name;
-        nameToRefMap.set(displayName, refName);
-      } else if (asset.type === "video") {
-        const refIndex = videoRefMap.get(asset.id)!;
-        const refName = `视频${refIndex}`;
-        const displayName = asset.display_name || asset.name;
-        nameToRefMap.set(displayName, refName);
-      }
-    }
-
-    /**
-     * 替换提示词中的 @角色名 为对应引用格式
-     * 按名字长度降序替换，避免短名误替换长名
-     */
-    function replaceMentions(text: string): string {
-      const sortedNames = [...nameToRefMap.keys()].sort((a, b) => b.length - a.length);
-      let result = text;
-      for (const name of sortedNames) {
-        const ref = nameToRefMap.get(name)!;
-        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`@${escaped}`, "g");
-        result = result.replace(regex, `${ref}(${name})`);
-      }
-      return result;
-    }
-
-    // 构建素材定义行
-    const assetDefParts: string[] = [];
-    for (const asset of activatedAssets) {
-      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
-      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      const isVirtualAvatar = asset.type === "virtual_avatar";
-
-      if (isImage || isKeyframe || isVirtualAvatar) {
-        const refIndex = imageRefMap.get(asset.id)!;
-        const refName = `图片${refIndex}`;
-        const displayName = asset.display_name || asset.name;
-
-        if (isKeyframe) {
-          const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-          assetDefParts.push(`${refName}为${desc}`);
-        } else if (isVirtualAvatar) {
-          const assetId = (asset as { asset_id?: string }).asset_id;
-          if (assetId) {
-            let defPart = `@${refName} 为 ${displayName}（资产 ID: [${assetId}]）`;
-            if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-              const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-              defPart += `，声线为@${audioRef}`;
-            }
-            assetDefParts.push(defPart);
-          } else {
-            assetDefParts.push(`${refName}为${displayName}`);
-          }
-        } else {
-          // 普通图片
-          if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-            const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-            assetDefParts.push(`${refName}为${displayName}，声线为@${audioRef}`);
-          } else {
-            assetDefParts.push(`${refName}为${displayName}`);
-          }
-        }
-      } else if (asset.type === "video") {
-        const refIndex = videoRefMap.get(asset.id)!;
-        const refName = `视频${refIndex}`;
-        const displayName = asset.display_name || asset.name;
-        assetDefParts.push(`@${refName} 为 ${displayName}`);
-      }
-      // 独立音频不在定义行声明（它们通过声线绑定或@音频N引用）
-    }
-
-    // 构建文本内容
-    const textParts: string[] = [];
-    const assetDefLine = assetDefParts.join("；");
-    if (assetDefLine) {
-      textParts.push(assetDefLine);
-    }
-    for (const box of nonEmptyBoxes) {
-      if (box.content.trim()) {
-        textParts.push(replaceMentions(box.content.trim()));
-      }
-    }
-
-    const contentItems: SeedanceContentItem[] = [];
-    if (textParts.length > 0) {
-      contentItems.push({
-        type: "text",
-        text: textParts.join("\n"),
-      });
-    }
-
-    // 按 activatedAssets 顺序添加所有图片（含虚拟人像）
-    for (const asset of activatedAssets) {
-      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
-      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      const isVirtualAvatar = asset.type === "virtual_avatar";
-      if (isImage || isKeyframe || isVirtualAvatar) {
-        const imageUrl = isVirtualAvatar && (asset as { asset_id?: string }).asset_id
-          ? `asset://${(asset as { asset_id?: string }).asset_id}`
-          : asset.url;
-        contentItems.push({
-          type: "image_url",
-          image_url: { url: imageUrl },
-          role: "reference_image",
-        });
-      }
-    }
-
-    // 按 activatedAssets 顺序添加所有视频
-    for (const asset of activatedAssets) {
-      if (asset.type === "video") {
-        contentItems.push({
-          type: "video_url",
-          video_url: { url: asset.url },
-          role: "reference_video",
-        });
-      }
-    }
-
-    // 按图片绑定顺序添加所有音频（与图片顺序对应）
-    for (const asset of activatedAssets) {
-      if (asset.bound_audio_id) {
-        const audioAsset = selectedAssets.find(a => a.id === asset.bound_audio_id) 
-          || materials.find(m => m.id === asset.bound_audio_id);
-        if (audioAsset) {
-          contentItems.push({
-            type: "audio_url",
-            audio_url: { url: audioAsset.url },
-            role: "reference_audio",
-          });
-        }
-      }
-    }
-
-    // 添加独立音频（未被图片绑定但已激活的音频）
-    const boundAudioIds = new Set(
-      activatedAssets.filter(a => a.bound_audio_id).map(a => a.bound_audio_id!)
+    const contentItems = buildSeedanceContent(
+      [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))],
+      promptBoxesForApi,
+      true // 只使用激活的素材
     );
-    for (const asset of activatedAssets) {
-      if (asset.type === "audio" && !boundAudioIds.has(asset.id)) {
-        contentItems.push({
-          type: "audio_url",
-          audio_url: { url: asset.url },
-          role: "reference_audio",
-        });
-      }
-    }
 
-    // 返回 JSON 格式预览
     const requestBody = buildSeedanceRequestBody(modelId || "", contentItems, {
       ratio: params_.ratio,
       duration: params_.duration,
@@ -678,15 +492,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
     if (firstActivatedAsset) {
       const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
-      const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
-      const isVirtualAvatar = firstActivatedAsset.type === "virtual_avatar";
+      const kind = getAssetKind(firstActivatedAsset);
       
       let assetLine = "";
 
-      if (isVirtualAvatar) {
+      if (kind === "virtualAvatar") {
         // 虚拟人像：角色名@这张图片
         assetLine = `${displayName}@这张图片`;
-      } else if (isKeyframe) {
+      } else if (kind === "keyframe") {
         // 关键帧：关键帧描述@文件名
         const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
         if (keyframeDesc) {

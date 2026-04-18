@@ -8,6 +8,8 @@ import { useSettingsStore } from "./settings";
 export interface UploadOptions {
   projectId: string;
   type: "image" | "audio" | "video" | "keyframe";
+  /** 如果为 true，只上传文件不创建数据库记录（用于缩略图等辅助文件） */
+  skipDb?: boolean;
 }
 
 /**
@@ -25,6 +27,11 @@ export async function uploadFile(
   formData.append("file", file);
   formData.append("projectId", options.projectId);
   formData.append("type", options.type);
+  
+  // 缩略图等辅助文件不需要创建数据库记录
+  if (options.skipDb) {
+    formData.append("skipDb", "true");
+  }
   
   // 如果启用了用户 TOS 配置，添加到表单
   if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey && 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, parseJsonField, toJsonField } from "@/storage/database/sqlite-client";
-import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
+import { buildSeedanceRequestBody, buildSeedanceContent, type SeedanceContentItem } from "@/lib/seedance";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const DEFAULT_MODEL_ID = process.env.ARK_MODEL_ID || "";
@@ -27,238 +27,7 @@ interface CreateTaskRequest {
   model_id?: string;
 }
 
-// Content Item 类型定义
-interface TextContent {
-  type: "text";
-  text: string;
-}
 
-interface ImageContent {
-  type: "image_url";
-  image_url: {
-    url: string;
-  };
-  role?: "first_frame" | "last_frame" | "reference_image";
-}
-
-interface VideoContent {
-  type: "video_url";
-  video_url: {
-    url: string;
-  };
-  role: "reference_video";
-}
-
-interface AudioContent {
-  type: "audio_url";
-  audio_url: {
-    url: string;
-  };
-  role: "reference_audio";
-}
-
-type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
-
-function buildContent(
-  promptBoxes: CreateTaskRequest["prompt_boxes"],
-  assets: Array<{
-    id: string;
-    url: string;
-    type: string;
-    display_name?: string;
-    name: string;
-    asset_category?: string;
-    asset_id?: string;
-    bound_audio_id?: string;
-    voice_description?: string;
-    keyframe_description?: string;
-    is_keyframe?: boolean;
-  }>
-): ContentItem[] {
-  const content: ContentItem[] = [];
-
-  const imageAssets = assets.filter((a) => (a.type === "image" || a.type === "virtual_avatar") && a.asset_category !== "keyframe");
-  const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
-  const audioAssets = assets.filter((a) => a.type === "audio");
-  const videoAssets = assets.filter((a) => a.type === "video");
-
-  const allImageAssets: typeof imageAssets = [];
-  allImageAssets.push(...keyframeAssets);
-  allImageAssets.push(...imageAssets);
-
-  const allAudioAssets: typeof audioAssets = [];
-  const usedAudioIds = new Set<string>();
-
-  for (const asset of allImageAssets) {
-    if (asset.bound_audio_id) {
-      usedAudioIds.add(asset.bound_audio_id);
-    }
-  }
-
-  for (const audio of audioAssets) {
-    if (usedAudioIds.has(audio.id)) {
-      allAudioAssets.push(audio);
-    }
-  }
-
-  for (const audio of audioAssets) {
-    if (!usedAudioIds.has(audio.id)) {
-      allAudioAssets.push(audio);
-    }
-  }
-
-  const imageRefMap = new Map<string, string>();
-  let imageIndex = 0;
-  for (const asset of allImageAssets) {
-    imageIndex++;
-    const refName = `图片${imageIndex}`;
-    imageRefMap.set(asset.id, refName);
-  }
-
-  const audioRefMap = new Map<string, string>();
-  let audioIndex = 0;
-  for (const audio of allAudioAssets) {
-    audioIndex++;
-    const refName = `音频${audioIndex}`;
-    audioRefMap.set(audio.id, refName);
-  }
-
-  const videoRefMap = new Map<string, string>();
-  let videoIndex = 0;
-  for (const video of videoAssets) {
-    videoIndex++;
-    const refName = `视频${videoIndex}`;
-    videoRefMap.set(video.id, refName);
-  }
-
-  // 反向映射: displayName → refName，用于提示词中 @角色名 替换
-  const nameToRefMap = new Map<string, string>();
-  for (const asset of allImageAssets) {
-    const refName = imageRefMap.get(asset.id)!;
-    const displayName = asset.display_name || asset.name;
-    nameToRefMap.set(displayName, refName);
-  }
-  for (const audio of allAudioAssets) {
-    const refName = audioRefMap.get(audio.id)!;
-    const displayName = audio.display_name || audio.name;
-    nameToRefMap.set(displayName, refName);
-  }
-  for (const video of videoAssets) {
-    const refName = videoRefMap.get(video.id)!;
-    const displayName = video.display_name || video.name;
-    nameToRefMap.set(displayName, refName);
-  }
-
-  /**
-   * 替换提示词中的 @角色名 为 图片N(角色名)/音频N(名称)/视频N(名称) 格式
-   * Seedance API 要求：提示词中使用"素材类型+序号"引用，不用 @ 前缀
-   * 按名字长度降序替换，避免短名误替换长名
-   */
-  function replaceMentions(text: string): string {
-    const sortedNames = [...nameToRefMap.keys()].sort((a, b) => b.length - a.length);
-    let result = text;
-    for (const name of sortedNames) {
-      const ref = nameToRefMap.get(name)!;
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(`@${escaped}`, "g");
-      result = result.replace(regex, `${ref}(${name})`);
-    }
-    return result;
-  }
-
-  const textParts: string[] = [];
-  const assetDefParts: string[] = [];
-
-  for (const asset of keyframeAssets) {
-    const refName = imageRefMap.get(asset.id)!;
-    const desc = asset.keyframe_description || asset.display_name || asset.name;
-    assetDefParts.push(`${refName}为${desc}`);
-  }
-
-  for (const asset of imageAssets) {
-    const refName = imageRefMap.get(asset.id)!;
-    const displayName = asset.display_name || asset.name;
-
-    // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式，支持声线
-    if (asset.type === "virtual_avatar" && asset.asset_id) {
-      let defPart = `@${refName} 为 ${displayName}（资产 ID: [${asset.asset_id}]）`;
-      if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-        const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-        defPart += `，声线为${audioRef}`;
-      }
-      assetDefParts.push(defPart);
-    } else if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-      const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-      assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);
-    } else {
-      assetDefParts.push(`${refName}为${displayName}`);
-    }
-  }
-
-  // 视频素材定义
-  for (const video of videoAssets) {
-    const refName = videoRefMap.get(video.id)!;
-    const displayName = video.display_name || video.name;
-    assetDefParts.push(`${refName}为${displayName}`);
-  }
-
-  if (assetDefParts.length > 0) {
-    textParts.push(assetDefParts.join("；"));
-  }
-
-  const sortedBoxes = promptBoxes
-    .filter((box) => box.content.trim())
-    .sort((a, b) => a.order - b.order);
-
-  for (const box of sortedBoxes) {
-    if (box.content.trim()) {
-      textParts.push(replaceMentions(box.content.trim()));
-    }
-  }
-
-  if (textParts.length > 0) {
-    content.push({
-      type: "text",
-      text: textParts.join("\n"),
-    });
-  }
-
-  for (const asset of allImageAssets) {
-    // 虚拟人像使用 asset:// 协议，普通素材使用原始 URL
-    const imageUrl = asset.type === "virtual_avatar" && asset.asset_id
-      ? `asset://${asset.asset_id}`
-      : asset.url;
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: imageUrl,
-      },
-      role: "reference_image",
-    });
-  }
-
-  for (const video of videoAssets) {
-    content.push({
-      type: "video_url",
-      video_url: {
-        url: video.url,
-      },
-      role: "reference_video",
-    });
-  }
-
-  for (const audio of allAudioAssets) {
-    content.push({
-      type: "audio_url",
-      audio_url: {
-        url: audio.url,
-      },
-      role: "reference_audio",
-    });
-  }
-
-  return content;
-}
 
 // 创建视频生成任务
 export async function POST(request: NextRequest) {
@@ -300,20 +69,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 构建 content 数组
-    const content = buildContent(prompt_boxes, allAssetRows as Array<{
-      id: string;
-      url: string;
-      type: string;
-      display_name?: string;
-      name: string;
-      asset_category?: string;
-      asset_id?: string;
-      bound_audio_id?: string;
-      voice_description?: string;
-      keyframe_description?: string;
-      is_keyframe?: boolean;
-    }>);
+    // 构建 content 数组（使用共享逻辑）
+    const content = buildSeedanceContent(
+      allAssetRows as Array<{
+        id: string;
+        url: string;
+        type: string;
+        display_name?: string;
+        name: string;
+        asset_category?: string;
+        asset_id?: string;
+        bound_audio_id?: string;
+        voice_description?: string;
+        keyframe_description?: string;
+        is_keyframe?: boolean;
+      }>,
+      prompt_boxes.map((box, idx) => ({
+        content: box.content,
+        order: idx,
+        keyframeDescription: box.keyframe_description,
+      })),
+      false // 后端已预筛选素材，不需要过滤激活状态
+    );;
 
     if (content.length === 0) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });
