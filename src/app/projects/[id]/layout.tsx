@@ -810,20 +810,28 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   {filtered.image.length > 0 && (
                     <div className="mb-4">
                       <div className="flex flex-wrap gap-1.5">
-                        {filtered.image.map((asset) => (
-                          <div key={asset.id} className="flex flex-col items-center">
-                            <DraggableAsset
-                              asset={asset}
-                              size="small"
-                              onClick={setSelectedDetailAsset}
-                              showRemove
-                              onRemove={handleDeleteMaterial}
-                            />
-                            <p className="text-[10px] text-center mt-0.5 truncate max-w-20" title={asset.display_name || asset.name}>
-                              {asset.display_name || asset.name}
-                            </p>
-                          </div>
-                        ))}
+                        {filtered.image.map((asset) => {
+                          const isInPool = selectedAssets.some(s => s.id === asset.id);
+                          return (
+                            <div key={asset.id} className="flex flex-col items-center relative">
+                              {isInPool && (
+                                <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                                  <CheckCircle className="w-2.5 h-2.5" />
+                                </div>
+                              )}
+                              <DraggableAsset
+                                asset={asset}
+                                size="small"
+                                onClick={setSelectedDetailAsset}
+                                showRemove
+                                onRemove={handleDeleteMaterial}
+                              />
+                              <p className="text-[10px] text-center mt-0.5 truncate max-w-20" title={asset.display_name || asset.name}>
+                                {asset.display_name || asset.name}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -831,20 +839,28 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   {filtered.keyframe.length > 0 && (
                     <div className="mb-4">
                       <div className="flex flex-wrap gap-1.5">
-                        {filtered.keyframe.map((asset) => (
-                          <div key={asset.id} className="flex flex-col items-center">
-                            <DraggableAsset
-                              asset={asset}
-                              size="small"
-                              onClick={setSelectedDetailAsset}
-                              showRemove
-                              onRemove={handleDeleteMaterial}
-                            />
-                            <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
-                              {asset.display_name || asset.name}
-                            </p>
-                          </div>
-                        ))}
+                        {filtered.keyframe.map((asset) => {
+                          const isInPool = selectedAssets.some(s => s.id === asset.id);
+                          return (
+                            <div key={asset.id} className="flex flex-col items-center relative">
+                              {isInPool && (
+                                <div className="absolute top-0 right-0 z-10 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                                  <CheckCircle className="w-2.5 h-2.5" />
+                                </div>
+                              )}
+                              <DraggableAsset
+                                asset={asset}
+                                size="small"
+                                onClick={setSelectedDetailAsset}
+                                showRemove
+                                onRemove={handleDeleteMaterial}
+                              />
+                              <p className="text-xs text-center mt-1 truncate max-w-24" title={asset.display_name || asset.name}>
+                                {asset.display_name || asset.name}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

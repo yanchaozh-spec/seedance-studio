@@ -201,8 +201,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }
   }, [setSelectedAssets]);
 
-  // 可排序的素材卡片组件
-  function SortableAssetCard({ asset, index }: { asset: SelectedAsset; index: number }) {
+  // 可排序的素材卡片组件 - 整个卡片可直接拖拽
+  function SortableAssetCard({ asset }: { asset: SelectedAsset }) {
     const {
       attributes,
       listeners,
@@ -222,19 +222,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
 
     return (
-      <div ref={setNodeRef} style={style} className="relative group">
-        {/* 序号标签 */}
-        <div className="absolute -top-2 -left-2 z-10 bg-background border rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium shadow-sm">
-          {index + 1}
-        </div>
-        {/* 拖拽手柄 */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="absolute top-1 left-1 z-10 p-1 rounded bg-background/80 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
-        >
-          <GripVertical className="w-3 h-3 text-muted-foreground" />
-        </div>
+      <div 
+        ref={setNodeRef} 
+        style={style} 
+        className="relative group cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
         <AssetCard
           asset={asset}
           onClick={() => setSelectedDetailAsset(asset)}
@@ -374,19 +368,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       audioRefMap.set(audio.id, `音频${audioIndex}`);
     }
 
-    // 按 selectedAssets 的顺序收集所有图片，分配序号
-    const assetRefMap = new Map<string, number>();
-    let imageIndex = 0;
-    for (const asset of activatedAssets) {
-      const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
-      const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      if (isImage || isKeyframe) {
-        imageIndex++;
-        assetRefMap.set(asset.id, imageIndex);
-      }
-    }
-
-    // 构建素材定义行（按 activatedAssets 的顺序）
+    // 构建素材定义行（按 activatedAssets 的顺序，不使用图片序号）
     const assetDefParts: string[] = [];
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
@@ -394,20 +376,18 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       
       if (!isImage && !isKeyframe) continue;
       
-      const refIndex = assetRefMap.get(asset.id)!;
-      const refName = `图片${refIndex}`;
       const isKeyframeType = asset.type === "keyframe" || asset.asset_category === "keyframe";
       
       if (isKeyframeType) {
         const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
-        assetDefParts.push(`${desc}：${refName}`);
+        assetDefParts.push(`${desc}`);
       } else {
         const displayName = asset.display_name || asset.name;
         if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
           const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-          assetDefParts.push(`${displayName}：${refName}，声线为：${audioRef}`);
+          assetDefParts.push(`${displayName}，声线为：${audioRef}`);
         } else {
-          assetDefParts.push(`${displayName}：${refName}`);
+          assetDefParts.push(`${displayName}`);
         }
       }
     }
@@ -851,11 +831,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 strategy={verticalListSortingStrategy}
               >
                 <div className="flex flex-wrap gap-3">
-                  {selectedAssets.map((asset, idx) => (
+                  {selectedAssets.map((asset) => (
                     <SortableAssetCard
                       key={asset.id}
                       asset={asset}
-                      index={idx}
                     />
                   ))}
                 </div>
