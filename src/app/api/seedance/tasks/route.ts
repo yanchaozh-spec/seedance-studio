@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { getDb, parseJsonField, toJsonField } from "@/storage/database/sqlite-client";
 import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
@@ -24,10 +24,10 @@ interface CreateTaskRequest {
     return_last_frame?: boolean;
     tools?: Array<{ type: "web_search" }>;
   };
-  model_id?: string; // 可选，由前端传入
+  model_id?: string;
 }
 
-// Content Item 类型定义 - 严格按照 API 文档格式
+// Content Item 类型定义
 interface TextContent {
   type: "text";
   text: string;
@@ -59,10 +59,6 @@ interface AudioContent {
 
 type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
 
-// 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
-// 格式：素材定义行（使用序号引用）+ 提示词分行
-// 示例：@[图片1]为林央，声线为@[音频1]；@[图片2]为启龙；@[关键帧1]为关键帧描述
-// content 数组结构：图片 -> 音频 -> 文本
 function buildContent(
   promptBoxes: CreateTaskRequest["prompt_boxes"],
   assets: Array<{
@@ -80,43 +76,35 @@ function buildContent(
 ): ContentItem[] {
   const content: ContentItem[] = [];
 
-  // 分类素材
   const imageAssets = assets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
 
-  // 合并所有图片资产（关键帧在前，美术资产在后，与前端显示一致）
   const allImageAssets: typeof imageAssets = [];
   allImageAssets.push(...keyframeAssets);
   allImageAssets.push(...imageAssets);
 
-  // 收集所有音频（绑定的 + 独立的）
   const allAudioAssets: typeof audioAssets = [];
   const usedAudioIds = new Set<string>();
-  
-  // 首先收集所有绑定的音频
+
   for (const asset of allImageAssets) {
     if (asset.bound_audio_id) {
       usedAudioIds.add(asset.bound_audio_id);
     }
   }
-  
-  // 添加绑定的音频
+
   for (const audio of audioAssets) {
     if (usedAudioIds.has(audio.id)) {
       allAudioAssets.push(audio);
     }
   }
-  
-  // 添加独立的音频
+
   for (const audio of audioAssets) {
     if (!usedAudioIds.has(audio.id)) {
       allAudioAssets.push(audio);
     }
   }
 
-  // 构建序号映射（无方括号，符合官方格式）
-  // 图片序号
   const imageRefMap = new Map<string, string>();
   let imageIndex = 0;
   for (const asset of allImageAssets) {
@@ -125,7 +113,6 @@ function buildContent(
     imageRefMap.set(asset.id, refName);
   }
 
-  // 音频序号
   const audioRefMap = new Map<string, string>();
   let audioIndex = 0;
   for (const audio of allAudioAssets) {
@@ -134,25 +121,19 @@ function buildContent(
     audioRefMap.set(audio.id, refName);
   }
 
-  // 第一步：添加文本（放在最前面，符合官方格式）
-  // 构建素材定义行（使用序号，无方括号）
   const textParts: string[] = [];
-
-  // 构建素材定义行（使用序号，与前端 UI 和 contentItems 顺序一致）
   const assetDefParts: string[] = [];
-  
-  // 先添加关键帧（使用 keyframe_description 作为名称）
+
   for (const asset of keyframeAssets) {
     const refName = imageRefMap.get(asset.id)!;
     const desc = asset.keyframe_description || asset.display_name || asset.name;
     assetDefParts.push(`@${refName}为${desc}`);
   }
 
-  // 再添加美术资产（带声线绑定）
   for (const asset of imageAssets) {
     const refName = imageRefMap.get(asset.id)!;
     const displayName = asset.display_name || asset.name;
-    
+
     if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
       const audioRef = audioRefMap.get(asset.bound_audio_id)!;
       assetDefParts.push(`@${refName}为${displayName}，声线为@${audioRef}`);
@@ -161,24 +142,20 @@ function buildContent(
     }
   }
 
-  // 添加素材定义行（第一行）
   if (assetDefParts.length > 0) {
     textParts.push(assetDefParts.join("；"));
   }
 
-  // 按顺序处理提示词框
   const sortedBoxes = promptBoxes
     .filter((box) => box.content.trim())
     .sort((a, b) => a.order - b.order);
 
-  // 添加提示词（每个提示词一行）
   for (const box of sortedBoxes) {
     if (box.content.trim()) {
       textParts.push(box.content.trim());
     }
   }
 
-  // 添加文本
   if (textParts.length > 0) {
     content.push({
       type: "text",
@@ -186,7 +163,6 @@ function buildContent(
     });
   }
 
-  // 第二步：添加所有图片（使用 URL）
   for (const asset of allImageAssets) {
     content.push({
       type: "image_url",
@@ -197,7 +173,6 @@ function buildContent(
     });
   }
 
-  // 第三步：添加所有音频（使用 URL）
   for (const audio of allAudioAssets) {
     content.push({
       type: "audio_url",
@@ -217,56 +192,60 @@ export async function POST(request: NextRequest) {
     const body: CreateTaskRequest = await request.json();
     const { project_id, prompt_boxes, selected_assets, params } = body;
 
-    // 获取 ARK API Key - 优先从请求头获取，其次从环境变量获取
     const apiKey = request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
-    
+
     if (!apiKey) {
       console.error("[CREATE TASK] ARK API Key not configured");
       return NextResponse.json({ error: "ARK API Key not configured" }, { status: 500 });
     }
 
-    // 获取选中的素材
-    const client = getSupabaseClient();
-    
-    // 先获取选中的素材
-    const { data: assets, error: assetsError } = await client
-      .from("assets")
-      .select("*")
-      .in("id", selected_assets);
+    const db = getDb();
 
-    if (assetsError) {
-      return NextResponse.json({ error: "Failed to fetch assets" }, { status: 500 });
-    }
+    // 获取选中的素材
+    const placeholders = selected_assets.map(() => "?").join(",");
+    const assets = db.prepare(`SELECT * FROM assets WHERE id IN (${placeholders})`).all(...selected_assets) as Record<string, unknown>[];
 
     // 如果有图片绑定了音频，也需要获取这些音频素材
-    let allAssets = assets || [];
+    const allAssetRows = [...assets];
     const boundAudioIds = assets
-      ?.filter((a) => (a.type === "image" || a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe) && a.bound_audio_id)
-      .map((a) => a.bound_audio_id)
-      .filter((id): id is string => !!id) || [];
-    
+      .filter((a) => (a.type === "image" || a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe) && a.bound_audio_id)
+      .map((a) => a.bound_audio_id as string)
+      .filter((id): id is string => !!id);
+
     if (boundAudioIds.length > 0) {
-      const { data: boundAudios } = await client
-        .from("assets")
-        .select("*")
-        .in("id", boundAudioIds);
-      
+      const audioPlaceholders = boundAudioIds.map(() => "?").join(",");
+      const boundAudios = db.prepare(`SELECT * FROM assets WHERE id IN (${audioPlaceholders})`).all(...boundAudioIds) as Record<string, unknown>[];
+
       if (boundAudios && boundAudios.length > 0) {
-        allAssets = [...allAssets, ...boundAudios.filter(b => !allAssets.some(a => a.id === b.id))];
+        const existingIds = new Set(allAssetRows.map((a) => a.id));
+        for (const b of boundAudios) {
+          if (!existingIds.has(b.id)) {
+            allAssetRows.push(b);
+          }
+        }
       }
     }
 
     // 构建 content 数组
-    const content = buildContent(prompt_boxes, allAssets);
+    const content = buildContent(prompt_boxes, allAssetRows as Array<{
+      id: string;
+      url: string;
+      type: string;
+      display_name?: string;
+      name: string;
+      asset_category?: string;
+      bound_audio_id?: string;
+      voice_description?: string;
+      keyframe_description?: string;
+      is_keyframe?: boolean;
+    }>);
 
     if (content.length === 0) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });
     }
 
-    // 使用前端传入的 model_id 或默认值
     const modelId = body.model_id || DEFAULT_MODEL_ID;
 
-    // 构建请求参数 - 使用共享模块
     const requestBody = buildSeedanceRequestBody(modelId, content as unknown as SeedanceContentItem[], {
       ratio: params.ratio,
       duration: params.duration,
@@ -276,7 +255,6 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      // 调用 Seedance API 获取 task ID
       const response = await fetch(`${ARK_API_URL}/contents/generations/tasks`, {
         method: "POST",
         headers: {
@@ -287,7 +265,6 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(requestBody),
       });
 
-      // 检查 HTTP 状态码
       if (!response.ok) {
         let errorMessage = "API request failed";
         try {
@@ -297,44 +274,35 @@ export async function POST(request: NextRequest) {
           // 响应体不是 JSON
         }
         console.error("[CREATE TASK] API error:", response.status, errorMessage);
-        return NextResponse.json({ 
-          error: errorMessage 
+        return NextResponse.json({
+          error: errorMessage
         }, { status: response.status });
       }
 
       const data = await response.json();
 
-      // 检查业务错误
       if (data.error) {
         console.error("[CREATE TASK] Business error:", data.error);
-        return NextResponse.json({ 
-          error: data.error?.message || data.error?.code || "Task creation failed" 
+        return NextResponse.json({
+          error: data.error?.message || data.error?.code || "Task creation failed"
         }, { status: 400 });
       }
 
       // 使用 API 返回的 task ID 保存任务到数据库
       const taskId = data.id;
-      const { error: insertError } = await client.from("tasks").insert({
-        id: taskId,
+      db.prepare(`
+        INSERT INTO tasks (id, project_id, task_id_external, status, model_mode, model_id, progress, prompt_boxes, selected_assets, params, queued_at, api_key)
+        VALUES (?, ?, ?, 'queued', 'standard', ?, 0, ?, ?, ?, datetime('now', 'localtime'), ?)
+      `).run(
+        taskId,
         project_id,
-        task_id_external: taskId,
-        status: "queued",
-        model_mode: "standard",
-        model_id: modelId,
-        progress: 0,
-        prompt_boxes,
-        selected_assets,
-        params,
-        queued_at: new Date().toISOString(),
-        api_key: apiKey, // 保存 API Key 用于轮询
-      });
-
-      if (insertError) {
-        console.error("Failed to save task:", insertError);
-        return NextResponse.json({ 
-          error: "Failed to save task" 
-        }, { status: 500 });
-      }
+        taskId,
+        modelId,
+        toJsonField(prompt_boxes),
+        toJsonField(selected_assets),
+        toJsonField(params),
+        apiKey
+      );
 
       return NextResponse.json({
         id: taskId,
@@ -376,52 +344,50 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ 
-        error: data.error?.message || data.error?.code || "API request failed" 
+      return NextResponse.json({
+        error: data.error?.message || data.error?.code || "API request failed"
       }, { status: response.status });
     }
 
     // 更新数据库中的任务状态
-    const client = getSupabaseClient();
-    
+    const db = getDb();
+
     const updateData: Record<string, unknown> = {
       status: data.status,
       progress: data.status === "running" ? 50 : data.status === "succeeded" ? 100 : 0,
     };
 
-    // 记录时间戳
     if (data.status === "running" || data.status === "succeeded") {
       updateData.started_at = new Date(data.updated_at * 1000).toISOString();
     }
-    
+
     if (data.status === "succeeded") {
       updateData.completed_at = new Date(data.updated_at * 1000).toISOString();
-      updateData.result = {
+      updateData.result = JSON.stringify({
         video_url: data.content?.video_url,
         resolution: data.resolution,
         duration: data.duration,
         last_frame_url: data.content?.last_frame_url,
-      };
+      });
     }
-    
+
     if (data.status === "failed") {
       updateData.completed_at = new Date(data.updated_at * 1000).toISOString();
       updateData.error_message = data.error?.message || "Generation failed";
     }
 
-    // Token 消耗统计
     if (data.usage) {
       updateData.completion_tokens = data.usage.completion_tokens;
       updateData.total_tokens = data.usage.total_tokens;
     }
 
     // 计算耗时
-    const task = await client.from("tasks").select("*").eq("id", taskId).single();
-    if (task.data) {
-      const queuedAt = task.data.queued_at ? new Date(task.data.queued_at).getTime() : 0;
+    const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId) as Record<string, unknown> | undefined;
+    if (task) {
+      const queuedAt = task.queued_at ? new Date(task.queued_at as string).getTime() : 0;
       const startedAt = updateData.started_at ? new Date(updateData.started_at as string).getTime() : 0;
       const completedAt = updateData.completed_at ? new Date(updateData.completed_at as string).getTime() : Date.now();
-      
+
       if (queuedAt && startedAt) {
         updateData.queue_duration = Math.round((startedAt - queuedAt) / 1000);
       }
@@ -430,13 +396,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    await client.from("tasks").update(updateData).eq("id", taskId);
+    // 动态构建 UPDATE
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    for (const [key, value] of Object.entries(updateData)) {
+      setClauses.push(`${key} = ?`);
+      values.push(value);
+    }
+    setClauses.push("updated_at = datetime('now', 'localtime')");
+    values.push(taskId);
+
+    db.prepare(`UPDATE tasks SET ${setClauses.join(", ")} WHERE id = ?`).run(...values);
+
+    const parsedResult = typeof updateData.result === "string" ? JSON.parse(updateData.result) : updateData.result;
 
     return NextResponse.json({
       id: data.id,
       status: data.status,
       progress: updateData.progress,
-      result: updateData.result,
+      result: parsedResult,
       error_message: updateData.error_message,
       completion_tokens: updateData.completion_tokens,
       total_tokens: updateData.total_tokens,

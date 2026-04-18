@@ -44,6 +44,8 @@ const eslintConfig = defineConfig([
     // Build artifacts:
     'server.js',
     'dist/**',
+    // Tauri build artifacts:
+    'src-tauri/**',
     // Script files (CommonJS):
     'scripts/**/*.js',
   ]),

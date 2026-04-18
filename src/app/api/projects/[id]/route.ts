@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { getDb } from "@/storage/database/sqlite-client";
 
 // GET /api/projects/[id] - 获取单个项目
 export async function GET(
@@ -8,15 +8,9 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const client = getSupabaseClient();
-    const { data, error } = await client
-      .from("projects")
-      .select("*")
-      .eq("id", resolvedParams.id)
-      .maybeSingle();
-
-    if (error) throw new Error(`获取项目失败: ${error.message}`);
-    return NextResponse.json(data);
+    const db = getDb();
+    const data = db.prepare("SELECT * FROM projects WHERE id = ?").get(resolvedParams.id);
+    return NextResponse.json(data || null);
   } catch (error) {
     console.error("GET /api/projects/[id] error:", error);
     return NextResponse.json({ error: "Failed to fetch project" }, { status: 500 });
@@ -31,19 +25,29 @@ export async function PATCH(
   try {
     const resolvedParams = await params;
     const body = await request.json();
-    const client = getSupabaseClient();
-    
+    const db = getDb();
+
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
-    
-    const { data, error } = await client
-      .from("projects")
-      .update(updateData)
-      .eq("id", resolvedParams.id)
-      .select()
-      .maybeSingle();
 
-    if (error) throw new Error(`更新项目失败: ${error.message}`);
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    // 动态构建 SET 子句
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    for (const [key, value] of Object.entries(updateData)) {
+      setClauses.push(`${key} = ?`);
+      values.push(value);
+    }
+    setClauses.push("updated_at = datetime('now', 'localtime')");
+    values.push(resolvedParams.id);
+
+    const stmt = db.prepare(`UPDATE projects SET ${setClauses.join(", ")} WHERE id = ?`);
+    stmt.run(...values);
+
+    const data = db.prepare("SELECT * FROM projects WHERE id = ?").get(resolvedParams.id);
     return NextResponse.json(data);
   } catch (error) {
     console.error("PATCH /api/projects/[id] error:", error);
@@ -58,10 +62,8 @@ export async function DELETE(
 ) {
   try {
     const resolvedParams = await params;
-    const client = getSupabaseClient();
-    const { error } = await client.from("projects").delete().eq("id", resolvedParams.id);
-
-    if (error) throw new Error(`删除项目失败: ${error.message}`);
+    const db = getDb();
+    db.prepare("DELETE FROM projects WHERE id = ?").run(resolvedParams.id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/projects/[id] error:", error);

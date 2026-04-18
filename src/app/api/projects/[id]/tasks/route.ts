@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { getDb, parseJsonField } from "@/storage/database/sqlite-client";
 
 // GET /api/projects/[id]/tasks - 获取项目的所有任务
 export async function GET(
@@ -8,15 +8,21 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const client = getSupabaseClient();
-    const { data, error } = await client
-      .from("tasks")
-      .select("*")
-      .eq("project_id", resolvedParams.id)
-      .order("created_at", { ascending: false });
+    const db = getDb();
+    const rows = db
+      .prepare("SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC")
+      .all(resolvedParams.id) as Record<string, unknown>[];
 
-    if (error) throw new Error(`获取任务列表失败: ${error.message}`);
-    return NextResponse.json(data || []);
+    // 解析 JSON 字段
+    const data = rows.map((row) => ({
+      ...row,
+      prompt_boxes: parseJsonField(row.prompt_boxes as string | null, []),
+      selected_assets: parseJsonField(row.selected_assets as string | null, []),
+      params: parseJsonField(row.params as string | null, null),
+      result: parseJsonField(row.result as string | null, null),
+    }));
+
+    return NextResponse.json(data);
   } catch (error) {
     console.error("GET /api/projects/[id]/tasks error:", error);
     return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 });

@@ -242,6 +242,13 @@ async function main() {
     <div class="status" id="status"></div>
   </div>
   <script>
+    // 监听 Tauri 事件（服务器状态通知）
+    if (window.__TAURI__) {
+      window.__TAURI__.event.listen('server-status', function(event) {
+        document.getElementById('status').textContent = event.payload;
+      });
+    }
+
     // 自动检测服务器就绪并跳转
     let attempts = 0;
     const maxAttempts = 120;
@@ -251,10 +258,18 @@ async function main() {
       attempts++;
       statusEl.textContent = '连接中... (' + Math.floor(attempts / 2) + 's)';
 
-      fetch('http://localhost:5000', { method: 'HEAD', mode: 'no-cors' })
-        .then(function() {
-          statusEl.textContent = '服务已就绪，正在跳转...';
-          window.location.href = 'http://localhost:5000';
+      fetch('http://localhost:5000', { method: 'HEAD' })
+        .then(function(resp) {
+          if (resp.ok || resp.status === 307) {
+            statusEl.textContent = '服务已就绪，正在跳转...';
+            window.location.href = 'http://localhost:5000';
+          } else {
+            if (attempts < maxAttempts) {
+              setTimeout(checkServer, 500);
+            } else {
+              statusEl.textContent = '启动超时，请关闭占用端口 5000 的程序，然后重启应用';
+            }
+          }
         })
         .catch(function() {
           if (attempts < maxAttempts) {

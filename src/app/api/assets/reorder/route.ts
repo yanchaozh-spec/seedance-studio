@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { getDb } from "@/storage/database/sqlite-client";
 
 // PATCH /api/assets/reorder - 批量更新素材排序
 // 请求体: { items: [{ id: string, sort_order: number }, ...] }
 export async function PATCH(request: NextRequest) {
   try {
-    const { items } = await request.json();
+    const { items } = await request.json() as { items: Array<{ id: string; sort_order: number }> };
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -24,28 +24,16 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const client = getSupabaseClient();
+    const db = getDb();
+    const stmt = db.prepare("UPDATE assets SET sort_order = ?, updated_at = datetime('now', 'localtime') WHERE id = ?");
 
-    // 逐条更新 sort_order（批量更新在 Supabase REST API 中没有原生支持）
-    // 使用 Promise.all 并行执行
-    const results = await Promise.all(
-      items.map((item: { id: string; sort_order: number }) =>
-        client
-          .from("assets")
-          .update({ sort_order: item.sort_order })
-          .eq("id", item.id)
-      )
-    );
-
-    // 检查是否有失败
-    const failed = results.find((r) => r.error);
-    if (failed && failed.error) {
-      console.error("Reorder update failed:", failed.error);
-      return NextResponse.json(
-        { error: "Failed to update sort order" },
-        { status: 500 }
-      );
-    }
+    // 使用事务批量更新
+    const transaction = db.transaction(() => {
+      for (const item of items) {
+        stmt.run(item.sort_order, item.id);
+      }
+    });
+    transaction();
 
     return NextResponse.json({ success: true });
   } catch (error) {

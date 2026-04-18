@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getDb, toJsonField } from "@/storage/database/sqlite-client";
 
 // 轮询任务状态
 export async function POST(request: NextRequest) {
   try {
-    const { taskId } = await request.json();
+    const { taskId } = await request.json() as { taskId: string };
 
     if (!taskId) {
       return NextResponse.json({ error: "Task ID required" }, { status: 400 });
@@ -42,33 +43,44 @@ export async function POST(request: NextRequest) {
     }
 
     // 更新数据库
-    const { getSupabaseClient } = await import("@/storage/database/supabase-client");
-    const client = getSupabaseClient();
-    
+    const db = getDb();
+
     const updateData: Record<string, unknown> = {
       status: data.status,
       progress,
+      updated_at: new Date().toISOString(),
     };
 
     if (data.status === "succeeded" && data.content) {
-      updateData.result = {
+      updateData.result = JSON.stringify({
         video_url: data.content.video_url,
         resolution: data.resolution,
         duration: data.duration,
-      };
+      });
     }
 
     if (data.status === "failed") {
       updateData.error_message = data.error?.message || "Generation failed";
     }
 
-    await client.from("tasks").update(updateData).eq("id", taskId);
+    // 动态构建 UPDATE
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    for (const [key, value] of Object.entries(updateData)) {
+      setClauses.push(`${key} = ?`);
+      values.push(value);
+    }
+    values.push(taskId);
+
+    db.prepare(`UPDATE tasks SET ${setClauses.join(", ")} WHERE id = ?`).run(...values);
+
+    const parsedResult = typeof updateData.result === "string" ? JSON.parse(updateData.result) : updateData.result;
 
     return NextResponse.json({
       id: data.id,
       status: data.status,
       progress,
-      result: updateData.result,
+      result: parsedResult,
       error_message: updateData.error_message,
     });
   } catch (error) {

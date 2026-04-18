@@ -73,19 +73,8 @@ fn list_files(dir: String) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
-/// 检测端口是否被占用
-fn is_port_in_use(port: u16) -> bool {
-    use std::net::TcpListener;
-    TcpListener::bind(format!("127.0.0.1:{}", port)).is_err()
-}
-
 /// 在生产模式下使用内嵌的 node.exe 启动 Next.js standalone server
 fn start_nextjs_server(resource_dir: &std::path::Path) -> Result<Child, String> {
-    // 检测端口是否被占用
-    if is_port_in_use(5000) {
-        return Err("端口 5000 已被占用，请关闭占用该端口的程序后重试".to_string());
-    }
-
     let node_path = resource_dir.join("node.exe");
     let server_path = resource_dir.join("server").join("server.js");
     
@@ -143,9 +132,12 @@ fn wait_for_server_and_navigate(app_handle: tauri::AppHandle) {
     
     // 先等待 2 秒，给服务器启动时间
     std::thread::sleep(std::time::Duration::from_secs(2));
+
+    let client = reqwest::blocking::Client::new();
     
     for i in 0..60 {
-        if let Ok(resp) = reqwest::blocking::get("http://localhost:5000") {
+        // 使用 HEAD 请求代替 GET，避免下载整个响应体
+        if let Ok(resp) = client.head("http://localhost:5000").send() {
             if resp.status().is_success() || resp.status().as_u16() == 307 {
                 println!("[启动器] 服务器已就绪！耗时约 {}s", i + 2);
                 // 通知前端跳转
@@ -159,10 +151,8 @@ fn wait_for_server_and_navigate(app_handle: tauri::AppHandle) {
     }
     
     println!("[启动器] 警告：服务器启动超时（30秒）");
-    // 通知前端显示超时提示
-    if let Some(window) = app_handle.get_webview_window("main") {
-        let _ = window.eval("document.getElementById('status').textContent = '启动超时，请关闭占用端口 5000 的程序，然后重启应用';");
-    }
+    // 使用 Tauri 事件系统通知前端，避免 eval XSS 风险
+    let _ = app_handle.emit("server-status", "启动超时，可能端口 5000 被占用，请关闭占用程序后重启应用");
 }
 
 /// 杀死进程及其子进程（Windows 下使用 taskkill /T 杀进程树）
@@ -239,14 +229,8 @@ pub fn run() {
                     }
                     Err(e) => {
                         eprintln!("[启动器] 启动服务器失败: {}", e);
-                        // 通知前端显示错误
-                        if let Some(window) = app.get_webview_window("main") {
-                            let err_msg = e.replace('\'', "\\'");
-                            let _ = window.eval(&format!(
-                                "document.getElementById('status').textContent = '{}';",
-                                err_msg
-                            ));
-                        }
+                        // 使用 Tauri 事件系统通知前端，避免 eval XSS 风险
+                        let _ = app.handle().emit("server-status", &e);
                     }
                 }
             }
@@ -256,11 +240,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             // 窗口关闭时清理服务器进程
             if let tauri::WindowEvent::Destroyed = event {
-                if let Ok(mut guard) = SERVER_PROCESS.lock() {
-                    if let Some(ref mut child) = *guard {
-                        kill_process_tree(child);
-                    }
-                    *guard = None;
+                // 先从 Mutex 中 take 出 Child，释放锁后再 kill，避免死锁
+                let child = {
+                    let mut guard = SERVER_PROCESS.lock().unwrap();
+                    guard.take()
+                };
+                if let Some(mut child) = child {
+                    kill_process_tree(&mut child);
                 }
             }
         })

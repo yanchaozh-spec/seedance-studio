@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { getDb, parseJsonField } from "@/storage/database/sqlite-client";
 
 // DELETE /api/tasks/[id] - 删除任务
 export async function DELETE(
@@ -8,10 +8,8 @@ export async function DELETE(
 ) {
   try {
     const resolvedParams = await params;
-    const client = getSupabaseClient();
-    const { error } = await client.from("tasks").delete().eq("id", resolvedParams.id);
-
-    if (error) throw new Error(`删除任务失败: ${error.message}`);
+    const db = getDb();
+    db.prepare("DELETE FROM tasks WHERE id = ?").run(resolvedParams.id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/tasks/[id] error:", error);
@@ -26,14 +24,21 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const client = getSupabaseClient();
-    const { data, error } = await client
-      .from("tasks")
-      .select("*")
-      .eq("id", resolvedParams.id)
-      .maybeSingle();
+    const db = getDb();
+    const row = db.prepare("SELECT * FROM tasks WHERE id = ?").get(resolvedParams.id) as Record<string, unknown> | undefined;
 
-    if (error) throw new Error(`获取任务失败: ${error.message}`);
+    if (!row) {
+      return NextResponse.json(null);
+    }
+
+    const data = {
+      ...row,
+      prompt_boxes: parseJsonField(row.prompt_boxes as string | null, []),
+      selected_assets: parseJsonField(row.selected_assets as string | null, []),
+      params: parseJsonField(row.params as string | null, null),
+      result: parseJsonField(row.result as string | null, null),
+    };
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("GET /api/tasks/[id] error:", error);

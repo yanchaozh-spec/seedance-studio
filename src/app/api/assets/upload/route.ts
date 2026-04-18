@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdminDb } from "@/storage/database/supabase-client";
+import { getDb, parseJsonField } from "@/storage/database/sqlite-client";
 import { uploadAsset, isUserTosConfigured, isTosConfigured } from "@/storage/tos/client";
 
 // TOS 配置类型
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       file = formData.get("file") as File;
       projectId = formData.get("projectId") as string;
       type = formData.get("type") as "image" | "audio" | "keyframe";
-      
+
       // 从表单获取 TOS 配置（JSON 字符串）
       const tosConfigStr = formData.get("tosConfig") as string;
       if (tosConfigStr) {
@@ -37,24 +37,24 @@ export async function POST(request: NextRequest) {
     } else if (contentType.includes("application/json")) {
       // 如果是 JSON 格式
       const body = await request.json();
-      
+
       // 如果 file 是字符串（可能是 URL），需要下载它
       if (typeof body.file === "string") {
         const fileUrl = body.file;
         console.log("Downloading file from URL:", fileUrl);
-        
+
         const fileResponse = await fetch(fileUrl);
         if (!fileResponse.ok) {
           throw new Error(`Failed to download file: ${fileResponse.statusText}`);
         }
-        
+
         const blob = await fileResponse.blob();
         const fileName = body.fileName || `upload_${Date.now()}`;
         file = new File([blob], fileName, { type: blob.type || "application/octet-stream" });
       } else {
         file = body.file;
       }
-      
+
       projectId = body.projectId;
       type = body.type;
       userTosConfig = body.tosConfig || null;
@@ -70,10 +70,10 @@ export async function POST(request: NextRequest) {
     // 检查 TOS 配置
     const hasUserConfig = isUserTosConfigured(userTosConfig);
     const hasEnvConfig = isTosConfigured();
-    
+
     if (!hasUserConfig && !hasEnvConfig) {
-      return NextResponse.json({ 
-        error: "TOS not configured. Please set up TOS in settings or configure environment variables." 
+      return NextResponse.json({
+        error: "TOS not configured. Please set up TOS in settings or configure environment variables."
       }, { status: 500 });
     }
 
@@ -89,14 +89,14 @@ export async function POST(request: NextRequest) {
     // 上传到 TOS
     const buffer = Buffer.from(await file.arrayBuffer());
     const result = await uploadAsset(
-      buffer, 
-      file.name, 
-      file.type || "application/octet-stream", 
-      projectId, 
+      buffer,
+      file.name,
+      file.type || "application/octet-stream",
+      projectId,
       type,
       userTosConfig || undefined
     );
-    
+
     console.log("[TOS] Upload successful:", result.url);
 
     // 如果是图片，生成缩略图 URL（这里直接使用原图）
@@ -108,30 +108,25 @@ export async function POST(request: NextRequest) {
     // 创建数据库记录
     let assetId: string | null = null;
     try {
-      const supabaseAdmin = getSupabaseAdminDb();
+      const db = getDb();
       const assetCategory = type === "keyframe" ? "keyframe" : "image";
-      
-      const { data: assetData, error: assetError } = await supabaseAdmin
-        .from("assets")
-        .insert({
-          project_id: projectId,
-          name: fileNameWithoutExt,
-          type: type,
-          asset_category: assetCategory,
-          url: result.url,
-          thumbnail_url: thumbnailUrl,
-          size: file.size,
-          storage_key: result.key,
-        })
-        .select("id")
-        .single();
-      
-      if (assetError) {
-        console.error("Failed to create asset record:", assetError);
-      } else {
-        assetId = assetData.id;
-        console.log("Asset record created:", assetId);
-      }
+
+      const row = db.prepare(`
+        INSERT INTO assets (project_id, name, type, asset_category, url, thumbnail_url, size, storage_key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `).get(
+        projectId,
+        fileNameWithoutExt,
+        type,
+        assetCategory,
+        result.url,
+        thumbnailUrl,
+        file.size,
+        result.key
+      ) as { id: string } | undefined;
+      assetId = row?.id || null;
+      console.log("Asset record created:", assetId);
     } catch (dbError) {
       console.error("Database error:", dbError);
     }
