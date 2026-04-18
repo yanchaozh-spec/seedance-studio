@@ -25,6 +25,7 @@ import { buildSeedanceRequestBody, SeedanceContentItem } from "@/lib/seedance";
 import {
   DndContext,
   closestCenter,
+  closestCorners,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -36,7 +37,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -823,12 +824,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           ) : (
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={closestCorners}
               onDragEnd={handleDragEnd}
             >
               <SortableContext
                 items={selectedAssets.map(a => a.id)}
-                strategy={verticalListSortingStrategy}
+                strategy={rectSortingStrategy}
               >
                 <div className="flex flex-wrap gap-3">
                   {selectedAssets.map((asset) => (
