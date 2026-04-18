@@ -165,6 +165,9 @@ export async function GET(
           updates.status = "failed";
           updates.error_message = externalTask.error?.message || "Generation failed";
           updates.completed_at = new Date().toISOString();
+        } else if (externalTask.status === "cancelled") {
+          updates.status = "cancelled";
+          updates.completed_at = new Date().toISOString();
         } else if (externalTask.status === "running" || externalTask.status === "processing") {
           updates.status = "running";
           updates.progress = 50;
@@ -179,9 +182,9 @@ export async function GET(
           updates.progress = 0;
         }
 
-        if (externalTask.data?.usage) {
-          updates.completion_tokens = externalTask.data.usage.completion_tokens;
-          updates.total_tokens = externalTask.data.usage.total_tokens;
+        if (externalTask.usage) {
+          updates.completion_tokens = externalTask.usage.completion_tokens;
+          updates.total_tokens = externalTask.usage.total_tokens;
         }
 
         console.log("[POLL] Updating DB with:", JSON.stringify(updates));

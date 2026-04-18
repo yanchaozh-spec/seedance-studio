@@ -1,7 +1,7 @@
 // 任务相关的 API 调用
 
 // 任务状态类型（包含 pending 状态）
-export type TaskStatus = "pending" | "queued" | "running" | "succeeded" | "failed";
+export type TaskStatus = "pending" | "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 // 提示词框类型
 export interface PromptBox {
@@ -146,6 +146,26 @@ export async function deleteTask(id: string, taskIdExternal?: string): Promise<v
   if (!response.ok) {
     throw new Error("Failed to delete task");
   }
+}
+
+// 取消任务（仅排队中可取消）
+export async function cancelTask(id: string, apiKey?: string): Promise<{ success: boolean; error?: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-ark-api-key"] = apiKey;
+  }
+
+  const response = await fetch(`/api/tasks/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ action: "cancel" }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    return { success: false, error: data.error || "取消失败" };
+  }
+  return { success: true };
 }
 
 // 轮询任务状态

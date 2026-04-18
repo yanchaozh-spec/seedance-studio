@@ -26,6 +26,7 @@ import {
   Coins,
   AlertCircle,
   XCircle,
+  Ban,
 } from "lucide-react";
 import { Task, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { Asset, submitFrameFromCanvas } from "@/lib/assets";
@@ -42,6 +43,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ElementType; label: string;
   running: { icon: Loader2, label: "生成中", color: "text-blue-500" },
   succeeded: { icon: CheckCircle, label: "已完成", color: "text-green-500" },
   failed: { icon: XCircle, label: "失败", color: "text-red-500" },
+  cancelled: { icon: Ban, label: "已取消", color: "text-gray-400" },
 };
 
 // 格式化时长
@@ -254,10 +256,11 @@ export function TaskDetailSheet({
               task.status === "succeeded" ? "bg-green-100 text-green-700" :
               task.status === "running" ? "bg-blue-100 text-blue-700" :
               task.status === "failed" ? "bg-red-100 text-red-700" :
+              task.status === "cancelled" ? "bg-gray-50 text-gray-500" :
               "bg-gray-100 text-gray-700"
             )}>
               {(() => {
-                const Icon = statusConfig[task.status].icon;
+                const Icon = statusConfig[task.status]?.icon || Clock;
                 return task.status === "running" || task.status === "queued" ? (
                   <Icon className="w-4 h-4 animate-spin" />
                 ) : (
@@ -265,9 +268,7 @@ export function TaskDetailSheet({
                 );
               })()}
               <span className="text-sm font-medium">
-                {task.status === "succeeded" ? "已完成" :
-                 task.status === "running" ? "生成中" :
-                 task.status === "failed" ? "失败" : "排队中"}
+                {statusConfig[task.status]?.label || task.status}
               </span>
             </div>
             <span className="text-sm text-muted-foreground">

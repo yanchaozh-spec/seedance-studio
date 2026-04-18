@@ -48,6 +48,7 @@ import {
   Loader,
   Copy,
   ArrowLeft,
+  Ban,
 } from "lucide-react";
 import { Task, getTask, TaskStatus, getVideoUrl } from "@/lib/tasks";
 import { getAssets, Asset, submitFrameFromCanvas } from "@/lib/assets";
@@ -68,6 +69,7 @@ const STATUS_CONFIG: Record<TaskStatus, {
   running: { label: "生成中", color: "text-blue-600", icon: Loader2 },
   succeeded: { label: "已完成", color: "text-green-600", icon: CheckCircle },
   failed: { label: "失败", color: "text-red-600", icon: XCircle },
+  cancelled: { label: "已取消", color: "text-gray-400", icon: Ban },
 };
 
 // 格式化时长

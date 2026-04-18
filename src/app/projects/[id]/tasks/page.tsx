@@ -44,8 +44,9 @@ import {
   Camera,
   Film,
   Eye,
+  Ban,
 } from "lucide-react";
-import { Task, getTasks, deleteTask, TaskStatus, getVideoUrl } from "@/lib/tasks";
+import { Task, getTasks, deleteTask, cancelTask, TaskStatus, getVideoUrl } from "@/lib/tasks";
 import { getAssets, Asset, submitFrameFromCanvas } from "@/lib/assets";
 import { TaskCard, TaskList } from "@/components/tasks/TaskCard";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
@@ -65,6 +66,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ElementType; label: string;
   running: { icon: Loader2, label: "生成中", color: "text-blue-500" },
   succeeded: { icon: CheckCircle, label: "已完成", color: "text-green-500" },
   failed: { icon: XCircle, label: "失败", color: "text-red-500" },
+  cancelled: { icon: Ban, label: "已取消", color: "text-gray-400" },
 };
 
 // TaskDetailSheet 已移动到 @/components/tasks/TaskDetailSheet
@@ -174,6 +176,23 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       toast.success("删除成功");
     } catch (error) {
       toast.error("删除失败");
+    }
+  };
+
+  const handleCancel = async (taskId: string) => {
+    try {
+      const apiKey = useSettingsStore.getState().arkApiKey;
+      const result = await cancelTask(taskId, apiKey);
+      if (result.success) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, status: "cancelled" as TaskStatus } : t))
+        );
+        toast.success("已取消");
+      } else {
+        toast.error(result.error || "取消失败");
+      }
+    } catch (error) {
+      toast.error("取消请求失败");
     }
   };
 
@@ -349,6 +368,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {tasks.reduce((sum, t) => sum + (t.completion_tokens || 0), 0) > 0 && (
+            <div className="flex items-center gap-1.5 text-sm text-yellow-600 bg-yellow-50 rounded-md px-3 py-1.5">
+              <Coins className="w-4 h-4" />
+              <span>总计 {(tasks.reduce((sum, t) => sum + (t.completion_tokens || 0), 0)).toLocaleString()} tokens</span>
+            </div>
+          )}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -369,6 +394,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
               <SelectItem value="running">生成中</SelectItem>
               <SelectItem value="succeeded">已完成</SelectItem>
               <SelectItem value="failed">失败</SelectItem>
+              <SelectItem value="cancelled">已取消</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -497,17 +523,18 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         )}
                         <span className={cn("flex items-center gap-1 text-sm font-medium", 
                           task.status === "running" ? "text-blue-500" :
-                          task.status === "failed" ? "text-red-500" : "text-muted-foreground"
+                          task.status === "failed" ? "text-red-500" :
+                          task.status === "cancelled" ? "text-gray-400" : "text-muted-foreground"
                         )}>
                           {(() => {
-                            const Icon = statusConfig[task.status].icon;
+                            const Icon = statusConfig[task.status]?.icon || Clock;
                             return task.status === "running" || task.status === "queued" || task.status === "pending" ? (
                               <Icon className="w-4 h-4 animate-spin" />
                             ) : (
                               <Icon className="w-4 h-4" />
                             );
                           })()}
-                          {statusConfig[task.status].label}
+                          {statusConfig[task.status]?.label || task.status}
                         </span>
                       </div>
                     </div>
@@ -545,15 +572,27 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         <Eye className="w-3.5 h-3.5" />
                         详情
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-xs h-8 text-destructive"
-                        onClick={() => handleDelete(task.id, task.task_id_external)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        删除
-                      </Button>
+                      {(task.status === "queued" || task.status === "pending") ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-8 text-orange-500"
+                          onClick={() => handleCancel(task.id)}
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          取消
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-8 text-destructive"
+                          onClick={() => handleDelete(task.id, task.task_id_external)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          删除
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}

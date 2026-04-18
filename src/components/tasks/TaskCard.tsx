@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Play, Pause, RotateCcw, Trash2, Eye, Download, AlertCircle,
-  Clock, CheckCircle, XCircle, Loader2, Coins, Sparkles, Camera
+  Clock, CheckCircle, XCircle, Loader2, Coins, Sparkles, Camera, Ban
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Task, TaskStatus, getVideoUrl } from "@/lib/tasks";
@@ -50,6 +50,12 @@ const STATUS_CONFIG: Record<TaskStatus, {
     color: "text-red-600",
     bgColor: "bg-red-100 border-red-300",
     icon: XCircle,
+  },
+  cancelled: {
+    label: "已取消",
+    color: "text-gray-400",
+    bgColor: "bg-gray-50 border-gray-200",
+    icon: Ban,
   },
 };
 
