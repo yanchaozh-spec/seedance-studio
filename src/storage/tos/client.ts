@@ -24,8 +24,11 @@ let cachedConfig: TosConfig | null = null;
  * 从环境变量获取配置
  */
 function getEnvConfig(): TosConfig {
+  // 确保使用外网域名（volces.com），替换内网域名（ivolces.com）
+  // 云部署环境变量可能注入内网 endpoint，EXE 环境下用户无法访问内网
+  const endpoint = process.env.COZE_TOS_ENDPOINT?.replace(".ivolces.com", ".volces.com");
   return {
-    endpoint: process.env.COZE_TOS_ENDPOINT,
+    endpoint,
     accessKey: process.env.COZE_TOS_ACCESS_KEY || process.env.COZE_TOS_ACCESS_KEY_ID,
     secretKey: process.env.COZE_TOS_SECRET_KEY || process.env.COZE_TOS_SECRET_ACCESS_KEY,
     bucket: process.env.COZE_TOS_BUCKET || process.env.COZE_BUCKET_NAME,
@@ -43,9 +46,12 @@ function isConfigValid(config: TosConfig): boolean {
  * 创建存储客户端
  */
 function createStorage(config: TosConfig): S3Storage {
-  console.log("[TOS] createStorage - endpoint:", config.endpoint, "bucket:", config.bucket);
+  // 确保使用外网域名（volces.com），替换内网域名（ivolces.com）
+  // 用户可能从火山云控制台复制了内网 endpoint
+  const endpointUrl = config.endpoint?.replace(".ivolces.com", ".volces.com");
+  console.log("[TOS] createStorage - endpoint:", endpointUrl, "bucket:", config.bucket);
   return new S3Storage({
-    endpointUrl: config.endpoint!,
+    endpointUrl: endpointUrl!,
     accessKey: config.accessKey!,
     secretKey: config.secretKey!,
     bucketName: config.bucket!,
@@ -339,6 +345,37 @@ export async function uploadVideo(
 }
 
 /**
+ * 创建原生 AWS S3Client（用于用户动态配置）
+ * 统一使用外网域名，与 uploadAsset/uploadVideo 保持一致
+ */
+function createS3Client(config: TosConfig): { client: S3Client; bucket: string } {
+  let endpointUrl = config.endpoint || "";
+  if (endpointUrl && !endpointUrl.startsWith("http://") && !endpointUrl.startsWith("https://")) {
+    endpointUrl = "https://" + endpointUrl;
+  }
+  // 确保使用外网 endpoint（volces.com）而不是内网（ivolces.com）
+  endpointUrl = endpointUrl.replace(".ivolces.com", ".volces.com");
+
+  const client = new S3Client({
+    region: process.env.COZE_TOS_REGION || "cn-beijing",
+    endpoint: endpointUrl,
+    credentials: {
+      accessKeyId: config.accessKey!,
+      secretAccessKey: config.secretKey!,
+    },
+  });
+  return { client, bucket: config.bucket! };
+}
+
+/**
+ * 确保签名 URL 使用外网域名
+ * 兜底替换：防止 SDK 内部生成了内网域名
+ */
+function ensurePublicUrl(url: string): string {
+  return url.replace(".ivolces.com", ".volces.com");
+}
+
+/**
  * 生成文件访问 URL
  * @param key 存储的 key
  * @param expireSeconds 过期时间（秒）
@@ -349,18 +386,29 @@ export async function getFileUrl(
   expireSeconds: number = 7 * 24 * 60 * 60,
   config?: TosConfig
 ): Promise<string> {
-  const storage = config 
-    ? createTosStorage(config) 
-    : getTosStorage();
-  
+  // 用户配置路径：使用原生 S3Client 生成签名 URL（与 uploadAsset 保持一致）
+  if (config && isUserTosConfigured(config)) {
+    const { client, bucket } = createS3Client(config);
+    const getCommand = new GetObjectCommand({ Bucket: bucket, Key: key });
+    // @smithy/types 版本冲突，使用类型断言绕过
+    const url = await getSignedUrl(
+      client as unknown as Parameters<typeof getSignedUrl>[0],
+      getCommand as unknown as Parameters<typeof getSignedUrl>[1],
+      { expiresIn: expireSeconds }
+    );
+    return ensurePublicUrl(url);
+  }
+
+  // 环境变量路径：使用 SDK
+  const storage = getTosStorage();
   if (!storage) {
     throw new Error("TOS not configured");
   }
-  
-  return storage.generatePresignedUrl({
+  const url = await storage.generatePresignedUrl({
     key,
     expireTime: expireSeconds,
   });
+  return ensurePublicUrl(url);
 }
 
 /**
@@ -369,13 +417,18 @@ export async function getFileUrl(
  * @param config 可选的用户配置
  */
 export async function deleteFile(key: string, config?: TosConfig): Promise<boolean> {
-  const storage = config 
-    ? createTosStorage(config) 
-    : getTosStorage();
-  
+  // 用户配置路径：使用原生 S3Client
+  if (config && isUserTosConfigured(config)) {
+    const { client, bucket } = createS3Client(config);
+    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  }
+
+  // 环境变量路径：使用 SDK
+  const storage = getTosStorage();
   if (!storage) {
     throw new Error("TOS not configured");
   }
-  
   return storage.deleteFile({ fileKey: key });
 }
