@@ -21,7 +21,6 @@ interface CreateTaskRequest {
     duration: number;
     ratio: string;
     resolution: string;
-    service_tier?: "default" | "flex";
     return_last_frame?: boolean;
     tools?: Array<{ type: "web_search" }>;
   };
@@ -273,7 +272,6 @@ export async function POST(request: NextRequest) {
       duration: params.duration,
       resolution: params.resolution,
       return_last_frame: params.return_last_frame,
-      service_tier: params.service_tier,
       tools: params.tools,
     });
 

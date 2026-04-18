@@ -3,24 +3,6 @@
 // 任务状态类型（包含 pending 状态）
 export type TaskStatus = "pending" | "queued" | "running" | "succeeded" | "failed";
 
-export interface PromptBox {
-  id: string;
-  content: string;
-  is_activated: boolean;
-  activated_asset_id?: string;
-  order: number;
-}
-
-// 任务参数类型（与前端 GeneratorParams 一致）
-export interface TaskParams {
-  duration: number;
-  ratio: string;
-  resolution: string;
-  service_tier?: "default" | "flex";
-  return_last_frame?: boolean;
-  tools?: Array<{ type: "web_search" }>;
-}
-
 // 提示词框类型
 export interface PromptBox {
   id: string;
@@ -29,6 +11,15 @@ export interface PromptBox {
   activated_asset_id?: string;
   keyframe_description?: string;
   order: number;
+}
+
+// 任务参数类型（与前端 GeneratorParams 一致）
+export interface TaskParams {
+  duration: number;
+  ratio: string;
+  resolution: string;
+  return_last_frame?: boolean;
+  tools?: Array<{ type: "web_search" }>;
 }
 
 export interface TaskResult {

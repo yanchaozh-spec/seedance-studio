@@ -38,7 +38,6 @@ interface GeneratorParams {
   duration: number;
   ratio: string;
   resolution: string;
-  service_tier?: "default" | "flex";
   return_last_frame?: boolean;
   tools?: Array<{ type: "web_search" }>;
 }
@@ -58,7 +57,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     duration: 5,
     ratio: "16:9",
     resolution: "720p",
-    service_tier: "default",
     return_last_frame: false,
     tools: [],
   });
@@ -83,7 +81,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         duration?: number;
         ratio?: string;
         resolution?: string;
-        service_tier?: "default" | "flex";
         return_last_frame?: boolean;
         tools?: Array<{ type: "web_search" }>;
       };
@@ -135,7 +132,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         duration: task.params.duration || 5,
         ratio: task.params.ratio || "16:9",
         resolution: task.params.resolution || "720p",
-        service_tier: task.params.service_tier || "default",
         return_last_frame: task.params.return_last_frame ?? false,
         tools: task.params.tools || [],
       });
@@ -374,7 +370,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       duration: params_.duration,
       resolution: params_.resolution,
       return_last_frame: params_.return_last_frame,
-      service_tier: params_.service_tier,
       tools: params_.tools,
     });
 
@@ -694,22 +689,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 <SelectContent>
                   <SelectItem value="480p">480p</SelectItem>
                   <SelectItem value="720p">720p</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground">服务等级</label>
-              <Select
-                value={params_.service_tier || "default"}
-                onValueChange={(v) => setParams({ ...params_, service_tier: v as "default" | "flex" })}
-              >
-                <SelectTrigger className="w-20 h-7 text-xs" suppressHydrationWarning>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">默认</SelectItem>
-                  <SelectItem value="flex">离线</SelectItem>
                 </SelectContent>
               </Select>
             </div>

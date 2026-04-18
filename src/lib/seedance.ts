@@ -8,9 +8,7 @@ export interface SeedanceParams {
   duration: number;
   resolution: string;
   return_last_frame?: boolean;
-  service_tier?: "default" | "flex";
   tools?: Array<{ type: "web_search" }>;
-  model_id?: string;
 }
 
 /**
@@ -19,24 +17,13 @@ export interface SeedanceParams {
 export type SeedanceContentItem = Record<string, unknown>;
 
 /**
- * 检查是否为 Seedance 2.0 模型
- */
-export function isSeedance2Model(modelId: string): boolean {
-  const id = modelId.toLowerCase();
-  return id.includes("seedance-2-0") || id.includes("seedance-2.0");
-}
-
-/**
  * 构建 Seedance API 请求体
- * 自动处理 seedance 2.0 模型不支持 service_tier 的问题
  */
 export function buildSeedanceRequestBody(
   modelId: string,
   content: SeedanceContentItem[],
   params: SeedanceParams
 ): Record<string, unknown> {
-  const isS2 = isSeedance2Model(modelId);
-
   const requestBody: Record<string, unknown> = {
     model: modelId,
     content,
@@ -47,11 +34,6 @@ export function buildSeedanceRequestBody(
     watermark: false,
     return_last_frame: params.return_last_frame ?? false,
   };
-
-  // service_tier 仅非 seedance 2.0 模型支持
-  if (!isS2 && params.service_tier) {
-    requestBody.service_tier = params.service_tier;
-  }
 
   // 联网搜索工具
   if (params.tools && params.tools.length > 0) {
