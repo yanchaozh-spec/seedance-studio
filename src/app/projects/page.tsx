@@ -136,8 +136,8 @@ export default function ProjectsPage() {
               </svg>
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-semibold tracking-tight">Seedance</span>
-              <span className="text-xs text-muted-foreground -mt-0.5">视频工作台</span>
+              <span className="text-lg font-semibold tracking-tight">焱超</span>
+              <span className="text-xs text-muted-foreground -mt-0.5">SEEDANCE 工作台</span>
             </div>
           </div>
 
