@@ -7,7 +7,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:5000",
     "beforeDevCommand": "pnpm dev --port 5000",
-    "beforeBuildCommand": "node scripts/build-tauri.js",
+    "beforeBuildCommand": "",
     "devtools": true
   },
   "app": {

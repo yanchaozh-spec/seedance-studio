@@ -198,6 +198,79 @@ async function main() {
   copyDirSync(standaloneDir, tauriResources);
   log("✓", "已复制 standalone 到 src-tauri/resources/server/");
   log("✓", "node.exe 已就绪");
+
+  // 生成 Tauri 加载页面（out/index.html）
+  log("6.5/6", "生成 Tauri 加载页面...");
+  const outDir = path.join(ROOT, "out");
+  fs.mkdirSync(outDir, { recursive: true });
+  const loadingHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>焱超视频工具</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0f0f23 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+    .container { text-align: center; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+    p { font-size: 14px; color: rgba(255,255,255,0.6); }
+    .status { margin-top: 16px; font-size: 12px; color: rgba(255,255,255,0.4); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <h1>焱超视频工具</h1>
+    <p>正在启动服务，请稍候...</p>
+    <div class="status" id="status"></div>
+  </div>
+  <script>
+    // 自动检测服务器就绪并跳转
+    let attempts = 0;
+    const maxAttempts = 120;
+    const statusEl = document.getElementById('status');
+
+    function checkServer() {
+      attempts++;
+      statusEl.textContent = '连接中... (' + Math.floor(attempts / 2) + 's)';
+
+      fetch('http://localhost:5000', { method: 'HEAD', mode: 'no-cors' })
+        .then(function() {
+          statusEl.textContent = '服务已就绪，正在跳转...';
+          window.location.href = 'http://localhost:5000';
+        })
+        .catch(function() {
+          if (attempts < maxAttempts) {
+            setTimeout(checkServer, 500);
+          } else {
+            statusEl.textContent = '启动超时，请关闭占用端口 5000 的程序，然后重启应用';
+          }
+        });
+    }
+
+    setTimeout(checkServer, 1000);
+  </script>
+</body>
+</html>`;
+  fs.writeFileSync(path.join(outDir, "index.html"), loadingHtml, "utf-8");
+  log("✓", "已生成 out/index.html（Tauri 加载页面）");
   log("✓", "构建完成！现在可以运行 'pnpm tauri:build' 打包 EXE");
 }
 
