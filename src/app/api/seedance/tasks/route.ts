@@ -81,14 +81,29 @@ function buildContent(
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
 
-  // 按顺序收集所有图片（美术资产 + 关键帧）
+  // 收集所有需要引用的音频（图片绑定的 + 独立的）
+  const boundAudioIds = new Set<string>();
   const allImageAssets: typeof imageAssets = [];
   allImageAssets.push(...imageAssets);
   allImageAssets.push(...keyframeAssets);
 
+  // 找出所有绑定的音频
+  for (const asset of allImageAssets) {
+    if (asset.bound_audio_id) {
+      boundAudioIds.add(asset.bound_audio_id);
+    }
+  }
+
+  // 获取需要添加的音频资产（绑定的 + 独立的音频）
+  const audiosToAdd = audioAssets.filter((a) => boundAudioIds.has(a.id) || !boundAudioIds.size);
+  // 如果有独立音频，也添加
+  const independentAudios = audioAssets.filter((a) => !boundAudioIds.has(a.id));
+
   // 构建素材定义行（使用 URL）
-  // 格式：素材名1：url1，声线为：audioUrl1；素材名2：url2
+  // 格式：素材名1：url1；素材名2：url2
   const assetRefParts: string[] = [];
+  // 收集需要单独添加的音频
+  const audioRefs: { name: string; url: string; boundTo?: string }[] = [];
 
   for (let i = 0; i < allImageAssets.length; i++) {
     const asset = allImageAssets[i];
@@ -103,14 +118,31 @@ function buildContent(
       // 美术资产
       assetRefParts.push(`${displayName}：${asset.url}`);
 
-      // 检查是否绑定音频
+      // 检查是否绑定音频 - 单独添加音频对象
       if (asset.bound_audio_id) {
         const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
         if (boundAudio) {
-          assetRefParts[assetRefParts.length - 1] += `，声线为：${boundAudio.url}`;
+          // 在文本中引用音频名称
+          assetRefParts[assetRefParts.length - 1] += `，声线为：${boundAudio.display_name || boundAudio.name}`;
+          // 收集音频信息以便单独添加
+          audioRefs.push({
+            name: boundAudio.display_name || boundAudio.name,
+            url: boundAudio.url,
+            boundTo: displayName,
+          });
         }
       }
     }
+  }
+
+  // 添加独立的音频资产到引用列表
+  for (const audio of independentAudios) {
+    const audioName = audio.display_name || audio.name;
+    assetRefParts.push(`${audioName}：${audio.url}`);
+    audioRefs.push({
+      name: audioName,
+      url: audio.url,
+    });
   }
 
   // 按顺序处理提示词框
@@ -145,6 +177,17 @@ function buildContent(
         url: asset.url,
       },
       role: isKeyframe ? "first_frame" : "reference_image",
+    });
+  }
+
+  // 添加所有音频作为 reference_audio
+  for (const audio of audioRefs) {
+    content.push({
+      type: "audio_url",
+      audio_url: {
+        url: audio.url,
+      },
+      role: "reference_audio",
     });
   }
 

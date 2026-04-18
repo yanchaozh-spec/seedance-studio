@@ -83,16 +83,18 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
     loadData();
   }, [resolvedParams.id]);
 
-  // 轮询运行中的任务状态
+  // 轮询运行中的任务状态 - 使用 ref 跟踪需要轮询的任务 ID
   useEffect(() => {
-    const runningTasks = tasks.filter(
-      (t) => t.status === "pending" || t.status === "queued" || t.status === "running"
-    );
+    // 收集需要轮询的任务 ID
+    const runningTaskIds = tasks
+      .filter((t) => t.status === "pending" || t.status === "queued" || t.status === "running")
+      .map((t) => t.id);
     
-    if (runningTasks.length === 0) return;
+    if (runningTaskIds.length === 0) return;
 
+    // 每3秒轮询一次
     const pollInterval = setInterval(async () => {
-      for (const task of runningTasks) {
+      for (const taskId of runningTaskIds) {
         try {
           // 从设置中获取 API Key
           const apiKey = useSettingsStore.getState().arkApiKey;
@@ -102,22 +104,22 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             headers["x-ark-api-key"] = apiKey;
           }
           
-          const response = await fetch(`/api/tasks/${task.id}/poll`, { headers });
+          const response = await fetch(`/api/tasks/${taskId}/poll`, { headers });
           if (response.ok) {
             const updatedTask = await response.json();
             setTasks((prev) =>
-              prev.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
+              prev.map((t) => (t.id === taskId ? { ...t, ...updatedTask } : t))
             );
             // 如果选中任务的详情也需要更新
-            if (selectedTask?.id === task.id) {
+            if (selectedTask?.id === taskId) {
               setSelectedTask((prev) => (prev ? { ...prev, ...updatedTask } : null));
             }
           }
         } catch (error) {
-          console.error(`轮询任务 ${task.id} 失败:`, error);
+          console.error(`轮询任务 ${taskId} 失败:`, error);
         }
       }
-    }, 3000); // 每3秒轮询一次
+    }, 3000);
 
     return () => clearInterval(pollInterval);
   }, [tasks, selectedTask]);
