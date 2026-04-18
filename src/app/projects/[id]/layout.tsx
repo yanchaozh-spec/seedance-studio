@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef,
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Check, Sparkles, Coins, AlertCircle, RotateCcw, Upload, UserRound } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Check, Sparkles, Coins, AlertCircle, RotateCcw, Upload, UserRound, Plus } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets, deleteAsset, reorderAssets } from "@/lib/assets";
 import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
+import { Input } from "@/components/ui/input";
+import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
+import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { uploadFile } from "@/lib/upload";
 import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
@@ -470,6 +473,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<Task | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [virtualAvatarDialogOpen, setVirtualAvatarDialogOpen] = useState(false);
+  const [avatarDialogMode, setAvatarDialogMode] = useState<"manual" | "select">("select");
+  const [globalAvatars, setGlobalAvatars] = useState<GlobalAvatar[]>([]);
+  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "", description: "" });
+  const [virtualAvatarThumbnailFile, setVirtualAvatarThumbnailFile] = useState<File | null>(null);
+  const [virtualAvatarThumbnailPreview, setVirtualAvatarThumbnailPreview] = useState<string | null>(null);
+  const [virtualAvatarUploading, setVirtualAvatarUploading] = useState(false);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
@@ -480,6 +490,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // 加载全局虚拟人像库
+  useEffect(() => {
+    if (virtualAvatarDialogOpen) {
+      getGlobalAvatars().then(setGlobalAvatars).catch(console.error);
+    }
+  }, [virtualAvatarDialogOpen]);
 
   useEffect(() => {
     // 更新请求标识
@@ -1001,26 +1018,40 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       <TabsTrigger value="virtual_avatar" className="flex-1 text-xs" suppressHydrationWarning>人像</TabsTrigger>
                     </TabsList>
                   </Tabs>
-                  {/* 上传按钮 */}
+                  {/* 操作按钮 */}
                   <div className="mb-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={(e) => handleUpload(e.target.files)}
-                      className="hidden"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-1"
-                      disabled={uploading}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>{uploading ? "上传中..." : "上传图片"}</span>
-                    </Button>
+                    {materialFilter === "virtual_avatar" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1"
+                        onClick={() => setVirtualAvatarDialogOpen(true)}
+                      >
+                        <UserRound className="w-3.5 h-3.5" />
+                        <span>添加人像</span>
+                      </Button>
+                    ) : (
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={(e) => handleUpload(e.target.files)}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1"
+                          disabled={uploading}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{uploading ? "上传中..." : "上传图片"}</span>
+                        </Button>
+                      </>
+                    )}
                   </div>
                   {filtered.image.length > 0 && (
                     <DndContext
@@ -1331,6 +1362,247 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           }}
           onAssetCreated={loadMaterials}
         />
+
+        {/* 虚拟人像对话框 */}
+        {virtualAvatarDialogOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => { setVirtualAvatarDialogOpen(false); setVirtualAvatarThumbnailFile(null); setVirtualAvatarThumbnailPreview(null); }}>
+            <div className="bg-background rounded-lg p-6 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <UserRound className="w-5 h-5" />
+                  添加虚拟人像
+                </h2>
+                <Button variant="ghost" size="sm" onClick={() => { setVirtualAvatarDialogOpen(false); setVirtualAvatarThumbnailFile(null); setVirtualAvatarThumbnailPreview(null); }}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* 模式切换 */}
+              <div className="flex gap-2 mb-4 shrink-0">
+                <Button
+                  variant={avatarDialogMode === "select" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAvatarDialogMode("select")}
+                  className="flex-1"
+                >
+                  从人像库选择
+                </Button>
+                <Button
+                  variant={avatarDialogMode === "manual" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAvatarDialogMode("manual")}
+                  className="flex-1"
+                >
+                  手动输入
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-4">
+                {avatarDialogMode === "select" ? (
+                  /* 从全局库选择 */
+                  globalAvatars.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <UserRound className="w-8 h-8 mx-auto mb-2 text-purple-400" />
+                      <p className="text-sm mb-1">全局人像库为空</p>
+                      <p className="text-xs mb-3">请先在主页添加虚拟人像，或切换为手动输入</p>
+                      <Button size="sm" variant="outline" onClick={() => setAvatarDialogMode("manual")}>
+                        手动输入
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {globalAvatars.map((ga) => (
+                        <div
+                          key={ga.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:border-purple-500/50 hover:bg-muted/50 ${
+                            virtualAvatarForm.assetId === ga.asset_id ? "border-purple-500 bg-purple-500/5" : ""
+                          }`}
+                          onClick={() => {
+                            setVirtualAvatarForm({
+                              assetId: ga.asset_id,
+                              name: "",
+                              thumbnailUrl: ga.thumbnail_url || "",
+                              description: ga.description || "",
+                            });
+                            setVirtualAvatarThumbnailFile(null);
+                            setVirtualAvatarThumbnailPreview(null);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                            {ga.thumbnail_url ? (
+                              <img src={ga.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <UserRound className="w-5 h-5 text-purple-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-mono text-muted-foreground truncate">{ga.asset_id}</p>
+                            {ga.description && (
+                              <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{ga.description}</p>
+                            )}
+                          </div>
+                          {virtualAvatarForm.assetId === ga.asset_id && (
+                            <div className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center shrink-0">
+                              <Check className="w-2.5 h-2.5 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  /* 手动输入 */
+                  <>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">
+                        Asset ID <span className="text-destructive">*</span>
+                      </label>
+                      <Input
+                        placeholder="如：asset-202604011823-6d4x2"
+                        value={virtualAvatarForm.assetId}
+                        onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, assetId: e.target.value.trim() }))}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        从
+                        <a
+                          href="https://www.volcengine.com/docs/82379/2223965"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline hover:text-primary transition-colors mx-0.5"
+                        >
+                          官方虚拟人像库
+                        </a>
+                        获取 Asset ID
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">
+                        缩略图 <span className="text-muted-foreground font-normal">(可选，仅用于 UI 预览)</span>
+                      </label>
+                      <ThumbnailUpload
+                        url={virtualAvatarForm.thumbnailUrl}
+                        onUrlChange={(v) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: v }))}
+                        preview={virtualAvatarThumbnailPreview}
+                        onPreviewChange={setVirtualAvatarThumbnailPreview}
+                        file={virtualAvatarThumbnailFile}
+                        onFileChange={setVirtualAvatarThumbnailFile}
+                        uploading={virtualAvatarUploading}
+                        hint="缩略图仅用于素材池显示，不发送给 API"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">
+                        描述 <span className="text-muted-foreground font-normal">(可选)</span>
+                      </label>
+                      <Input
+                        placeholder="如：30岁女性，短发，专业形象"
+                        value={virtualAvatarForm.description}
+                        onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, description: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">人像特征描述，方便辨识和同步到全局人像库</p>
+                    </div>
+                  </>
+                )}
+
+                {/* 角色名称 - 两种模式都显示 */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    角色名称 <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    placeholder="如：女主-李武"
+                    value={virtualAvatarForm.name}
+                    onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    本项目中使用的角色名，不同项目可设置不同名称
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t mt-4 shrink-0">
+                <Button variant="outline" onClick={() => { setVirtualAvatarDialogOpen(false); setVirtualAvatarThumbnailFile(null); setVirtualAvatarThumbnailPreview(null); }}>
+                  取消
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!virtualAvatarForm.assetId.trim()) {
+                      toast.error(avatarDialogMode === "select" ? "请从人像库中选择" : "请输入 Asset ID");
+                      return;
+                    }
+                    if (!virtualAvatarForm.name.trim()) {
+                      toast.error("请输入角色名称");
+                      return;
+                    }
+                    try {
+                      // 如果有本地缩略图文件，先上传到 TOS
+                      let thumbnailUrl = virtualAvatarForm.thumbnailUrl.trim() || null;
+                      if (virtualAvatarThumbnailFile) {
+                        try {
+                          setVirtualAvatarUploading(true);
+                          const uploadResult = await uploadFile(virtualAvatarThumbnailFile, {
+                            projectId: resolvedParams.id,
+                            type: "image",
+                          });
+                          thumbnailUrl = uploadResult.url;
+                        } catch (uploadError) {
+                          console.error("缩略图上传失败:", uploadError);
+                          toast.error("缩略图上传失败，将使用 URL 或留空");
+                        } finally {
+                          setVirtualAvatarUploading(false);
+                        }
+                      }
+
+                      const response = await fetch(`/api/projects/${resolvedParams.id}/assets`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          name: virtualAvatarForm.name.trim(),
+                          display_name: virtualAvatarForm.name.trim(),
+                          type: "virtual_avatar",
+                          asset_id: virtualAvatarForm.assetId.trim(),
+                          url: `asset://${virtualAvatarForm.assetId.trim()}`,
+                          thumbnail_url: thumbnailUrl,
+                          keyframe_description: virtualAvatarForm.description.trim() || null,
+                        }),
+                      });
+                      if (!response.ok) throw new Error("创建失败");
+                      const newAsset = await response.json();
+
+                      // 同步到全局人像库
+                      try {
+                        await addGlobalAvatar({
+                          asset_id: virtualAvatarForm.assetId.trim(),
+                          thumbnail_url: thumbnailUrl || undefined,
+                          description: virtualAvatarForm.description.trim() || undefined,
+                          source_project_id: resolvedParams.id,
+                        });
+                      } catch (syncError) {
+                        console.warn("同步到全局人像库失败:", syncError);
+                      }
+
+                      // 刷新素材库
+                      await loadMaterials();
+                      // 添加到素材池
+                      addAssetToPool({ ...newAsset, isActivated: true } as SelectedAsset);
+                      // 重置表单并关闭对话框
+                      setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "", description: "" });
+                      setVirtualAvatarThumbnailFile(null);
+                      setVirtualAvatarThumbnailPreview(null);
+                      setVirtualAvatarDialogOpen(false);
+                      toast.success("虚拟人像已添加");
+                    } catch (error) {
+                      console.error("创建虚拟人像失败:", error);
+                      toast.error("创建虚拟人像失败");
+                    }
+                  }}
+                >
+                  添加
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ProjectDetailContext.Provider>
   );

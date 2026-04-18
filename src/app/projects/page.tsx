@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,12 +28,11 @@ import {
   Settings,
   Pencil,
   UserRound,
-  Image,
-  X,
 } from "lucide-react";
 import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
 import { uploadFile } from "@/lib/upload";
+import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { formatDistanceToNow } from "date-fns";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { toast } from "sonner";
@@ -61,7 +60,6 @@ export default function ProjectsPage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarAdding, setAvatarAdding] = useState(false);
   const [deletingAvatarId, setDeletingAvatarId] = useState<string | null>(null);
-  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadProjects();
@@ -507,68 +505,16 @@ export default function ProjectsPage() {
             </div>
             <div>
               <Label>缩略图 <span className="text-muted-foreground font-normal">(可选)</span></Label>
-              <div className="mt-1.5 space-y-2">
-                {(avatarThumbnailPreview || avatarForm.thumbnailUrl) && (
-                  <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                    <img
-                      src={avatarThumbnailPreview || avatarForm.thumbnailUrl}
-                      alt="缩略图预览"
-                      className="w-full h-full object-contain"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAvatarThumbnailFile(null);
-                        setAvatarThumbnailPreview(null);
-                        setAvatarForm((prev) => ({ ...prev, thumbnailUrl: "" }));
-                      }}
-                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:opacity-80 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-                {!avatarThumbnailPreview && !avatarForm.thumbnailUrl && (
-                  <div className="flex gap-2">
-                    <label className="flex-1 flex flex-col items-center justify-center gap-1 h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors">
-                      {avatarUploading ? (
-                        <span className="text-xs text-muted-foreground animate-pulse">上传中...</span>
-                      ) : (
-                        <>
-                          <Image className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">本地上传</span>
-                        </>
-                      )}
-                      <input
-                        ref={avatarFileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        disabled={avatarUploading}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            setAvatarThumbnailPreview(ev.target?.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                          setAvatarThumbnailFile(file);
-                        }}
-                      />
-                    </label>
-                    <div className="flex-1 flex flex-col items-center justify-center h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors">
-                      <Input
-                        placeholder="输入图片 URL"
-                        value={avatarForm.thumbnailUrl}
-                        onChange={(e) => setAvatarForm((prev) => ({ ...prev, thumbnailUrl: e.target.value.trim() }))}
-                        className="h-7 text-xs border-0 bg-transparent text-center placeholder:text-[10px]"
-                      />
-                      <span className="text-[10px] text-muted-foreground mt-0.5">URL 输入</span>
-                    </div>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">缩略图仅用于预览显示，不发送给 API</p>
+              <div className="mt-1.5">
+                <ThumbnailUpload
+                  url={avatarForm.thumbnailUrl}
+                  onUrlChange={(v) => setAvatarForm((prev) => ({ ...prev, thumbnailUrl: v }))}
+                  preview={avatarThumbnailPreview}
+                  onPreviewChange={setAvatarThumbnailPreview}
+                  file={avatarThumbnailFile}
+                  onFileChange={setAvatarThumbnailFile}
+                  uploading={avatarUploading}
+                />
               </div>
             </div>
             <div>

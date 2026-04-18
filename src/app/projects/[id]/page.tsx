@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task, createTask, getVideoUrl } from "@/lib/tasks";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
+import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { useProjectDetail } from "./layout";
 import { useSettingsStore } from "@/lib/settings";
 import { uploadFile } from "@/lib/upload";
@@ -88,7 +89,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
   const [virtualAvatarDialogOpen, setVirtualAvatarDialogOpen] = useState(false);
-  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "" });
+  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "", description: "" });
   const [virtualAvatarThumbnailFile, setVirtualAvatarThumbnailFile] = useState<File | null>(null);
   const [virtualAvatarThumbnailPreview, setVirtualAvatarThumbnailPreview] = useState<string | null>(null);
   const [virtualAvatarUploading, setVirtualAvatarUploading] = useState(false);
@@ -1167,6 +1168,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                             assetId: ga.asset_id,
                             name: "",
                             thumbnailUrl: ga.thumbnail_url || "",
+                            description: ga.description || "",
                           });
                           setVirtualAvatarThumbnailFile(null);
                           setVirtualAvatarThumbnailPreview(null);
@@ -1223,70 +1225,27 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     <label className="text-sm font-medium mb-1.5 block">
                       缩略图 <span className="text-muted-foreground font-normal">(可选，仅用于 UI 预览)</span>
                     </label>
-                    <div className="space-y-2">
-                      {(virtualAvatarThumbnailPreview || virtualAvatarForm.thumbnailUrl) && (
-                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                          <img
-                            src={virtualAvatarThumbnailPreview || virtualAvatarForm.thumbnailUrl}
-                            alt="缩略图预览"
-                            className="w-full h-full object-contain"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVirtualAvatarThumbnailFile(null);
-                              setVirtualAvatarThumbnailPreview(null);
-                              setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: "" }));
-                            }}
-                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:opacity-80 transition-opacity"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                      {!virtualAvatarThumbnailPreview && !virtualAvatarForm.thumbnailUrl && (
-                        <div className="flex gap-2">
-                          <label className="flex-1 flex flex-col items-center justify-center gap-1 h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors">
-                            {virtualAvatarUploading ? (
-                              <span className="text-xs text-muted-foreground animate-pulse">上传中...</span>
-                            ) : (
-                              <>
-                                <Image className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">本地上传</span>
-                              </>
-                            )}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              disabled={virtualAvatarUploading}
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onload = (ev) => {
-                                  setVirtualAvatarThumbnailPreview(ev.target?.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                                setVirtualAvatarThumbnailFile(file);
-                              }}
-                            />
-                          </label>
-                          <div className="flex-1 flex flex-col items-center justify-center h-20 border-2 border-dashed border-muted-foreground/25 rounded-lg hover:border-primary hover:bg-muted/50 transition-colors">
-                            <Input
-                              placeholder="输入图片 URL"
-                              value={virtualAvatarForm.thumbnailUrl}
-                              onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: e.target.value.trim() }))}
-                              className="h-7 text-xs border-0 bg-transparent text-center placeholder:text-[10px]"
-                            />
-                            <span className="text-[10px] text-muted-foreground mt-0.5">URL 输入</span>
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        缩略图仅用于素材池显示，不发送给 API
-                      </p>
-                    </div>
+                    <ThumbnailUpload
+                      url={virtualAvatarForm.thumbnailUrl}
+                      onUrlChange={(v) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: v }))}
+                      preview={virtualAvatarThumbnailPreview}
+                      onPreviewChange={setVirtualAvatarThumbnailPreview}
+                      file={virtualAvatarThumbnailFile}
+                      onFileChange={setVirtualAvatarThumbnailFile}
+                      uploading={virtualAvatarUploading}
+                      hint="缩略图仅用于素材池显示，不发送给 API"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">
+                      描述 <span className="text-muted-foreground font-normal">(可选)</span>
+                    </label>
+                    <Input
+                      placeholder="如：30岁女性，短发，专业形象"
+                      value={virtualAvatarForm.description}
+                      onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">人像特征描述，方便辨识和同步到全局人像库</p>
                   </div>
                 </>
               )}
@@ -1350,6 +1309,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                         asset_id: virtualAvatarForm.assetId.trim(),
                         url: `asset://${virtualAvatarForm.assetId.trim()}`,
                         thumbnail_url: thumbnailUrl,
+                        keyframe_description: virtualAvatarForm.description.trim() || null,
                       }),
                     });
                     if (!response.ok) throw new Error("创建失败");
@@ -1360,11 +1320,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       await addGlobalAvatar({
                         asset_id: virtualAvatarForm.assetId.trim(),
                         thumbnail_url: thumbnailUrl || undefined,
-                        description: "",
+                        description: virtualAvatarForm.description.trim() || undefined,
                         source_project_id: resolvedParams.id,
                       });
                     } catch (syncError) {
-                      // 同步失败不影响项目内使用
                       console.warn("同步到全局人像库失败:", syncError);
                     }
 
@@ -1373,7 +1332,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     // 添加到素材池
                     addAssetToPool({ ...newAsset, isActivated: true } as SelectedAsset);
                     // 重置表单并关闭对话框
-                    setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "" });
+                    setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "", description: "" });
                     setVirtualAvatarThumbnailFile(null);
                     setVirtualAvatarThumbnailPreview(null);
                     setVirtualAvatarDialogOpen(false);
