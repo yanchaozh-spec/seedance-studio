@@ -16,7 +16,7 @@ export interface UploadOptions {
 export async function uploadFile(
   file: File,
   options: UploadOptions
-): Promise<{ url: string; storageKey: string }> {
+): Promise<{ url: string; storageKey: string; id?: string }> {
   const { tosSettings, tosEnabled } = useSettingsStore.getState();
   
   console.log("[Upload] TOS Config:", { tosEnabled, tosSettings });
@@ -41,13 +41,20 @@ export async function uploadFile(
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "上传失败");
+    let errorMsg = "上传失败";
+    try {
+      const error = await response.json();
+      errorMsg = error.error || errorMsg;
+    } catch {
+      errorMsg = response.statusText || errorMsg;
+    }
+    throw new Error(errorMsg);
   }
   
   const result = await response.json();
   return {
     url: result.url,
     storageKey: result.storageKey,
+    id: result.id,
   };
 }

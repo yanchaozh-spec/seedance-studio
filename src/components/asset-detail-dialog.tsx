@@ -35,13 +35,18 @@ interface AssetDetailDialogProps {
 export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: AssetDetailDialogProps) {
   const [binding, setBinding] = useState(false);
   const [uploadingAudio, setUploadingAudio] = useState(false);
+  // 本地存储新上传的音频，用于对话框内显示（这些音频不在 allAssets 中）
+  const [localNewAudios, setLocalNewAudios] = useState<Asset[]>([]);
   const [keyframeDescription, setKeyframeDescription] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [assetCategory, setAssetCategory] = useState<"keyframe" | "image">("image");
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
 
+  // 合并 allAssets 和 localNewAudios 用于搜索
+  const allAssetsWithNew = [...allAssets, ...localNewAudios];
+  
   const boundAudio = currentAsset?.bound_audio_id 
-    ? allAssets.find((a) => a.id === currentAsset.bound_audio_id) 
+    ? allAssetsWithNew.find((a) => a.id === currentAsset.bound_audio_id) 
     : null;
 
   useEffect(() => {
@@ -67,33 +72,46 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       setUploadingAudio(true);
       
       // 使用统一的 uploadFile 函数，会自动处理 TOS 配置
-      // uploadFile 内部会创建素材记录
-      await uploadFile(file, {
+      // uploadFile 内部会创建素材记录，并返回新创建的音频 ID
+      const uploadResult = await uploadFile(file, {
         projectId: asset.project_id,
         type: "audio",
       });
       
-      // 获取音频素材列表，找到刚上传的
-      const response = await fetch(`/api/projects/${asset.project_id}/assets`);
-      const allAssets = await response.json();
-      const uploadedAudio = allAssets.find(
-        (a: Asset) => a.type === "audio" && a.name === file.name.replace(/\.[^/.]+$/, "")
-      );
-      
-      if (!uploadedAudio) {
-        toast.error("上传成功但未找到音频素材");
+      if (!uploadResult.id) {
+        toast.error("上传成功但未获取到音频 ID");
         return;
       }
 
+      // 构建新音频对象（从 API 响应中获取 URL）
+      const newAudio: Asset = {
+        id: uploadResult.id,
+        project_id: asset.project_id,
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        type: "audio",
+        url: uploadResult.url,
+        size: file.size,
+        asset_category: "image",
+        created_at: new Date().toISOString(),
+      };
+      
+      // 将新音频添加到本地状态，确保对话框内能找到
+      setLocalNewAudios((prev) => [...prev, newAudio]);
+      
       // 绑定音频到当前图片
       const bindResponse = await fetch(`/api/assets/${asset.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bound_audio_id: uploadedAudio.id }),
+        body: JSON.stringify({ bound_audio_id: uploadResult.id }),
       });
       
       if (!bindResponse.ok) throw new Error("绑定失败");
       const updatedAsset = await bindResponse.json();
+      
+      console.log("[AssetDetailDialog] Audio bound:", { 
+        audioId: uploadResult.id, 
+        updatedAsset 
+      });
       
       toast.success("音频上传并绑定成功");
       onUpdate(updatedAsset);
