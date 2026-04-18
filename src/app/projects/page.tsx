@@ -33,6 +33,8 @@ import { getProjects, createProject, deleteProject, renameProject, getProjectTas
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
 import { uploadFile } from "@/lib/upload";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
+import { AssetDetailDialog } from "@/components/asset-detail-dialog";
+import { Asset } from "@/lib/assets";
 import { formatDistanceToNow } from "date-fns";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { toast } from "sonner";
@@ -57,6 +59,7 @@ export default function ProjectsPage() {
   const [avatarForm, setAvatarForm] = useState({ assetId: "", thumbnailUrl: "", description: "" });
   const [avatarThumbnailFile, setAvatarThumbnailFile] = useState<File | null>(null);
   const [avatarThumbnailPreview, setAvatarThumbnailPreview] = useState<string | null>(null);
+  const [selectedAvatarDetail, setSelectedAvatarDetail] = useState<GlobalAvatar | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarAdding, setAvatarAdding] = useState(false);
   const [deletingAvatarId, setDeletingAvatarId] = useState<string | null>(null);
@@ -372,7 +375,8 @@ export default function ProjectsPage() {
               {globalAvatars.map((avatar) => (
                 <div
                   key={avatar.id}
-                  className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all"
+                  className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => setSelectedAvatarDetail(avatar)}
                 >
                   {/* 删除按钮 */}
                   <button
@@ -541,6 +545,28 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 全局人像详情对话框 */}
+      <AssetDetailDialog
+        asset={selectedAvatarDetail ? {
+          id: selectedAvatarDetail.id,
+          project_id: selectedAvatarDetail.source_project_id || "",
+          name: selectedAvatarDetail.asset_id,
+          display_name: selectedAvatarDetail.description || selectedAvatarDetail.asset_id,
+          type: "virtual_avatar" as const,
+          asset_id: selectedAvatarDetail.asset_id,
+          url: selectedAvatarDetail.thumbnail_url || "",
+          thumbnail_url: selectedAvatarDetail.thumbnail_url || undefined,
+          created_at: selectedAvatarDetail.created_at,
+        } : null}
+        allAssets={[]}
+        onClose={() => setSelectedAvatarDetail(null)}
+        onUpdate={() => {
+          // 全局人像库的详情对话框不支持编辑，关闭即可
+          setSelectedAvatarDetail(null);
+          loadGlobalAvatars();
+        }}
+      />
     </>
   );
 }

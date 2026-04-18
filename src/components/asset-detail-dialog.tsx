@@ -366,8 +366,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 音频参考（仅美术资产显示） */}
-          {assetCategory === "image" && (
+          {/* 音频参考（仅图片/人像类素材显示，音频/视频/关键帧不需要） */}
+          {assetCategory === "image" && asset.type !== "audio" && asset.type !== "video" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">音频参考</label>
