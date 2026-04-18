@@ -306,6 +306,18 @@ export function DraggableAsset({
                   {asset.display_name || asset.name}
                 </p>
               )}
+              {/* 关键帧描述 - 仅关键帧显示，与美术资产的音频行高度对齐 */}
+              {asset.asset_category === "keyframe" && (
+                <p
+                  className={cn(
+                    "text-muted-foreground/70 text-center truncate",
+                    size === "small" ? "text-[9px] px-0.5" : "text-[11px]"
+                  )}
+                  title={asset.keyframe_description || ""}
+                >
+                  {asset.keyframe_description || "-"}
+                </p>
+              )}
               {/* 音频参考按钮 - 仅美术资产显示 */}
               {asset.asset_category !== "keyframe" && (
                 <div className={cn(

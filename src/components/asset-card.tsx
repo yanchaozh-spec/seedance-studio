@@ -110,6 +110,13 @@ export function AssetCard({
           </div>
         )}
 
+        {/* 关键帧描述 - 仅关键帧显示，与美术资产的声音行高度对齐 */}
+        {isKeyframe && (
+          <p className="text-center text-[9px] text-muted-foreground/70 truncate" title={asset.keyframe_description || ""}>
+            {asset.keyframe_description || "-"}
+          </p>
+        )}
+
         {/* 激活按钮 */}
         {showActivation && (
           <button
