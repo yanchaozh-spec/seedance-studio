@@ -922,7 +922,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
 
   // 长视频编辑界面
   return (
-    <div className="flex h-full">
+    <div className="flex h-full" suppressHydrationWarning>
       {/* 左侧：步骤列表 */}
       <div className="w-64 border-r bg-card p-4 flex flex-col">
         <h2 className="font-semibold mb-4">视频段落</h2>

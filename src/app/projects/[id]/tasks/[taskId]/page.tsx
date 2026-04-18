@@ -253,7 +253,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     .filter(Boolean) as Asset[];
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
+    <div className="container mx-auto py-6 max-w-4xl" suppressHydrationWarning>
       {/* 顶部导航 */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>

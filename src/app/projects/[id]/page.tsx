@@ -557,7 +557,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const imageAssets = selectedAssets.filter((a) => a.type === "image");
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto" suppressHydrationWarning>
       {/* 页面标题 */}
       <div className="mb-4">
         <h1 className="text-xl font-semibold">视频生成</h1>

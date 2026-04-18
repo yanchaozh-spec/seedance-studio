@@ -585,7 +585,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         toggleAssetActivation,
       }}
     >
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen bg-background" suppressHydrationWarning>
         {/* 左侧导航 */}
         <aside
           className={cn(

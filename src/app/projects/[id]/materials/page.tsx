@@ -109,7 +109,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
   const keyframeAssets = filteredAssets.filter((a) => a.asset_category === "keyframe");
 
   return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-6 h-full flex flex-col" suppressHydrationWarning>
       {/* 头部 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">

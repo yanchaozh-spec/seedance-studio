@@ -292,7 +292,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   });
 
   return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-6 h-full flex flex-col" suppressHydrationWarning>
       {/* 头部 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
