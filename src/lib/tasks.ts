@@ -11,10 +11,24 @@ export interface PromptBox {
   order: number;
 }
 
+// 任务参数类型（与前端 GeneratorParams 一致）
 export interface TaskParams {
   duration: number;
   ratio: string;
   resolution: string;
+  service_tier?: "default" | "flex";
+  return_last_frame?: boolean;
+  tools?: Array<{ type: "web_search" }>;
+}
+
+// 提示词框类型
+export interface PromptBox {
+  id: string;
+  content: string;
+  is_activated: boolean;
+  activated_asset_id?: string;
+  keyframe_description?: string;
+  order: number;
 }
 
 export interface TaskResult {
