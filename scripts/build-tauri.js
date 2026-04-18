@@ -14,6 +14,8 @@ const NODE_VERSION = "20.18.0";
 const NODE_EXE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/win-x64/node.exe`;
 const NODE_EXE_PATH = path.join(ROOT, "src-tauri", "resources", "node.exe");
 
+const IS_WINDOWS = process.platform === "win32";
+
 function run(cmd) {
   console.log(`  > ${cmd}`);
   execSync(cmd, { stdio: "inherit", cwd: ROOT });
@@ -23,15 +25,47 @@ function log(tag, msg) {
   console.log(`[${tag}] ${msg}`);
 }
 
+/**
+ * 跨平台目录复制
+ * Windows 下使用 robocopy 处理符号链接和权限问题
+ * 其他系统使用 Node.js 递归复制
+ */
 function copyDirSync(src, dest) {
-  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirSync(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
+  if (!fs.existsSync(src)) return;
+
+  if (IS_WINDOWS) {
+    // Windows: 使用 robocopy，/E 递归复制含空目录，/NFL/NDL/NJ/NP 静默输出
+    // /COPY:DAT 复制数据、属性、时间戳（不复制权限，避免 EPERM）
+    const srcWin = src.replace(/\//g, "\\");
+    const destWin = dest.replace(/\//g, "\\");
+    try {
+      execSync(
+        `robocopy "${srcWin}" "${destWin}" /E /NFL /NDL /NJ /NP /COPY:DAT`,
+        { stdio: "pipe", windowsHide: true }
+      );
+      // robocopy 返回码 0-7 都是成功，8+ 才是错误
+    } catch (err) {
+      // robocopy 返回 1 表示文件已复制，不是错误
+      if (err.status && err.status > 7) {
+        throw new Error(`robocopy 失败，退出码: ${err.status}`);
+      }
+    }
+  } else {
+    // 非 Windows: Node.js 递归复制
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      if (entry.isDirectory()) {
+        copyDirSync(srcPath, destPath);
+      } else {
+        try {
+          fs.copyFileSync(srcPath, destPath);
+        } catch (e) {
+          // 跳过无法复制的文件（如符号链接目标不存在）
+          log("!", `跳过文件: ${srcPath} (${e.code})`);
+        }
+      }
     }
   }
 }
