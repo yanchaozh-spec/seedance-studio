@@ -12,6 +12,8 @@ const execAsync = promisify(exec);
 // 从请求头获取用户 TOS 配置
 function getUserTosConfig(request: NextRequest): TosConfig | null {
   const tosConfigHeader = request.headers.get("x-tos-config");
+  console.log("[ExtractFrame] Received headers:", JSON.stringify(Object.fromEntries(request.headers.entries())));
+  console.log("[ExtractFrame] x-tos-config header:", tosConfigHeader ? "present" : "missing");
   if (tosConfigHeader) {
     try {
       return JSON.parse(Buffer.from(tosConfigHeader, "base64").toString());
