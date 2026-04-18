@@ -548,68 +548,69 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
   // 开始生成
   const handleGenerate = async () => {
-    try {
-      setGenerating(true);
+    // 构建提示词：第一行素材引用，后续行提示词内容
+    const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
+    const promptLines: string[] = [];
+
+    // 找到第一个激活的素材
+    const firstBoxWithAsset = nonEmptyBoxes.find((box) => box.isActivated && box.activatedAssetId);
+    const firstActivatedAsset = firstBoxWithAsset
+      ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
+      : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
+
+    if (firstActivatedAsset) {
+      const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
+      const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
       
-      // 构建提示词：第一行素材引用，后续行提示词内容
-      const nonEmptyBoxes = promptBoxes.filter((box) => box.content.trim());
-      const promptLines: string[] = [];
+      let assetLine = "";
 
-      // 找到第一个激活的素材
-      const firstBoxWithAsset = nonEmptyBoxes.find((box) => box.isActivated && box.activatedAssetId);
-      const firstActivatedAsset = firstBoxWithAsset
-        ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
-        : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
-
-      if (firstActivatedAsset) {
-        const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
-        const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
-        
-        let assetLine = "";
-
-        if (isKeyframe) {
-          // 关键帧：关键帧描述@文件名
-          const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
-          if (keyframeDesc) {
-            assetLine = `${keyframeDesc}@${displayName}`;
-          } else {
-            assetLine = `@${displayName}`;
-          }
+      if (isKeyframe) {
+        // 关键帧：关键帧描述@文件名
+        const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
+        if (keyframeDesc) {
+          assetLine = `${keyframeDesc}@${displayName}`;
         } else {
-          // 美术资产："图片名"@这张图片，声线为@音频文件名
-          assetLine = `"${displayName}"@这张图片`;
-          if (firstActivatedAsset.bound_audio_id) {
-            // 从 selectedAssets 和 materials 中查找绑定的音频
-            const allAssets = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
-            const boundAudio = allAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
-            if (boundAudio) {
-              const audioName = boundAudio.display_name || boundAudio.name;
-              assetLine += `，声线为@${audioName}`;
-            }
+          assetLine = `@${displayName}`;
+        }
+      } else {
+        // 美术资产："图片名"@这张图片，声线为@音频文件名
+        assetLine = `"${displayName}"@这张图片`;
+        if (firstActivatedAsset.bound_audio_id) {
+          // 从 selectedAssets 和 materials 中查找绑定的音频
+          const allAssets = [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))];
+          const boundAudio = allAssets.find((a) => a.id === firstActivatedAsset.bound_audio_id);
+          if (boundAudio) {
+            const audioName = boundAudio.display_name || boundAudio.name;
+            assetLine += `，声线为@${audioName}`;
           }
         }
-
-        // 第一行：素材信息
-        promptLines.push(assetLine);
-
-        // 后续行：提示词内容
-        nonEmptyBoxes.forEach((box) => {
-          promptLines.push(box.content.trim());
-        });
-      } else {
-        // 没有激活素材时，直接输出提示词
-        nonEmptyBoxes.forEach((box) => {
-          promptLines.push(box.content.trim());
-        });
       }
 
-      const finalPrompt = promptLines.join("\n");
+      // 第一行：素材信息
+      promptLines.push(assetLine);
 
-      if (!finalPrompt.trim()) {
-        toast.error("请输入提示词");
-        return;
-      }
+      // 后续行：提示词内容
+      nonEmptyBoxes.forEach((box) => {
+        promptLines.push(box.content.trim());
+      });
+    } else {
+      // 没有激活素材时，直接输出提示词
+      nonEmptyBoxes.forEach((box) => {
+        promptLines.push(box.content.trim());
+      });
+    }
 
+    const finalPrompt = promptLines.join("\n");
+
+    if (!finalPrompt.trim()) {
+      toast.error("请输入提示词");
+      return;
+    }
+
+    // 先设置按钮状态（使用乐观更新，让用户立即看到反馈）
+    setGenerating(true);
+    
+    try {
       await createTask({
         project_id: resolvedParams.id,
         prompt_boxes: promptBoxes.map((box, idx) => ({
@@ -626,9 +627,6 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }, arkApiKey);
 
       toast.success("任务已创建");
-      
-      // 立即恢复按钮，用户可以继续操作
-      setGenerating(false);
       
       // 后台刷新任务列表（不等待）
       refreshTasks();
@@ -653,16 +651,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       } catch (e) {
         console.warn("保存任务数据失败:", e);
       }
-      
-      // 生成后不清空，用户可继续调整
-      // clearPool();
-      // setPromptBoxes([{ id: "1", content: "", isActivated: true }]);
     } catch (error) {
       console.error("创建任务失败:", error);
-      // 显示具体的错误消息
       const errorMessage = error instanceof Error ? error.message : "创建任务失败";
       toast.error(errorMessage);
-      // 失败时也要恢复按钮
+    } finally {
+      // 无论成功还是失败，都要恢复按钮状态
       setGenerating(false);
     }
   };
