@@ -283,27 +283,19 @@ export function TaskCard({
         {/* 视频预览 */}
         {task.status === "succeeded" && getVideoUrl(task) && !compact && (
           <div className="mt-3">
-            {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
-            <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
-              <VideoPlayer
-                src={getVideoUrl(task)}
-                poster={task.result?.last_frame_url}
-                className="max-h-[200px]"
-              />
-            </div>
+            <VideoPlayer
+              src={getVideoUrl(task)}
+              poster={task.result?.last_frame_url}
+            />
           </div>
         )}
 
         {/* 简短预览（紧凑模式） */}
         {task.status === "succeeded" && getVideoUrl(task) && compact && (
           <div className="mt-2">
-            {/* 自适应视频播放器 */}
-            <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
-              <VideoPlayer
-                src={getVideoUrl(task)}
-                className="max-h-[120px]"
-              />
-            </div>
+            <VideoPlayer
+              src={getVideoUrl(task)}
+            />
           </div>
         )}
       </CardContent>
@@ -423,13 +415,11 @@ export function VideoPreviewDialog({ task, open, onClose }: VideoPreviewDialogPr
           </Button>
         </div>
         {getVideoUrl(task) && (
-          <div className="bg-black rounded-lg overflow-hidden relative" style={{ height: "70vh" }}>
-            <VideoPlayer
-              src={getVideoUrl(task)}
-              autoPlay
-              className="absolute inset-0 w-full h-full object-contain"
-            />
-          </div>
+          <VideoPlayer
+            src={getVideoUrl(task)}
+            autoPlay
+            className="max-h-[70vh]"
+          />
         )}
         <div className="flex items-center gap-2 mt-4">
           {getVideoUrl(task) && (

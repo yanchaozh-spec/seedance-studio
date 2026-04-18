@@ -10,9 +10,11 @@ interface VideoPlayerProps extends Omit<VideoHTMLAttributes<HTMLVideoElement>, "
 
 /**
  * 自适应视频播放器组件
- * - 使用 object-fit: contain 保持视频原始比例
- * - 9:16 竖屏视频不会被放大，上下留黑边
- * - 播放按钮和控件与原生 video 一致
+ *
+ * 容器始终 16:9，视频内容 object-contain 保持原始比例：
+ * - 16:9 横屏视频：完美填充
+ * - 9:16 竖屏视频：左右留黑边
+ * - 播放控件始终可见，布局一致
  */
 export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
   function VideoPlayer(
@@ -20,24 +22,16 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     ref
   ) {
     return (
-      <video
-        ref={ref}
-        src={src || ""}
-        controls={controls}
-        className={cn(
-          // 核心样式：保持原始比例，不变形放大
-          "max-w-full max-h-full",
-          // 默认居中显示
-          "mx-auto",
-          // object-fit: contain 保持原始比例，整个视频可见
-          "object-contain",
-          // 黑色背景（视频周围可能有黑边）
-          "bg-black",
-          className
-        )}
-        style={style}
-        {...props}
-      />
+      <div className={cn("relative aspect-video bg-black overflow-hidden", className)}>
+        <video
+          ref={ref}
+          src={src || ""}
+          controls={controls}
+          className="absolute inset-0 w-full h-full object-contain"
+          style={style}
+          {...props}
+        />
+      </div>
     );
   }
 );

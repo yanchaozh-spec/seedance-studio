@@ -960,15 +960,12 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           
                           {/* 视频/状态区域 */}
                           {task.status === "succeeded" && getVideoUrl(task) ? (
-                            <div className="bg-black rounded overflow-hidden flex items-center justify-center" style={{ height: "120px" }}>
-                              <VideoPlayer
-                                ref={(el) => {
-                                  if (el) videoRefs.current.set(task.id, el);
-                                }}
-                                src={getVideoUrl(task) || ""}
-                                className="max-h-full"
-                              />
-                            </div>
+                            <VideoPlayer
+                              ref={(el) => {
+                                if (el) videoRefs.current.set(task.id, el);
+                              }}
+                              src={getVideoUrl(task) || ""}
+                            />
                           ) : task.status === "running" ? (
                             <div className="h-10 bg-muted-foreground/10 rounded flex items-center justify-center">
                               <Loader className="w-4 h-4 animate-spin text-blue-500" />

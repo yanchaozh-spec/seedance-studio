@@ -286,16 +286,12 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             <Card>
               <CardContent className="p-4">
                 <div className="space-y-4">
-                  {/* 自适应视频播放器，9:16 竖屏不会被放大 */}
-                  <div className="bg-black rounded-lg overflow-hidden relative" style={{ height: "400px" }}>
-                    <VideoPlayer
-                      ref={videoRef}
-                      src={getVideoUrl(task)}
-                      muted={muted}
-                      poster={task.result?.last_frame_url}
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  </div>
+                  <VideoPlayer
+                    ref={videoRef}
+                    src={getVideoUrl(task)}
+                    muted={muted}
+                    poster={task.result?.last_frame_url}
+                  />
                   
                   {/* 视频控制栏 */}
                   <div className="flex items-center gap-4">

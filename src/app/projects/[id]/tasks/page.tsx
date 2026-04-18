@@ -396,13 +396,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                 {task.status === "succeeded" && getVideoUrl(task) && (
                   <div className="flex gap-4 p-4 bg-black/5">
                     {/* 左侧视频 - 自适应显示，不变形 */}
-                    <div className="bg-black rounded overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: "140px", height: "80px" }}>
+                    <div className="flex-shrink-0" style={{ width: "140px" }}>
                       <VideoPlayer
                         ref={(el) => {
                           if (el) videoRefs.current.set(task.id, el);
                         }}
                         src={getVideoUrl(task)}
-                        className="max-h-full"
                       />
                     </div>
                     
