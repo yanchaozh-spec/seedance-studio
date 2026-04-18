@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef,
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Film, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle, RotateCcw, Upload } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Sparkles, Coins, AlertCircle, RotateCcw, Upload } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -636,7 +636,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
   const navItems = [
     { href: `/projects/${resolvedParams.id}`, icon: Video, label: "视频生成", exact: true },
-    { href: `/projects/${resolvedParams.id}/long-video`, icon: Film, label: "长视频", exact: true },
     { href: `/projects/${resolvedParams.id}/materials`, icon: FolderOpen, label: "素材库" },
     { href: `/projects/${resolvedParams.id}/tasks`, icon: ListTodo, label: "任务管理" },
   ];

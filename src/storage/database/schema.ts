@@ -82,75 +82,6 @@ export const tasks = pgTable(
   ]
 );
 
-// 长视频任务表
-export const longVideos = pgTable(
-  "long_videos",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    project_id: varchar("project_id", { length: 36 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
-    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'generating' | 'merging' | 'succeeded' | 'failed'
-    progress: integer("progress").default(0), // 0-100
-    total_segments: integer("total_segments").notNull(), // 总分段数
-    completed_segments: integer("completed_segments").default(0), // 已完成分段数
-    final_video_url: text("final_video_url"), // 拼接后的视频 URL
-    final_video_duration: integer("final_video_duration"), // 最终视频时长（秒）
-    target_duration: integer("target_duration").notNull(), // 目标时长（秒）
-    prompts: jsonb("prompts").$type<{
-      id: string;
-      content: string;
-      is_activated: boolean;
-      activated_asset_id?: string;
-      keyframe_description?: string;
-      order: number;
-    }[]>().default([]), // 原始 prompt 列表
-    selected_assets: jsonb("selected_assets").$type<string[]>().default([]),
-    params: jsonb("params").$type<{
-      ratio: string;
-      resolution: string;
-      generate_audio: boolean;
-    }>(),
-    error_message: text("error_message"),
-    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("long_videos_project_id_idx").on(table.project_id),
-    index("long_videos_status_idx").on(table.status),
-    index("long_videos_created_at_idx").on(table.created_at),
-  ]
-);
-
-// 视频分段表
-export const videoSegments = pgTable(
-  "video_segments",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    long_video_id: varchar("long_video_id", { length: 36 }).notNull().references(() => longVideos.id, { onDelete: "cascade" }),
-    segment_index: integer("segment_index").notNull(), // 段序号 (0, 1, 2, ...)
-    task_id: varchar("task_id", { length: 64 }), // Seedance API 返回的任务 ID
-    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'queued' | 'running' | 'succeeded' | 'failed'
-    video_url: text("video_url"), // 该段的视频 URL
-    last_frame_url: text("last_frame_url"), // 该段的尾帧 URL
-    prompt_content: jsonb("prompt_content").$type<{
-      id: string;
-      content: string;
-      is_activated: boolean;
-      activated_asset_id?: string;
-      keyframe_description?: string;
-      order: number;
-    }>(),
-    first_frame_url: text("first_frame_url"), // 该段的首帧 URL（用于连接上一段）
-    error_message: text("error_message"),
-    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("video_segments_long_video_id_idx").on(table.long_video_id),
-    index("video_segments_task_id_idx").on(table.task_id),
-    index("video_segments_status_idx").on(table.status),
-  ]
-);
-
 // Zod Schema
 const { createInsertSchema: createProjectInsertSchema } = createSchemaFactory({ coerce: { date: true } });
 export const insertProjectSchema = createProjectInsertSchema(projects).pick({ name: true });
@@ -164,11 +95,3 @@ export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export const insertTaskSchema = createProjectInsertSchema(tasks).omit({ id: true, created_at: true, updated_at: true });
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
-
-export const insertLongVideoSchema = createProjectInsertSchema(longVideos).omit({ id: true, created_at: true, updated_at: true });
-export type LongVideo = typeof longVideos.$inferSelect;
-export type InsertLongVideo = z.infer<typeof insertLongVideoSchema>;
-
-export const insertVideoSegmentSchema = createProjectInsertSchema(videoSegments).omit({ id: true, created_at: true, updated_at: true });
-export type VideoSegment = typeof videoSegments.$inferSelect;
-export type InsertVideoSegment = z.infer<typeof insertVideoSegmentSchema>;
