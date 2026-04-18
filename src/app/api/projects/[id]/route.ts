@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/storage/database/sqlite-client";
+import { deleteFile, isTosConfigured } from "@/storage/tos/client";
 
 // GET /api/projects/[id] - 获取单个项目
 export async function GET(
@@ -55,7 +56,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/projects/[id] - 删除项目
+// DELETE /api/projects/[id] - 删除项目（级联删除关联素材和任务）
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -63,7 +64,34 @@ export async function DELETE(
   try {
     const resolvedParams = await params;
     const db = getDb();
+
+    // 1. 获取项目关联的素材 storage_key，用于删除 TOS 文件
+    const assets = db.prepare("SELECT storage_key FROM assets WHERE project_id = ?").all(resolvedParams.id) as { storage_key: string | null }[];
+
+    // 2. 获取项目关联的任务 storage_key，用于删除 TOS 视频
+    const tasks = db.prepare("SELECT video_storage_key FROM tasks WHERE project_id = ?").all(resolvedParams.id) as { video_storage_key: string | null }[];
+
+    // 3. 删除 TOS 上的文件（不阻塞主流程）
+    if (isTosConfigured()) {
+      const allKeys = [
+        ...assets.map((a) => a.storage_key),
+        ...tasks.map((t) => t.video_storage_key),
+      ].filter(Boolean) as string[];
+
+      for (const key of allKeys) {
+        try {
+          await deleteFile(key);
+        } catch (err) {
+          console.error("[DELETE PROJECT] Failed to delete TOS file:", key, err);
+        }
+      }
+    }
+
+    // 4. 级联删除关联数据（先子表后主表）
+    db.prepare("DELETE FROM assets WHERE project_id = ?").run(resolvedParams.id);
+    db.prepare("DELETE FROM tasks WHERE project_id = ?").run(resolvedParams.id);
     db.prepare("DELETE FROM projects WHERE id = ?").run(resolvedParams.id);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/projects/[id] error:", error);

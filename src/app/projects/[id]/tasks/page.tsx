@@ -12,21 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
   ChevronLeft,
-  MoreVertical,
   Download,
   RotateCcw,
   Trash2,
@@ -35,23 +21,15 @@ import {
   XCircle,
   Loader2,
   Search,
-  Image as ImageIcon,
-  Music,
   AlertCircle,
   Coins,
-  Sparkles,
-  Play,
   Camera,
-  Film,
   Eye,
   Ban,
 } from "lucide-react";
 import { Task, getTasks, deleteTask, cancelTask, TaskStatus, getVideoUrl } from "@/lib/tasks";
-import { getAssets, Asset, submitFrameFromCanvas } from "@/lib/assets";
-import { TaskCard, TaskList } from "@/components/tasks/TaskCard";
+import { getAssets, Asset } from "@/lib/assets";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
-import { formatDistanceToNow, formatDuration } from "date-fns";
-import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/settings";

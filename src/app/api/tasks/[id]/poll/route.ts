@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, parseJsonField, toJsonField } from "@/storage/database/sqlite-client";
+import { getDb, parseJsonField } from "@/storage/database/sqlite-client";
 import { uploadVideo, isTosConfigured, isUserTosConfigured, type TosConfig } from "@/storage/tos/client";
 
 export async function GET(

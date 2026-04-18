@@ -4,7 +4,7 @@ import { useState, createContext, useContext, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, Sun, Moon } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 interface ProjectLayoutContextType {

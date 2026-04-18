@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
         console.error("[ExtractFrame] Failed to parse TOS config from header:", e);
       }
     }
-    const useTos = isUserTosConfigured(userTosConfig) || isTosConfigured();
 
     // 判断是 JSON 还是 FormData
     if (contentType.includes("application/json")) {
@@ -100,10 +99,10 @@ export async function POST(request: NextRequest) {
       // 去除扩展名
       const displayName = name.replace(/\.[^/.]+$/, "");
 
-      // 创建素材记录
+      // 创建素材记录（如果有 taskId 则记录来源任务）
       const asset = db.prepare(`
-        INSERT INTO assets (project_id, name, display_name, type, asset_category, url, thumbnail_url, storage_key, keyframe_description)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO assets (project_id, name, display_name, type, asset_category, url, thumbnail_url, storage_key, keyframe_description, keyframe_source_task_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING *
       `).get(
         projectId,
@@ -114,7 +113,8 @@ export async function POST(request: NextRequest) {
         imageUrl,
         imageUrl,
         result.key,
-        timestamp ? `视频帧 @ ${timestamp}s` : null
+        timestamp ? `视频帧 @ ${timestamp}s` : null,
+        taskId || null
       );
 
       return NextResponse.json({

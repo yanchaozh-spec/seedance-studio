@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, parseJsonField } from "@/storage/database/sqlite-client";
+import { getDb } from "@/storage/database/sqlite-client";
 import { uploadAsset, isUserTosConfigured, isTosConfigured } from "@/storage/tos/client";
 
 // TOS 配置类型

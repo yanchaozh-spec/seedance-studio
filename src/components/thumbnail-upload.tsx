@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { Image, X, Upload } from "lucide-react";
+import { X, Upload } from "lucide-react";
 
 interface ThumbnailUploadProps {
   /** 当前 URL 值 */
@@ -29,7 +29,7 @@ export function ThumbnailUpload({
   onUrlChange,
   preview,
   onPreviewChange,
-  file,
+  file: _file, // eslint-disable-line @typescript-eslint/no-unused-vars
   onFileChange,
   uploading = false,
   hint = "缩略图仅用于预览显示，不发送给 API",

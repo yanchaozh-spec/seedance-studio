@@ -12,7 +12,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Image as ImageIcon,
   Music,
   Trash2,
   Unlink,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, toJsonField } from "@/storage/database/sqlite-client";
+import { getDb } from "@/storage/database/sqlite-client";
 
 // 轮询任务状态
 export async function POST(request: NextRequest) {

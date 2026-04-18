@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, parseJsonField, toJsonField } from "@/storage/database/sqlite-client";
+import { getDb, toJsonField } from "@/storage/database/sqlite-client";
 import { buildSeedanceRequestBody, buildSeedanceContent, type SeedanceContentItem } from "@/lib/seedance";
 
 const ARK_API_URL = "https://ark.cn-beijing.volces.com/api/v3";
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         keyframeDescription: box.keyframe_description,
       })),
       false // 后端已预筛选素材，不需要过滤激活状态
-    );;
+    );
 
     if (content.length === 0) {
       return NextResponse.json({ error: "No content to generate" }, { status: 400 });

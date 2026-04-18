@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Play, Pause, RotateCcw, Trash2, Eye, Download, AlertCircle,
+  Play, RotateCcw, Trash2, Eye, Download, AlertCircle,
   Clock, CheckCircle, XCircle, Loader2, Coins, Sparkles, Camera, Ban
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Task, TaskStatus, getVideoUrl } from "@/lib/tasks";
-import { formatDistanceToNow, formatDuration } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { VideoPlayer } from "@/components/ui/video-player";
 

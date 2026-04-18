@@ -102,8 +102,11 @@ export async function GET(
       return NextResponse.json(null);
     }
 
+    // 过滤敏感字段
+    const { api_key: _apiKey, ...safeRow } = row;
+    void _apiKey;
     const data = {
-      ...row,
+      ...safeRow,
       prompt_boxes: parseJsonField(row.prompt_boxes as string | null, []),
       selected_assets: parseJsonField(row.selected_assets as string | null, []),
       params: parseJsonField(row.params as string | null, null),

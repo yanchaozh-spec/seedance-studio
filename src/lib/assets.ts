@@ -287,7 +287,7 @@ export async function submitFrameFromCanvas(
           reject(error);
         }
       }, "image/png");
-    } catch (error) {
+    } catch {
       // canvas.toBlob 本身抛出错误（通常是跨域污染）
       reject(new Error("Canvas is tainted (cross-origin content)"));
     }

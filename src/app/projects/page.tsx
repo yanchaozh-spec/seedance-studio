@@ -34,7 +34,6 @@ import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, deleteGlobalAvatar } f
 import { uploadFile } from "@/lib/upload";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
-import { Asset } from "@/lib/assets";
 import { formatDistanceToNow } from "date-fns";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { toast } from "sonner";

@@ -3,7 +3,7 @@
  * 前后端共享的请求参数构建逻辑
  */
 
-import { getAssetKind, type AssetKind } from "./assets";
+import { getAssetKind } from "./assets";
 
 export interface SeedanceParams {
   ratio: string;

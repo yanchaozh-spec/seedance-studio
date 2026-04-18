@@ -4,13 +4,10 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef,
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Check, Sparkles, Coins, AlertCircle, RotateCcw, Upload, UserRound, Plus } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, X, Scissors, Image, Music, Sun, Moon, XCircle, Clock, Loader, CheckCircle, Check, Upload, UserRound } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets, deleteAsset, reorderAssets, getAssetKind } from "@/lib/assets";
 import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
 import { Input } from "@/components/ui/input";
@@ -18,16 +15,13 @@ import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-av
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { uploadFile } from "@/lib/upload";
 import { extractVideoThumbnail } from "@/lib/video-thumbnail";
-import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
-import { useDraggable } from "@/hooks/use-draggable";
+import { Task, getTasks, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
 import { useDragStore } from "@/lib/drag-store";
-import { formatDistanceToNow } from "date-fns";
 import { SelectedAsset } from "./page";
 import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
-import { AssetCard } from "@/components/asset-card";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
 import { VideoPlayer } from "@/components/ui/video-player";
@@ -118,16 +112,6 @@ export function DraggableAsset({
       }
     };
   }, []);
-
-  const handleClick = (e: React.MouseEvent) => {
-    // 如果是拖拽操作，不触发点击
-    if (isDragging.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (onClick) {
-      onClick(asset);
-    }
-  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     dragStartPos.current = { x: e.clientX, y: e.clientY };
@@ -532,7 +516,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"materials" | "tasks">("materials");
   const [materialFilter, setMaterialFilter] = useState<"all" | "keyframe" | "image" | "virtual_avatar" | "audio" | "video">("all");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -718,22 +701,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     }
   };
 
-  // 统一的回滚处理函数（用于需要跳转的场景，如左侧任务管理页面）
-  const handleRollback = (task: Task) => {
-    // 使用 history.state 替代 sessionStorage，避免同步阻塞
-    if (task.prompt_boxes && task.prompt_boxes.length > 0) {
-      const taskData = {
-        id: task.id,
-        prompt_boxes: task.prompt_boxes,
-        selected_assets: task.selected_assets,
-        params: task.params,
-      };
-      // 使用 history.state 传递数据，避免 JSON.stringify 阻塞
-      window.history.pushState(taskData, "", window.location.href);
-      router.push(`/projects/${resolvedParams.id}`);
-    }
-  };
-
   // 右侧侧边栏回滚 - 使用 window.location.href 刷新当前页面，比 window.location.reload() 更快
   const handleRollbackInline = (task: Task) => {
     // 恢复提示词
@@ -751,15 +718,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
       // 刷新当前页面，比 window.location.reload() 更快
       window.location.href = window.location.href;
     }
-  };
-
-  // 格式化时间
-  const formatSeconds = (seconds: number | undefined | null) => {
-    if (!seconds) return "-";
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}m ${secs}s`;
   };
 
   // 加载素材列表（带竞态保护）
@@ -867,20 +825,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     } finally {
       setLoadingTasks(false);
     }
-  };
-
-  // 打开右侧抽屉
-  const openDrawer = (tab: "materials" | "tasks") => {
-    setActiveTab(tab);
-    setRightDrawerOpen(true);
-    if (tab === "tasks") {
-      loadTasks();
-    }
-  };
-
-  // 关闭右侧抽屉
-  const closeDrawer = () => {
-    setRightDrawerOpen(false);
   };
 
   const addAssetToPool = (asset: Asset) => {

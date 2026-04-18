@@ -33,7 +33,7 @@ import {
 import { Task, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { Asset, submitFrameFromCanvas } from "@/lib/assets";
 import { useSettingsStore } from "@/lib/settings";
-import { formatDistanceToNow, formatDuration } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -127,7 +127,7 @@ export function TaskDetailSheet({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast.success("下载成功");
-    } catch (error) {
+    } catch {
       toast.error("下载失败");
     }
   };

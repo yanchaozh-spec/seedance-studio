@@ -13,14 +13,18 @@ export async function GET(
       .prepare("SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC")
       .all(resolvedParams.id) as Record<string, unknown>[];
 
-    // 解析 JSON 字段
-    const data = rows.map((row) => ({
-      ...row,
-      prompt_boxes: parseJsonField(row.prompt_boxes as string | null, []),
-      selected_assets: parseJsonField(row.selected_assets as string | null, []),
-      params: parseJsonField(row.params as string | null, null),
-      result: parseJsonField(row.result as string | null, null),
-    }));
+    // 解析 JSON 字段，并过滤敏感字段
+    const data = rows.map((row) => {
+      const { api_key: _apiKey, ...safeRow } = row;
+      void _apiKey;
+      return {
+        ...safeRow,
+        prompt_boxes: parseJsonField(row.prompt_boxes as string | null, []),
+        selected_assets: parseJsonField(row.selected_assets as string | null, []),
+        params: parseJsonField(row.params as string | null, null),
+        result: parseJsonField(row.result as string | null, null),
+      };
+    });
 
     return NextResponse.json(data);
   } catch (error) {
