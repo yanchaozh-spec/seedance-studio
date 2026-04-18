@@ -742,7 +742,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                   onChange={(val) => updatePromptBox(box.id, val)}
                   onKeyDown={(e) => handlePromptKeyDown(e, index)}
                   placeholder={`提示词 ${index + 1}...（输入 @ 引用素材）`}
-                  className="min-h-16 resize-none text-sm"
+                  className="resize-none text-sm"
                   mentionItems={mentionItems}
                 />
                 {promptBoxes.length > 1 && (

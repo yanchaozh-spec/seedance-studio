@@ -70,7 +70,12 @@ function parseMentionSegments(
  * - 底层 div 渲染高亮文本（textarea 文字透明）
  * - 两层共享完全相同的字体、行高、内边距
  * - 高亮 span 的文本内容与 textarea 完全一致（保证字符宽度对齐）
- * - 缩略图使用 position: absolute 定位，脱离文本流，不影响 span 宽度
+ *
+ * 缩略图定位技巧：
+ * - 给高亮 span 加 pl-[22px]（左内边距），为缩略图腾出空间
+ * - 同时加 -ml-[22px]（负左外边距），抵消内边距导致的偏移
+ * - 这样文字位置不变（与 textarea 对齐），但缩略图在 padding 区域内
+ * - 缩略图使用 absolute 定位在 padding 区域，被高亮背景覆盖
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -236,7 +241,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
     const sharedTextStyle = "text-sm leading-[1.625rem] px-3 py-2 font-inherit";
 
     return (
-      <div className="relative">
+      <div className="relative flex-1 min-w-0">
         {/* 高亮镜像层：渲染带样式的文本 */}
         <div
           ref={mirrorRef}
@@ -255,34 +260,36 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                   <span
                     key={i}
                     className={cn(
-                      "relative inline rounded-sm font-medium",
+                      /*
+                       * pl-[22px] -ml-[22px] 技巧：
+                       * pl-[22px]: 在 span 左侧腾出 22px 空间放缩略图
+                       * -ml-[22px]: 负 margin 抵消 padding 导致的偏移
+                       * 效果：文字位置不变（与 textarea 对齐），但缩略图在 padding 区域内
+                       * 高亮背景覆盖 padding + content，所以缩略图在高亮框内
+                       */
+                      "relative inline-block pl-[22px] -ml-[22px] rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
                         : "bg-primary/10 text-primary"
                     )}
                   >
                     {seg.text}
-                    {/*
-                      缩略图徽章：position: absolute 脱离文本流，
-                      不影响 span 的文本宽度，保证镜像层与 textarea 对齐。
-                      定位在 @ 符号左侧，垂直居中。
-                    */}
+                    {/* 缩略图在 padding 区域内，被高亮背景覆盖 */}
                     {item?.thumbnail_url ? (
                       <img
                         src={item.thumbnail_url}
                         alt=""
-                        className="absolute rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
-                        style={{ top: 5, left: -14, width: 16, height: 16 }}
+                        className="absolute left-[3px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
                       />
                     ) : item ? (
                       <span
                         className={cn(
-                          "absolute rounded-sm flex items-center justify-center pointer-events-none",
+                          "absolute left-[3px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
                           item.type === "audio"
-                            ? "bg-violet-200 dark:bg-violet-800/50"
-                            : "bg-primary/20"
+                            ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
+                            : "bg-primary/20 text-primary"
                         )}
-                        style={{ top: 5, left: -14, width: 16, height: 16, fontSize: 8, lineHeight: 1 }}
+                        style={{ fontSize: 9, lineHeight: 1 }}
                       >
                         {item.type === "audio" ? "♪" : "🖼"}
                       </span>
@@ -318,7 +325,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
             "dark:bg-input/30",
             "rounded-md border shadow-xs transition-[color,box-shadow] outline-none",
             "focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
-            "w-full flex field-sizing-content min-h-16",
+            "w-full flex field-sizing-content",
             sharedTextStyle,
             className
           )}
