@@ -113,15 +113,13 @@ function buildContent(
   }
 
   // 第一步：添加所有图片（使用 URL）
-  // 序号规则：所有图片按顺序编号，从1开始
-  // 类型前缀：美术资产用"图片"，关键帧用"关键帧"
+  // 序号规则：所有图片统一用 [图片N] 格式
   const imageRefMap = new Map<string, string>(); // asset.id -> 引用名称
   let imageIndex = 0;
   
   for (const asset of allImageAssets) {
-    const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe;
     imageIndex++;
-    const refName = isKeyframe ? `[关键帧${imageIndex}]` : `[图片${imageIndex}]`;
+    const refName = `[图片${imageIndex}]`;
     imageRefMap.set(asset.id, refName);
 
     content.push({
@@ -129,7 +127,7 @@ function buildContent(
       image_url: {
         url: asset.url,
       },
-      role: isKeyframe ? "first_frame" : "reference_image",
+      role: asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe ? "first_frame" : "reference_image",
     });
   }
 
@@ -172,11 +170,11 @@ function buildContent(
     }
   }
   
-  // 添加关键帧
+  // 添加关键帧（使用 keyframe_description 作为名称）
   for (const asset of keyframeAssets) {
     const refName = imageRefMap.get(asset.id)!;
     const desc = asset.keyframe_description || asset.display_name || asset.name;
-    assetDefParts.push(`关键帧描述：${refName}`);
+    assetDefParts.push(`${desc}：${refName}`);
   }
 
   // 添加素材定义行（第一行）

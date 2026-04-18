@@ -269,13 +269,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 按顺序收集所有图片（美术资产 + 关键帧）
     const allImageAssets = [...imageAssets, ...keyframeAssets];
 
-    // 构建序号映射
+    // 构建序号映射 - 所有图片统一用 [图片N] 格式
     const imageRefMap = new Map<string, string>();
     let imageIndex = 0;
     for (const asset of allImageAssets) {
-      const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe";
       imageIndex++;
-      const refName = isKeyframe ? `[关键帧${imageIndex}]` : `[图片${imageIndex}]`;
+      const refName = `[图片${imageIndex}]`;
       imageRefMap.set(asset.id, refName);
     }
 
@@ -303,11 +302,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }
     }
     
-    // 添加关键帧
+    // 添加关键帧（使用 keyframe_description 作为名称）
     for (const asset of keyframeAssets) {
       const refName = imageRefMap.get(asset.id)!;
       const desc = (asset as { keyframe_description?: string }).keyframe_description || asset.display_name || asset.name;
-      assetDefParts.push(`关键帧描述：${refName}`);
+      assetDefParts.push(`${desc}：${refName}`);
     }
 
     const contentItems: Array<Record<string, unknown>> = [];
