@@ -276,8 +276,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       activatedAssets.some(img => img.bound_audio_id === a.id)
     );
 
-    // 按顺序收集所有图片（美术资产 + 关键帧）
-    const allImageAssets = [...imageAssets, ...keyframeAssets];
+    // 按顺序收集所有图片（关键帧在前，美术资产在后，与前端显示一致）
+    const allImageAssets = [...keyframeAssets, ...imageAssets];
 
     // 构建序号映射 - 所有图片统一用 [图片N] 格式
     const imageRefMap = new Map<string, string>();

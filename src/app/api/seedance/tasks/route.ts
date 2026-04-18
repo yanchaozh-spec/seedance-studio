@@ -85,10 +85,10 @@ function buildContent(
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
 
-  // 合并所有图片资产（美术资产 + 关键帧）
+  // 合并所有图片资产（关键帧在前，美术资产在后，与前端显示一致）
   const allImageAssets: typeof imageAssets = [];
-  allImageAssets.push(...imageAssets);
   allImageAssets.push(...keyframeAssets);
+  allImageAssets.push(...imageAssets);
 
   // 收集所有音频（绑定的 + 独立的）
   const allAudioAssets: typeof audioAssets = [];
