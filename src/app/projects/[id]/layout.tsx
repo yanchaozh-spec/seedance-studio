@@ -1067,9 +1067,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                   <Tabs value={materialFilter} onValueChange={(v) => setMaterialFilter(v as typeof materialFilter)} className="mb-2" suppressHydrationWarning>
                     <TabsList className="w-full h-7" suppressHydrationWarning>
                       <TabsTrigger value="all" className="flex-1 text-xs" suppressHydrationWarning>全部</TabsTrigger>
-                      <TabsTrigger value="keyframe" className="flex-1 text-xs" suppressHydrationWarning>关键帧</TabsTrigger>
                       <TabsTrigger value="image" className="flex-1 text-xs" suppressHydrationWarning>美术</TabsTrigger>
                       <TabsTrigger value="virtual_avatar" className="flex-1 text-xs" suppressHydrationWarning>人像</TabsTrigger>
+                      <TabsTrigger value="keyframe" className="flex-1 text-xs" suppressHydrationWarning>关键帧</TabsTrigger>
                       <TabsTrigger value="audio" className="flex-1 text-xs" suppressHydrationWarning>音频</TabsTrigger>
                       <TabsTrigger value="video" className="flex-1 text-xs" suppressHydrationWarning>视频</TabsTrigger>
                     </TabsList>
@@ -1173,15 +1173,15 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </DndContext>
                   )}
 
-                  {filtered.keyframe.length > 0 && (
+                  {filtered.virtualAvatar.length > 0 && (
                     <DndContext
                       sensors={materialSensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.keyframe)}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.virtualAvatar)}
                     >
-                      <SortableContext items={filtered.keyframe.map((a) => a.id)} strategy={rectSortingStrategy}>
+                      <SortableContext items={filtered.virtualAvatar.map((a) => a.id)} strategy={rectSortingStrategy}>
                         <div className="flex flex-wrap gap-1.5 mb-4">
-                          {filtered.keyframe.map((asset) => (
+                          {filtered.virtualAvatar.map((asset) => (
                             <SortableMaterialItem
                               key={asset.id}
                               asset={asset}
@@ -1195,15 +1195,15 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     </DndContext>
                   )}
 
-                  {filtered.virtualAvatar.length > 0 && (
+                  {filtered.keyframe.length > 0 && (
                     <DndContext
                       sensors={materialSensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.virtualAvatar)}
+                      onDragEnd={(event) => handleMaterialDragEnd(event, filtered.keyframe)}
                     >
-                      <SortableContext items={filtered.virtualAvatar.map((a) => a.id)} strategy={rectSortingStrategy}>
+                      <SortableContext items={filtered.keyframe.map((a) => a.id)} strategy={rectSortingStrategy}>
                         <div className="flex flex-wrap gap-1.5 mb-4">
-                          {filtered.virtualAvatar.map((asset) => (
+                          {filtered.keyframe.map((asset) => (
                             <SortableMaterialItem
                               key={asset.id}
                               asset={asset}

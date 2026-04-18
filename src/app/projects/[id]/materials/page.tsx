@@ -377,33 +377,6 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
               </div>
             )}
             
-            {/* 关键帧 */}
-            {keyframeAssets.length > 0 && (
-              <div>
-                <h2 className="text-sm font-medium text-muted-foreground mb-3">
-                  关键帧 ({keyframeAssets.length})
-                </h2>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={(event) => handleDragEnd(event, keyframeAssets)}
-                >
-                  <SortableContext items={keyframeAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-                      {keyframeAssets.map((asset) => (
-                        <SortableAssetCard
-                          key={asset.id}
-                          asset={asset}
-                          onClick={() => setSelectedAsset(asset)}
-                          onRemove={() => handleDeleteAsset(asset.id)}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              </div>
-            )}
-
             {/* 虚拟人像 */}
             <div>
               <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1">
@@ -440,6 +413,33 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                 </div>
               )}
             </div>
+
+            {/* 关键帧 */}
+            {keyframeAssets.length > 0 && (
+              <div>
+                <h2 className="text-sm font-medium text-muted-foreground mb-3">
+                  关键帧 ({keyframeAssets.length})
+                </h2>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, keyframeAssets)}
+                >
+                  <SortableContext items={keyframeAssets.map((a) => a.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                      {keyframeAssets.map((asset) => (
+                        <SortableAssetCard
+                          key={asset.id}
+                          asset={asset}
+                          onClick={() => setSelectedAsset(asset)}
+                          onRemove={() => handleDeleteAsset(asset.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            )}
 
             {/* 音频素材 */}
             <div>
