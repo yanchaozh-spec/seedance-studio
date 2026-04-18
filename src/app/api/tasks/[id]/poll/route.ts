@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
-import { uploadVideo, isTosConfigured } from "@/storage/tos/client";
+import { uploadVideo, isTosConfigured, isUserTosConfigured, type TosConfig } from "@/storage/tos/client";
 
 export async function GET(
   request: NextRequest,
@@ -9,6 +9,18 @@ export async function GET(
   try {
     const resolvedParams = await params;
     const client = getSupabaseClient();
+    
+    // 从请求头读取用户 TOS 配置
+    let userTosConfig: TosConfig | null = null;
+    const tosConfigHeader = request.headers.get("x-tos-config");
+    if (tosConfigHeader) {
+      try {
+        userTosConfig = JSON.parse(Buffer.from(tosConfigHeader, "base64").toString());
+      } catch (e) {
+        console.error("[POLL] Failed to parse TOS config from header:", e);
+      }
+    }
+    const useTos = isUserTosConfigured(userTosConfig) || isTosConfigured();
     
     const { data: task, error } = await client
       .from("tasks")
@@ -127,13 +139,13 @@ export async function GET(
           };
           
           // 异步上传视频到 TOS（不阻塞响应）
-          if (videoUrl && isTosConfigured()) {
+          if (videoUrl && useTos) {
             // 直接保存 videoUrl 到数据库，同时触发 TOS 上传
             // 注意：由于这是异步操作，permanent_video_url 可能在稍后才更新
             console.log("[POLL] Task succeeded, will upload video to TOS:", videoUrl);
             
             // 触发异步上传（在后台进行）
-            uploadVideoToTos(task.id, videoUrl).catch((err) => {
+            uploadVideoToTos(task.id, videoUrl, userTosConfig).catch((err) => {
               console.error("[POLL] Failed to upload video to TOS:", err);
             });
           }
@@ -229,8 +241,9 @@ export async function GET(
  * 异步上传视频到 TOS
  * 下载 Seedance 视频并上传到用户自己的 TOS 存储
  */
-async function uploadVideoToTos(taskId: string, videoUrl: string): Promise<void> {
-  if (!isTosConfigured()) {
+async function uploadVideoToTos(taskId: string, videoUrl: string, userConfig?: TosConfig | null): Promise<void> {
+  // 使用用户配置或环境变量配置
+  if (!isUserTosConfigured(userConfig) && !isTosConfigured()) {
     console.log("[TOS] TOS not configured, skipping video upload");
     return;
   }
@@ -239,8 +252,8 @@ async function uploadVideoToTos(taskId: string, videoUrl: string): Promise<void>
     console.log("[TOS] Starting video upload for task:", taskId);
     console.log("[TOS] Source URL:", videoUrl);
 
-    // 上传视频到 TOS
-    const result = await uploadVideo(videoUrl, taskId, true);
+    // 上传视频到 TOS（传入用户配置）
+    const result = await uploadVideo(videoUrl, taskId, true, userConfig || undefined);
     
     console.log("[TOS] Video uploaded successfully!");
     console.log("[TOS] Storage key:", result.key);

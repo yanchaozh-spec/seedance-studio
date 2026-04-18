@@ -245,10 +245,61 @@ export async function uploadVideo(
   isUrl: boolean = false,
   config?: TosConfig
 ): Promise<{ key: string; url: string }> {
-  const storage = config 
-    ? createTosStorage(config) 
-    : getTosStorage();
+  // 如果有用户配置，使用原生 AWS S3 SDK
+  if (config && isUserTosConfigured(config)) {
+    let endpointUrl = config.endpoint || "";
+    if (endpointUrl && !endpointUrl.startsWith("http://") && !endpointUrl.startsWith("https://")) {
+      endpointUrl = "https://" + endpointUrl;
+    }
+    // 确保使用外网 endpoint
+    endpointUrl = endpointUrl.replace(".ivolces.com", ".volces.com");
+
+    const s3Client = new S3Client({
+      region: process.env.COZE_TOS_REGION || "cn-beijing",
+      endpoint: endpointUrl,
+      credentials: {
+        accessKeyId: config.accessKey!,
+        secretAccessKey: config.secretKey!,
+      },
+    });
+    
+    let buffer: Buffer;
+    
+    if (isUrl && typeof bufferOrUrl === "string") {
+      // 从 URL 下载
+      console.log("[TOS] Downloading video from URL:", bufferOrUrl);
+      const response = await fetch(bufferOrUrl);
+      buffer = Buffer.from(await response.arrayBuffer());
+    } else {
+      buffer = bufferOrUrl as Buffer;
+    }
+    
+    const key = `videos/${taskId}.mp4`;
+    
+    // 使用原生 SDK 上传
+    const putCommand = new PutObjectCommand({
+      Bucket: config.bucket!,
+      Key: key,
+      Body: buffer,
+      ContentType: "video/mp4",
+    });
+    await s3Client.send(putCommand);
+    
+    // 生成签名 URL
+    const getCommand = new GetObjectCommand({
+      Bucket: config.bucket!,
+      Key: key,
+    });
+    const url = await getSignedUrl(s3Client, getCommand, { 
+      expiresIn: 7 * 24 * 60 * 60,
+    });
+    
+    console.log("[TOS] Video uploaded successfully:", url);
+    return { key, url };
+  }
   
+  // 使用平台存储
+  const storage = getTosStorage();
   if (!storage) {
     throw new Error("TOS not configured");
   }

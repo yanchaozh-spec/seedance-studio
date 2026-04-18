@@ -374,6 +374,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
               headers["x-ark-api-key"] = apiKey;
             }
             
+            // 传递 TOS 配置到后端（用于视频上传）
+            const tosEnabled = useSettingsStore.getState().tosEnabled;
+            const tosSettings = useSettingsStore.getState().tosSettings;
+            if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+              headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+            }
+            
             const response = await fetch(`/api/tasks/${task.id}/poll`, { headers });
             if (response.ok) {
               const updatedTask = await response.json();
