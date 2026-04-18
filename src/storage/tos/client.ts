@@ -5,7 +5,7 @@
  */
 
 import { S3Storage } from "coze-coding-dev-sdk";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // TOS 配置类型
@@ -43,6 +43,7 @@ function isConfigValid(config: TosConfig): boolean {
  * 创建存储客户端
  */
 function createStorage(config: TosConfig): S3Storage {
+  console.log("[TOS] createStorage - endpoint:", config.endpoint, "bucket:", config.bucket);
   return new S3Storage({
     endpointUrl: config.endpoint!,
     accessKey: config.accessKey!,
@@ -130,14 +131,11 @@ export async function uploadAsset(
   let storage: S3Storage | null = null;
   let s3Client: S3Client | null = null;
   let userBucket: string | undefined = undefined;
+  let useNativeUpload = false; // 是否使用原生 AWS S3 SDK
   
   if (config) {
-    // 使用用户配置创建存储客户端
-    storage = createTosStorage(config);
+    // 使用用户配置创建 AWS S3 客户端
     userBucket = config.bucket;
-    console.log("[TOS] Using user config - creating new storage client with bucket:", config.bucket);
-    
-    // 为用户配置创建 AWS S3 客户端用于生成签名 URL
     s3Client = new S3Client({
       region: process.env.COZE_TOS_REGION || "cn-beijing",
       endpoint: config.endpoint,
@@ -147,13 +145,15 @@ export async function uploadAsset(
       },
       forcePathStyle: true, // S3 兼容模式必须
     });
+    useNativeUpload = true;
+    console.log("[TOS] Using native AWS S3 SDK for user config with bucket:", userBucket);
   } else {
     // 使用环境变量配置的存储
     storage = getTosStorage();
-    console.log("[TOS] Using environment config");
+    console.log("[TOS] Using SDK for platform storage");
   }
   
-  if (!storage) {
+  if (!storage && !s3Client) {
     throw new Error("TOS not configured");
   }
   
@@ -163,35 +163,53 @@ export async function uploadAsset(
   
   console.log("[TOS] Uploading to key:", key, "with contentType:", contentType);
   
-  const uploadResult = await storage.uploadFile({
+  let uploadResult: string;
+  
+  if (useNativeUpload && s3Client && userBucket) {
+    // 使用原生 AWS S3 SDK 上传
+    console.log("[TOS] Using native PutObjectCommand");
+    const putCommand = new PutObjectCommand({
+      Bucket: userBucket,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+    await s3Client.send(putCommand);
+    uploadResult = key;
+    console.log("[TOS] Native upload successful, key:", uploadResult);
+    
+    // 使用原生 AWS S3 SDK 生成签名 URL
+    console.log("[TOS] Generating presigned URL using native AWS S3 SDK for bucket:", userBucket);
+    const getCommand = new GetObjectCommand({
+      Bucket: userBucket,
+      Key: uploadResult,
+    });
+    const url = await getSignedUrl(s3Client, getCommand, { expiresIn: 7 * 24 * 60 * 60 }); // 7 天
+    console.log("[TOS] Native presigned URL generated");
+    return { key: uploadResult, url };
+  }
+  
+  // 使用 SDK 上传（平台存储）
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
+  
+  uploadResult = await storage.uploadFile({
     fileContent: buffer,
     fileName: key,
     contentType,
     bucket: userBucket,
   });
 
-  console.log("[TOS] Upload result key:", uploadResult);
+  console.log("[TOS] SDK upload result key:", uploadResult);
 
-  let url: string;
-  
-  if (s3Client && userBucket) {
-    // 对于用户配置的 bucket，使用 AWS S3 SDK 生成签名 URL
-    console.log("[TOS] Generating presigned URL using AWS S3 SDK for bucket:", userBucket);
-    const command = new GetObjectCommand({
-      Bucket: userBucket,
-      Key: uploadResult,
-    });
-    url = await getSignedUrl(s3Client, command, { expiresIn: 7 * 24 * 60 * 60 }); // 7 天
-    console.log("[TOS] AWS S3 presigned URL generated");
-  } else {
-    // 对于平台存储，使用 SDK 的 generatePresignedUrl
-    console.log("[TOS] Using SDK generatePresignedUrl for platform storage");
-    url = await storage.generatePresignedUrl({
-      key: uploadResult,
-      bucket: userBucket,
-      expireTime: 7 * 24 * 60 * 60,
-    });
-  }
+  // 使用 SDK 的 generatePresignedUrl
+  console.log("[TOS] Using SDK generatePresignedUrl for platform storage");
+  const url = await storage.generatePresignedUrl({
+    key: uploadResult,
+    bucket: userBucket,
+    expireTime: 7 * 24 * 60 * 60,
+  });
 
   console.log("[TOS] Generated URL:", url);
 
