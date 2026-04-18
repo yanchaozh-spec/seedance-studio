@@ -197,6 +197,7 @@ export async function uploadAsset(
     });
     
     // 设置签名 URL 的自定义 endpoint（包含 bucket）
+    // @ts-expect-error - SDK 版本冲突，使用类型断言解决
     const url = await getSignedUrl(s3Client, getCommand, { 
       expiresIn: 7 * 24 * 60 * 60,
     });
@@ -290,6 +291,7 @@ export async function uploadVideo(
       Bucket: config.bucket!,
       Key: key,
     });
+    // @ts-expect-error - SDK 版本冲突，使用类型断言解决
     const url = await getSignedUrl(s3Client, getCommand, { 
       expiresIn: 7 * 24 * 60 * 60,
     });

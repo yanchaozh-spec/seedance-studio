@@ -153,16 +153,14 @@ export async function extractFrameFromVideo(params: {
             formData.append("assetCategory", assetCategory);
             formData.append("name", name || `frame-${Date.now()}`);
 
-            // 构建请求头
-            const headers: Record<string, string> = {};
+            // 添加 TOS 配置到 FormData
             const { tosEnabled, tosSettings } = useSettingsStore.getState();
             if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
-              headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+              formData.append("tos_config", JSON.stringify(tosSettings));
             }
 
             const response = await fetch("/api/assets/extract-frame", {
               method: "POST",
-              headers,
               body: formData,
             });
 
@@ -221,16 +219,18 @@ export async function submitFrameFromCanvas(
           formData.append("assetCategory", options?.assetCategory || "image");
           formData.append("name", options?.name || `frame-${Date.now()}`);
 
-          // 构建请求头
-          const headers: Record<string, string> = {};
+          // 添加 TOS 配置到 FormData
           const { tosEnabled, tosSettings } = useSettingsStore.getState();
+          console.log("[submitFrameFromCanvas] tosEnabled:", tosEnabled, "tosSettings:", JSON.stringify(tosSettings));
           if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
-            headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+            formData.append("tos_config", JSON.stringify(tosSettings));
+            console.log("[submitFrameFromCanvas] Added tos_config to FormData");
+          } else {
+            console.log("[submitFrameFromCanvas] TOS not enabled or config incomplete");
           }
 
           const response = await fetch("/api/assets/extract-frame", {
             method: "POST",
-            headers,
             body: formData,
           });
 

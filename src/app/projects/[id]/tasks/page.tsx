@@ -253,6 +253,12 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           formData.append("assetCategory", "keyframe");
           formData.append("name", `关键帧_${Date.now()}`);
           
+          // 添加 TOS 配置
+          const { tosEnabled, tosSettings } = useSettingsStore.getState();
+          if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+            formData.append("tos_config", JSON.stringify(tosSettings));
+          }
+          
           const response = await fetch("/api/assets/extract-frame", {
             method: "POST",
             body: formData,
@@ -286,16 +292,23 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   const fallbackExtractFrame = async (videoUrl: string, taskId: string) => {
     try {
       toast.loading("正在抽帧...", { id: "extract-frame" });
+      // 获取 TOS 配置
+      const { tosEnabled, tosSettings } = useSettingsStore.getState();
+      const requestBody: Record<string, unknown> = {
+        video_url: videoUrl,
+        project_id: resolvedParams.id,
+        task_id: taskId,
+      };
+      if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+        requestBody.tos_config = tosSettings;
+      }
+      
       const response = await fetch("/api/assets/extract-frame", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          video_url: videoUrl,
-          project_id: resolvedParams.id,
-          task_id: taskId,
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {

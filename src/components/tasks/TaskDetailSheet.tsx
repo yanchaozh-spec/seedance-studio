@@ -191,23 +191,31 @@ export function TaskDetailSheet({
         // Canvas 被污染，降级到 API 方式
         toast.loading("正在抽帧...", { id: "extract-frame" });
         
-        // 构建请求头
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
+        // 获取 TOS 配置
         const { tosEnabled, tosSettings } = useSettingsStore.getState();
+        console.log("[ExtractFrame] Frontend - tosEnabled:", tosEnabled, "tosSettings:", tosSettings);
+        
+        // 构建请求体
+        const requestBody: Record<string, unknown> = {
+          video_url: task.result!.video_url,
+          project_id: projectId,
+          task_id: task.id,
+        };
+        
+        // 如果 TOS 已配置，将配置添加到请求体
         if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
-          headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+          requestBody.tos_config = tosSettings;
+          console.log("[ExtractFrame] Frontend - Added tos_config to request body");
+        } else {
+          console.log("[ExtractFrame] Frontend - TOS not enabled or config incomplete");
         }
         
         const response = await fetch("/api/assets/extract-frame", {
           method: "POST",
-          headers,
-          body: JSON.stringify({
-            video_url: task.result!.video_url,
-            project_id: projectId,
-            task_id: task.id,
-          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {

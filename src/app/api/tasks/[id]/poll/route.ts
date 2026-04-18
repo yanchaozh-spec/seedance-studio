@@ -243,7 +243,7 @@ export async function GET(
  */
 async function uploadVideoToTos(taskId: string, videoUrl: string, userConfig?: TosConfig | null): Promise<void> {
   // 使用用户配置或环境变量配置
-  if (!isUserTosConfigured(userConfig) && !isTosConfigured()) {
+  if (!isUserTosConfigured(userConfig ?? null) && !isTosConfigured()) {
     console.log("[TOS] TOS not configured, skipping video upload");
     return;
   }

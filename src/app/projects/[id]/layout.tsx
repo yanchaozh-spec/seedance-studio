@@ -951,14 +951,21 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                 
                                 toast.promise(
                                   async () => {
+                                    // 获取 TOS 配置
+                                    const { tosEnabled, tosSettings } = useSettingsStore.getState();
+                                    const requestBody: Record<string, unknown> = {
+                                      video_url: task.result!.video_url,
+                                      project_id: resolvedParams.id,
+                                      task_id: task.id,
+                                    };
+                                    if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+                                      requestBody.tos_config = tosSettings;
+                                    }
+                                    
                                     const response = await fetch("/api/assets/extract-frame", {
                                       method: "POST",
                                       headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        video_url: task.result!.video_url,
-                                        project_id: resolvedParams.id,
-                                        task_id: task.id,
-                                      }),
+                                      body: JSON.stringify(requestBody),
                                     });
                                     
                                     if (!response.ok) {

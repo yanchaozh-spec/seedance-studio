@@ -9,35 +9,33 @@ import { uploadAsset, isTosConfigured, isUserTosConfigured, type TosConfig } fro
 
 const execAsync = promisify(exec);
 
-// 从请求头获取用户 TOS 配置
-function getUserTosConfig(request: NextRequest): TosConfig | null {
-  const tosConfigHeader = request.headers.get("x-tos-config");
-  console.log("[ExtractFrame] Received headers:", JSON.stringify(Object.fromEntries(request.headers.entries())));
-  console.log("[ExtractFrame] x-tos-config header:", tosConfigHeader ? "present" : "missing");
-  if (tosConfigHeader) {
-    try {
-      return JSON.parse(Buffer.from(tosConfigHeader, "base64").toString());
-    } catch (e) {
-      console.error("[ExtractFrame] Failed to parse TOS config from header:", e);
-    }
-  }
-  return null;
-}
-
 // POST /api/assets/extract-frame - 从视频提取帧并保存为素材
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get("content-type") || "";
     
-    // 获取用户 TOS 配置
-    const userTosConfig = getUserTosConfig(request);
+    // 从请求头获取用户 TOS 配置
+    let userTosConfig: TosConfig | null = null;
+    const tosConfigHeader = request.headers.get("x-tos-config");
+    if (tosConfigHeader) {
+      try {
+        userTosConfig = JSON.parse(Buffer.from(tosConfigHeader, "base64").toString());
+      } catch (e) {
+        console.error("[ExtractFrame] Failed to parse TOS config from header:", e);
+      }
+    }
     const useTos = isUserTosConfigured(userTosConfig) || isTosConfigured();
     
     // 判断是 JSON 还是 FormData
     if (contentType.includes("application/json")) {
       // JSON 格式：通过视频 URL 抽帧
       const body = await request.json();
-      const { video_url, project_id, task_id, timestamp = 0 } = body;
+      const { video_url, project_id, task_id, timestamp = 0, tos_config } = body;
+      
+      // 如果请求体中有 tos_config，优先使用
+      if (tos_config) {
+        userTosConfig = tos_config;
+      }
       
       if (!video_url || !project_id) {
         return NextResponse.json(
@@ -56,6 +54,19 @@ export async function POST(request: NextRequest) {
       const timestamp = formData.get("timestamp") as string;
       const assetCategory = formData.get("assetCategory") as "keyframe" | "image" || "image";
       const name = formData.get("name") as string || `frame-${Date.now()}`;
+      const tosConfigStr = formData.get("tos_config") as string | null;
+      
+      // 从 FormData 中解析 TOS 配置
+      if (tosConfigStr) {
+        try {
+          userTosConfig = JSON.parse(tosConfigStr);
+        } catch (e) {
+          console.error("[ExtractFrame] Failed to parse tos_config from FormData:", e);
+        }
+      }
+      
+      // 重新检查 TOS 配置
+      const canUseTos = isUserTosConfigured(userTosConfig) || isTosConfigured();
       
       if (!file || !projectId) {
         return NextResponse.json(
@@ -65,7 +76,7 @@ export async function POST(request: NextRequest) {
       }
       
       // 检查 TOS 是否配置
-      if (!useTos) {
+      if (!canUseTos) {
         return NextResponse.json(
           { error: "TOS not configured. Please set up TOS in settings or configure environment variables." },
           { status: 500 }
@@ -136,7 +147,7 @@ async function extractFrameFromUrl(videoUrl: string, projectId: string, taskId?:
   
   try {
     // 检查 TOS 是否配置
-    if (!isUserTosConfigured(userConfig) && !isTosConfigured()) {
+    if (!isUserTosConfigured(userConfig ?? null) && !isTosConfigured()) {
       throw new Error("TOS not configured. Please set up TOS in settings or configure environment variables.");
     }
     

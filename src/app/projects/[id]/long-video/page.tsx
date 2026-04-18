@@ -719,7 +719,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                 <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-4 text-center text-muted-foreground text-sm">
                   <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-50" />
                   <p>暂无选择素材</p>
-                  <p className="text-xs mt-1">点击"选择素材"从素材库中添加</p>
+                  <p className="text-xs mt-1">点击&quot;选择素材&quot;从素材库中添加</p>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -1205,7 +1205,7 @@ export default function LongVideoPage({ params }: { params: Promise<{ id: string
                   <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-4 text-center text-muted-foreground text-sm">
                     <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-50" />
                     <p>暂无选择素材</p>
-                    <p className="text-xs mt-1">点击"选择素材"从素材库中添加</p>
+                    <p className="text-xs mt-1">点击&quot;选择素材&quot;从素材库中添加</p>
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
