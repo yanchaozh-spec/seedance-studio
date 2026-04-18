@@ -122,22 +122,30 @@ export async function unbindAudio(imageId: string): Promise<void> {
   }
 }
 
-// 从视频提取帧并保存为素材
+// 从视频提取帧并保存为素材（两阶段模式：先获取提交函数，再提交 canvas）
+export interface ExtractFrameResult {
+  success: boolean;
+  asset: Asset | null;
+  url: string;
+  /** 调用此函数提交 canvas 截图，完成后返回服务端结果 */
+  submitFrame: (canvas: HTMLCanvasElement) => Promise<{ success: boolean; asset: Asset; url: string }>;
+}
+
 export async function extractFrameFromVideo(params: {
   projectId: string;
   taskId?: string;
   timestamp: number; // 时间点（秒）
   assetCategory?: "keyframe" | "image";
   name?: string;
-}): Promise<{ success: boolean; asset: Asset; url: string }> {
+}): Promise<ExtractFrameResult> {
   // 返回一个需要前端提供 canvas 截图的函数
   // 使用方式：先调用此函数获取配置，然后在 canvas 上绘制视频帧并调用返回的提交函数
   const { projectId, taskId, timestamp, assetCategory = "image", name } = params;
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     // 返回一个闭包，让调用者获取提交函数
     const submitFrame = async (canvas: HTMLCanvasElement) => {
-      return new Promise<void>((res, rej) => {
+      return new Promise<{ success: boolean; asset: Asset; url: string }>((res, rej) => {
         canvas.toBlob(async (blob) => {
           if (!blob) {
             rej(new Error("Failed to capture frame"));
@@ -171,7 +179,7 @@ export async function extractFrameFromVideo(params: {
             }
 
             const result = await response.json();
-            resolve(result);
+            res(result);
           } catch (error) {
             rej(error);
           }
@@ -182,9 +190,8 @@ export async function extractFrameFromVideo(params: {
     // 返回一个对象包含配置和提交函数
     resolve({
       success: true,
-      asset: null as unknown as Asset,
+      asset: null,
       url: "",
-      // @ts-expect-error - 返回提交函数
       submitFrame,
     });
   });

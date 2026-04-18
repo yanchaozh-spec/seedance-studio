@@ -196,11 +196,13 @@ export async function uploadAsset(
       Key: uploadResult,
     });
     
-    // 设置签名 URL 的自定义 endpoint（包含 bucket）
-    // @ts-expect-error - SDK 版本冲突，使用类型断言解决
-    const url = await getSignedUrl(s3Client, getCommand, { 
-      expiresIn: 7 * 24 * 60 * 60,
-    });
+    // S3Client 与 GetObjectCommand 与 getSignedUrl 之间存在 @smithy/types 版本冲突 (4.12 vs 4.14)，
+    // 导致类型不兼容。运行时行为正确，使用类型断言绕过。
+    const url = await getSignedUrl(
+      s3Client as unknown as Parameters<typeof getSignedUrl>[0],
+      getCommand as unknown as Parameters<typeof getSignedUrl>[1],
+      { expiresIn: 7 * 24 * 60 * 60 }
+    );
     
     console.log("[TOS] Native presigned URL generated");
     return { key: uploadResult, url };
@@ -291,10 +293,12 @@ export async function uploadVideo(
       Bucket: config.bucket!,
       Key: key,
     });
-    // @ts-expect-error - SDK 版本冲突，使用类型断言解决
-    const url = await getSignedUrl(s3Client, getCommand, { 
-      expiresIn: 7 * 24 * 60 * 60,
-    });
+    // 同上，@smithy/types 版本冲突，使用类型断言绕过
+    const url = await getSignedUrl(
+      s3Client as unknown as Parameters<typeof getSignedUrl>[0],
+      getCommand as unknown as Parameters<typeof getSignedUrl>[1],
+      { expiresIn: 7 * 24 * 60 * 60 }
+    );
     
     console.log("[TOS] Video uploaded successfully:", url);
     return { key, url };

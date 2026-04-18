@@ -459,12 +459,16 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   // 组件卸载时清理 videoRefs，防止内存泄漏
   useEffect(() => {
     return () => {
-      // 先暂停所有视频，释放资源
+      // 先暂停所有视频，彻底释放资源
       videoRefs.current.forEach((video) => {
         if (video) {
-          video.pause();
-          video.src = "";
-          video.load();
+          try {
+            video.pause();
+            video.removeAttribute("src");
+            video.load();
+          } catch (e) {
+            console.warn("清理视频资源失败:", e);
+          }
         }
       });
       videoRefs.current.clear();
@@ -556,13 +560,21 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     return `${minutes}m ${secs}s`;
   };
 
-  // 加载素材列表
+  // 加载素材列表（带竞态保护）
   const loadMaterials = useCallback(async () => {
+    const requestId = resolvedParams.id;
     try {
       const assets = await getAssets(resolvedParams.id);
+      // 检查是否是最新的请求，防止 projectId 切换后旧请求覆盖数据
+      if (projectIdRef.current !== requestId) {
+        console.log("忽略过期素材加载请求:", requestId, "最新:", projectIdRef.current);
+        return;
+      }
       setMaterials(assets);
     } catch (error) {
-      console.error("加载素材失败:", error);
+      if (projectIdRef.current === requestId) {
+        console.error("加载素材失败:", error);
+      }
     }
   }, [resolvedParams.id]);
 
