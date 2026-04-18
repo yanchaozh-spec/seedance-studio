@@ -61,7 +61,7 @@ type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
 
 // 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
 // 格式：素材定义行（使用序号引用）+ 提示词分行
-// 示例：林央@[图片1]，声线为@[音频1]；启龙@[图片2]；关键帧描述@[关键帧1]
+// 示例：@[图片1]为林央，声线为@[音频1]；@[图片2]为启龙；@[关键帧1]为关键帧描述
 // content 数组结构：图片 -> 音频 -> 文本
 function buildContent(
   promptBoxes: CreateTaskRequest["prompt_boxes"],
@@ -145,7 +145,7 @@ function buildContent(
   for (const asset of keyframeAssets) {
     const refName = imageRefMap.get(asset.id)!;
     const desc = asset.keyframe_description || asset.display_name || asset.name;
-    assetDefParts.push(`${desc}@${refName}`);
+    assetDefParts.push(`@${refName}为${desc}`);
   }
 
   // 再添加美术资产（带声线绑定）
@@ -155,9 +155,9 @@ function buildContent(
     
     if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
       const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-      assetDefParts.push(`${displayName}@${refName}，声线为@${audioRef}`);
+      assetDefParts.push(`@${refName}为${displayName}，声线为@${audioRef}`);
     } else {
-      assetDefParts.push(`${displayName}@${refName}`);
+      assetDefParts.push(`@${refName}为${displayName}`);
     }
   }
 

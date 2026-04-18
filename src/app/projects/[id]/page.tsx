@@ -399,13 +399,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       
       if (isKeyframe) {
         const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
-        assetDefParts.push(`${desc}@${refName}`);
+        assetDefParts.push(`@${refName}为${desc}`);
       } else {
         if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
           const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
-          assetDefParts.push(`${displayName}@${refName}，声线为@${audioRef}`);
+          assetDefParts.push(`@${refName}为${displayName}，声线为@${audioRef}`);
         } else {
-          assetDefParts.push(`${displayName}@${refName}`);
+          assetDefParts.push(`@${refName}为${displayName}`);
         }
       }
     }
