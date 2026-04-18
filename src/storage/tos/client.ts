@@ -193,13 +193,21 @@ export async function uploadAsset(
     });
     
     // 设置签名 URL 的自定义 endpoint（包含 bucket）
+    // 注意：ivolces.com 是内网，volces.com 是外网
+    // 沙箱环境需要使用外网地址访问
     const url = await getSignedUrl(s3Client, getCommand, { 
       expiresIn: 7 * 24 * 60 * 60,
-      // 确保签名 URL 使用正确的 hostname 格式
     });
     
+    // 如果是内网地址，转换为外网地址供浏览器访问
+    let publicUrl = url;
+    if (url.includes(".ivolces.com")) {
+      publicUrl = url.replace(".ivolces.com", ".volces.com");
+      console.log("[TOS] Converted internal URL to public URL");
+    }
+    
     console.log("[TOS] Native presigned URL generated");
-    return { key: uploadResult, url };
+    return { key: uploadResult, url: publicUrl };
   }
   
   // 使用 SDK 上传（平台存储）
