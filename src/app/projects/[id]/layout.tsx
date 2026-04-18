@@ -266,6 +266,16 @@ export function DraggableAsset({
             "w-full flex items-center justify-center bg-muted",
             size === "small" ? "aspect-square" : "aspect-video"
           )}>
+            {/* 关键帧标识 */}
+            {asset.asset_category === "keyframe" && (
+              <div className={cn(
+                "absolute top-1 left-1 bg-primary text-primary-foreground rounded flex items-center gap-0.5 z-10",
+                size === "small" ? "text-[8px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5"
+              )}>
+                <Scissors className={size === "small" ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                <span>关键帧</span>
+              </div>
+            )}
             {asset.thumbnail_url ? (
               <img
                 src={asset.thumbnail_url}
