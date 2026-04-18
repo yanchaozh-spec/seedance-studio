@@ -7,7 +7,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:5000",
     "beforeDevCommand": "pnpm dev --port 5000",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "bash scripts/build-tauri.sh",
     "devtools": true
   },
   "app": {
@@ -41,7 +41,13 @@
       "nsis": {
         "installMode": "currentUser"
       }
-    }
+    },
+    "resources": [
+      {
+        "path": "resources/server/**/*",
+        "target": "server/"
+      }
+    ]
   },
   "plugins": {
     "fs": {

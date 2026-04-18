@@ -1,12 +1,15 @@
 use tauri::Manager;
 use std::fs;
 use std::path::PathBuf;
+use std::process::{Child, Command};
+
+// 全局保存子进程引用，退出时自动清理
+static mut SERVER_PROCESS: Option<Child> = None;
 
 #[tauri::command]
 fn select_data_folder() -> Result<String, String> {
     use std::process::Command;
     
-    // 使用系统对话框让用户选择文件夹
     let output = Command::new("powershell")
         .args(["-Command", "Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = '选择数据存储文件夹'; if ($dialog.ShowDialog() -eq 'OK') { $dialog.SelectedPath } else { '' }"])
         .output()
@@ -69,6 +72,49 @@ fn list_files(dir: String) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+/// 在生产模式下启动 Next.js standalone server
+fn start_nextjs_server(app_dir: &std::path::Path) -> Result<Child, String> {
+    let server_path = app_dir.join("server").join("server.js");
+    
+    if !server_path.exists() {
+        return Err(format!("找不到服务器文件: {:?}", server_path));
+    }
+    
+    println!("[启动器] 正在启动 Next.js 服务器...");
+    println!("[启动器] 服务器路径: {:?}", server_path);
+    
+    let child = Command::new("node")
+        .arg(&server_path)
+        .env("PORT", "5000")
+        .env("HOSTNAME", "localhost")
+        .env("COZE_PROJECT_ENV", "PROD")
+        .current_dir(app_dir.join("server"))
+        .spawn()
+        .map_err(|e| format!("启动服务器失败: {}", e))?;
+    
+    println!("[启动器] Next.js 服务器已启动 (PID: {:?})", child.id());
+    Ok(child)
+}
+
+/// 等待服务器就绪（轮询 localhost:5000）
+fn wait_for_server() -> bool {
+    println!("[启动器] 等待服务器就绪...");
+    
+    for i in 0..60 {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        
+        if let Ok(resp) = reqwest::blocking::get("http://localhost:5000") {
+            if resp.status().is_success() {
+                println!("[启动器] 服务器已就绪！耗时约 {}ms", (i + 1) * 500);
+                return true;
+            }
+        }
+    }
+    
+    println!("[启动器] 服务器启动超时（30秒）");
+    false
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -91,7 +137,6 @@ pub fn run() {
                     let _ = fs::create_dir_all(&data_folder);
                 }
                 
-                // 初始化子文件夹
                 let folders = ["projects", "assets", "database"];
                 for folder in folders {
                     let sub_folder = data_folder.join(folder);
@@ -100,8 +145,57 @@ pub fn run() {
                     }
                 }
             }
+
+            // 生产模式：启动 Next.js standalone server
+            if !cfg!(debug_assertions) {
+                let resolve_dir = app.path().resource_dir().expect("无法获取资源目录");
+                println!("[启动器] 资源目录: {:?}", resolve_dir);
+                
+                match start_nextjs_server(&resolve_dir) {
+                    Ok(child) => {
+                        // 保存子进程引用
+                        unsafe { SERVER_PROCESS = Some(child); }
+                        
+                        // 等待服务器就绪
+                        if wait_for_server() {
+                            // 服务器就绪，导航到应用页面
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.eval("window.location.href = 'http://localhost:5000';");
+                            }
+                        } else {
+                            println!("[启动器] 警告：服务器启动超时，请手动刷新页面");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[启动器] 启动服务器失败: {}", e);
+                    }
+                }
+                
+                // 注册退出清理
+                let _ = ctrlc::set_handler(|| {
+                    println!("[启动器] 正在关闭...");
+                    unsafe {
+                        if let Some(ref mut child) = SERVER_PROCESS {
+                            let _ = child.kill();
+                            println!("[启动器] 服务器进程已终止");
+                        }
+                    }
+                    std::process::exit(0);
+                });
+            }
             
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // 窗口关闭时清理服务器进程
+            if let tauri::WindowEvent::Destroyed = event {
+                unsafe {
+                    if let Some(ref mut child) = SERVER_PROCESS {
+                        let _ = child.kill();
+                        println!("[启动器] 窗口关闭，服务器进程已终止");
+                    }
+                }
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
