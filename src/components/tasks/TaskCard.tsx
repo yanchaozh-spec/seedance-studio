@@ -9,7 +9,7 @@ import {
   Clock, CheckCircle, XCircle, Loader2, Coins, Sparkles, Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Task, TaskStatus } from "@/lib/tasks";
+import { Task, TaskStatus, getVideoUrl } from "@/lib/tasks";
 import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
@@ -280,25 +280,25 @@ export function TaskCard({
         )}
 
         {/* 视频预览 */}
-        {task.status === "succeeded" && task.result?.video_url && !compact && (
+        {task.status === "succeeded" && getVideoUrl(task) && !compact && (
           <div className="mt-3">
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
               <video
-                src={task.result.video_url}
+                src={getVideoUrl(task) || ""}
                 controls
                 className="w-full h-full"
-                poster={task.result.last_frame_url}
+                poster={task.result?.last_frame_url}
               />
             </div>
           </div>
         )}
 
         {/* 简短预览（紧凑模式） */}
-        {task.status === "succeeded" && task.result?.video_url && compact && (
+        {task.status === "succeeded" && getVideoUrl(task) && compact && (
           <div className="mt-2">
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
               <video
-                src={task.result.video_url}
+                src={getVideoUrl(task) || ""}
                 controls
                 className="w-full h-full"
               />
@@ -421,22 +421,22 @@ export function VideoPreviewDialog({ task, open, onClose }: VideoPreviewDialogPr
             </svg>
           </Button>
         </div>
-        {task.result?.video_url && (
+        {getVideoUrl(task) && (
           <video
-            src={task.result.video_url}
+            src={getVideoUrl(task) || ""}
             controls
             autoPlay
             className="w-full rounded"
           />
         )}
         <div className="flex items-center gap-2 mt-4">
-          {task.result?.video_url && (
+          {getVideoUrl(task) && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 const a = document.createElement("a");
-                a.href = task.result!.video_url!;
+                a.href = getVideoUrl(task) || "";
                 a.download = `video_${task.id}.mp4`;
                 a.click();
               }}

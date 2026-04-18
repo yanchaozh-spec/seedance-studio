@@ -45,7 +45,7 @@ import {
   Film,
   Eye,
 } from "lucide-react";
-import { Task, getTasks, deleteTask, TaskStatus } from "@/lib/tasks";
+import { Task, getTasks, deleteTask, TaskStatus, getVideoUrl } from "@/lib/tasks";
 import { getAssets, Asset, submitFrameFromCanvas } from "@/lib/assets";
 import { TaskCard, TaskList } from "@/components/tasks/TaskCard";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
@@ -185,10 +185,11 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
 
   // 全局下载处理函数
   const handleDownload = async (task: Task) => {
-    if (!task.result?.video_url) return;
+    const videoUrl = getVideoUrl(task);
+    if (!videoUrl) return;
     
     try {
-      const response = await fetch(task.result.video_url);
+      const response = await fetch(videoUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -370,7 +371,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
             {filteredTasks.map((task) => (
               <div key={task.id} className="bg-card border rounded-lg overflow-hidden">
                 {/* 视频播放器区域 - 水平布局 */}
-                {task.status === "succeeded" && task.result?.video_url && (
+                {task.status === "succeeded" && getVideoUrl(task) && (
                   <div className="flex gap-4 p-4 bg-black/5">
                     {/* 左侧视频 */}
                     <div className="relative w-56 h-32 bg-black rounded overflow-hidden flex-shrink-0">
@@ -378,7 +379,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
                         ref={(el) => {
                           if (el) videoRefs.current.set(task.id, el);
                         }}
-                        src={task.result.video_url}
+                        src={getVideoUrl(task) || ""}
                         controls
                         className="w-full h-full object-contain"
                         preload="metadata"

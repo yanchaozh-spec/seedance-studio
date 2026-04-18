@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { uploadVideo, isTosConfigured } from "@/storage/tos/client";
 
 export async function GET(
   request: NextRequest,
@@ -20,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // 如果已完成或失败，直接返回
+    // 如果已完成或失败，直接返回（检查是否已经有 TOS URL）
     if (task.status === "succeeded" || task.status === "failed") {
       return NextResponse.json({
         id: task.id,
@@ -28,6 +29,8 @@ export async function GET(
         progress: task.progress || 100,
         result: task.result,
         error_message: task.error_message,
+        // 如果有持久化的 video_url，返回它
+        permanent_video_url: task.permanent_video_url || null,
       });
     }
 
@@ -115,13 +118,25 @@ export async function GET(
               lastFrameUrl = lastFrameItem?.image_url?.url || "";
             }
           }
-            
+          
           updates.result = {
             video_url: videoUrl,
             resolution: task.params?.resolution,
             duration: task.params?.duration,
             last_frame_url: lastFrameUrl,
           };
+          
+          // 异步上传视频到 TOS（不阻塞响应）
+          if (videoUrl && isTosConfigured()) {
+            // 直接保存 videoUrl 到数据库，同时触发 TOS 上传
+            // 注意：由于这是异步操作，permanent_video_url 可能在稍后才更新
+            console.log("[POLL] Task succeeded, will upload video to TOS:", videoUrl);
+            
+            // 触发异步上传（在后台进行）
+            uploadVideoToTos(task.id, videoUrl).catch((err) => {
+              console.error("[POLL] Failed to upload video to TOS:", err);
+            });
+          }
           
           // 计算排队耗时（从排队到开始生成）
           if (task.queued_at && updates.started_at) {
@@ -183,6 +198,8 @@ export async function GET(
           generation_duration: updates.generation_duration,
           completed_at: updates.completed_at,
           updated_at: updates.updated_at,
+          // 返回持久化的 video_url（如果已有）
+          permanent_video_url: task.permanent_video_url || null,
         });
       } catch (apiError) {
         console.error("External API call failed:", apiError);
@@ -205,5 +222,47 @@ export async function GET(
   } catch (error) {
     console.error("Poll error:", error);
     return NextResponse.json({ error: "Failed to poll task" }, { status: 500 });
+  }
+}
+
+/**
+ * 异步上传视频到 TOS
+ * 下载 Seedance 视频并上传到用户自己的 TOS 存储
+ */
+async function uploadVideoToTos(taskId: string, videoUrl: string): Promise<void> {
+  if (!isTosConfigured()) {
+    console.log("[TOS] TOS not configured, skipping video upload");
+    return;
+  }
+
+  try {
+    console.log("[TOS] Starting video upload for task:", taskId);
+    console.log("[TOS] Source URL:", videoUrl);
+
+    // 上传视频到 TOS
+    const result = await uploadVideo(videoUrl, taskId, true);
+    
+    console.log("[TOS] Video uploaded successfully!");
+    console.log("[TOS] Storage key:", result.key);
+    console.log("[TOS] Permanent URL:", result.url);
+
+    // 更新数据库，保存持久化的 video URL
+    const client = getSupabaseClient();
+    const { error } = await client
+      .from("tasks")
+      .update({
+        permanent_video_url: result.url,
+        video_storage_key: result.key,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error("[TOS] Failed to update task with permanent URL:", error);
+    } else {
+      console.log("[TOS] Task updated with permanent video URL");
+    }
+  } catch (err) {
+    console.error("[TOS] Video upload failed:", err);
+    throw err;
   }
 }

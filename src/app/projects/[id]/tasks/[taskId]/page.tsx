@@ -49,7 +49,7 @@ import {
   Copy,
   ArrowLeft,
 } from "lucide-react";
-import { Task, getTask, TaskStatus } from "@/lib/tasks";
+import { Task, getTask, TaskStatus, getVideoUrl } from "@/lib/tasks";
 import { getAssets, Asset, submitFrameFromCanvas } from "@/lib/assets";
 import { formatDistanceToNow } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -281,18 +281,18 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         {/* 左侧：视频预览 */}
         <div className="lg:col-span-2 space-y-4">
           {/* 视频播放器 */}
-          {task.status === "succeeded" && task.result?.video_url ? (
+          {task.status === "succeeded" && getVideoUrl(task) ? (
             <Card>
               <CardContent className="p-4">
                 <div className="space-y-4">
                   <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                     <video
                       ref={videoRef}
-                      src={task.result.video_url}
+                      src={getVideoUrl(task) || ""}
                       controls
                       className="w-full h-full"
                       muted={muted}
-                      poster={task.result.last_frame_url}
+                      poster={task.result?.last_frame_url}
                     />
                   </div>
                   

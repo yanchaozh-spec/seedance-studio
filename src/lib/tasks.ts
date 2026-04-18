@@ -43,8 +43,23 @@ export interface Task {
   completed_at?: string; // 完成时间
   queue_duration?: number; // 排队时长（秒）
   generation_duration?: number; // 生成时长（秒）
+  // 持久化视频存储
+  permanent_video_url?: string; // 永久可用的视频 URL
+  video_storage_key?: string; // TOS 存储路径
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * 获取视频 URL，优先使用持久化的永久 URL
+ */
+export function getVideoUrl(task: Task): string | null {
+  // 优先使用持久化的永久 URL
+  if (task.permanent_video_url) {
+    return task.permanent_video_url;
+  }
+  // 降级使用原始 URL
+  return task.result?.video_url || null;
 }
 
 // 获取项目的所有任务

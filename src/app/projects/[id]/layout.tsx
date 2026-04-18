@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets } from "@/lib/assets";
-import { Task, getTasks, TaskStatus, deleteTask } from "@/lib/tasks";
+import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
 import { useSettingsStore } from "@/lib/settings";
@@ -871,13 +871,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           </div>
                           
                           {/* 视频/状态区域 */}
-                          {task.status === "succeeded" && task.result?.video_url ? (
+                          {task.status === "succeeded" && getVideoUrl(task) ? (
                             <div className="aspect-video bg-black rounded overflow-hidden">
                               <video
                                 ref={(el) => {
                                   if (el) videoRefs.current.set(task.id, el);
                                 }}
-                                src={task.result.video_url}
+                                src={getVideoUrl(task) || undefined}
                                 controls
                                 className="w-full h-full object-cover"
                                 preload="metadata"
@@ -959,7 +959,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               className="text-[10px] h-6 px-0.5"
                               onClick={() => {
                                 const a = document.createElement("a");
-                                a.href = task.result?.video_url || "";
+                                a.href = getVideoUrl(task) || "";
                                 a.download = `video-${task.id}.mp4`;
                                 a.click();
                               }}

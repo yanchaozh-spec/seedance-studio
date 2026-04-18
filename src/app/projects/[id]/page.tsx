@@ -11,9 +11,8 @@ import { useDragStore, useIsDragging } from "@/lib/drag-store";
 import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
-import { Task } from "@/lib/tasks";
+import { Task, createTask, getVideoUrl } from "@/lib/tasks";
 import { useProjectDetail } from "./layout";
-import { createTask } from "@/lib/tasks";
 import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -360,7 +359,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
 
   // 抽帧功能
   const extractFrame = async (task: Task, time: number = 0) => {
-    if (!task.result?.video_url) return;
+    if (!getVideoUrl(task)) return;
 
     try {
       toast.loading("正在抽帧...", { id: "extract-frame" });
@@ -368,7 +367,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // 创建画布来截取视频帧
       const video = document.createElement("video");
       video.crossOrigin = "anonymous";
-      video.src = task.result.video_url;
+      video.src = getVideoUrl(task) || "";
       video.currentTime = time;
       
       await new Promise<void>((resolve, reject) => {

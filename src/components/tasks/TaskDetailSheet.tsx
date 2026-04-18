@@ -27,7 +27,7 @@ import {
   AlertCircle,
   XCircle,
 } from "lucide-react";
-import { Task, TaskStatus, deleteTask } from "@/lib/tasks";
+import { Task, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { Asset, submitFrameFromCanvas } from "@/lib/assets";
 import { formatDistanceToNow, formatDuration } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -95,10 +95,10 @@ export function TaskDetailSheet({
     .filter(Boolean) as Asset[];
 
   const handleDownload = async () => {
-    if (!task.result?.video_url) return;
+    if (!getVideoUrl(task)) return;
 
     try {
-      const response = await fetch(task.result.video_url);
+      const response = await fetch(getVideoUrl(task) || "");
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -308,12 +308,12 @@ export function TaskDetailSheet({
           )}
 
           {/* 视频播放器 */}
-          {task.status === "succeeded" && task.result?.video_url && (
+          {task.status === "succeeded" && getVideoUrl(task) && (
             <div className="space-y-3">
               <div className="bg-black rounded-lg overflow-hidden">
                 <video
                   ref={videoRef}
-                  src={task.result.video_url}
+                  src={getVideoUrl(task) || ""}
                   controls
                   className="w-full aspect-video"
                   muted={muted}
