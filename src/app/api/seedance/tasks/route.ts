@@ -57,8 +57,8 @@ interface AudioContent {
 type ContentItem = TextContent | ImageContent | VideoContent | AudioContent;
 
 // 构建 content 数组 - 符合 Seedance 2.0 官方 API 格式
-// 格式：素材定义行（使用URL） + 提示词分行
-// 示例：林央：url1，声线为：audioUrl1；启龙：url2；花花：url3；关键帧描述：url4
+// 格式：素材类型+序号 引用（如"图片1"、"音频1"）
+// content 数组结构：图片 -> 音频 -> 文本
 function buildContent(
   promptBoxes: CreateTaskRequest["prompt_boxes"],
   assets: Array<{
@@ -81,95 +81,34 @@ function buildContent(
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
 
-  // 收集所有需要引用的音频（图片绑定的 + 独立的）
-  const boundAudioIds = new Set<string>();
+  // 合并所有图片资产（美术资产 + 关键帧）
   const allImageAssets: typeof imageAssets = [];
   allImageAssets.push(...imageAssets);
   allImageAssets.push(...keyframeAssets);
 
-  // 找出所有绑定的音频
+  // 收集需要引用的音频（绑定的 + 独立的）
+  const boundAudioIds = new Set<string>();
   for (const asset of allImageAssets) {
     if (asset.bound_audio_id) {
       boundAudioIds.add(asset.bound_audio_id);
     }
   }
-
-  // 获取需要添加的音频资产（绑定的 + 独立的音频）
-  const audiosToAdd = audioAssets.filter((a) => boundAudioIds.has(a.id) || !boundAudioIds.size);
-  // 如果有独立音频，也添加
+  const audioToAdd = audioAssets.filter((a) => boundAudioIds.has(a.id) || !boundAudioIds.size);
   const independentAudios = audioAssets.filter((a) => !boundAudioIds.has(a.id));
 
-  // 构建素材定义行（使用 URL）
-  // 格式：素材名1：url1；素材名2：url2
-  const assetRefParts: string[] = [];
-  // 收集需要单独添加的音频
-  const audioRefs: { name: string; url: string; boundTo?: string }[] = [];
-
-  for (let i = 0; i < allImageAssets.length; i++) {
-    const asset = allImageAssets[i];
-    const displayName = asset.display_name || asset.name;
-    const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe;
-
-    if (isKeyframe) {
-      // 关键帧：使用 keyframe_description 或 name
-      const desc = asset.keyframe_description || displayName;
-      assetRefParts.push(`${desc}：${asset.url}`);
-    } else {
-      // 美术资产
-      assetRefParts.push(`${displayName}：${asset.url}`);
-
-      // 检查是否绑定音频 - 单独添加音频对象
-      if (asset.bound_audio_id) {
-        const boundAudio = audioAssets.find((a) => a.id === asset.bound_audio_id);
-        if (boundAudio) {
-          // 在文本中引用音频名称
-          assetRefParts[assetRefParts.length - 1] += `，声线为：${boundAudio.display_name || boundAudio.name}`;
-          // 收集音频信息以便单独添加
-          audioRefs.push({
-            name: boundAudio.display_name || boundAudio.name,
-            url: boundAudio.url,
-            boundTo: displayName,
-          });
-        }
-      }
-    }
-  }
-
-  // 添加独立的音频资产到引用列表
-  for (const audio of independentAudios) {
-    const audioName = audio.display_name || audio.name;
-    assetRefParts.push(`${audioName}：${audio.url}`);
-    audioRefs.push({
-      name: audioName,
-      url: audio.url,
-    });
-  }
-
-  // 按顺序处理提示词框
-  const sortedBoxes = promptBoxes
-    .filter((box) => box.content.trim())
-    .sort((a, b) => a.order - b.order);
-
-  // 构建文本内容
-  const textParts: string[] = [];
-
-  // 第一行：素材定义（用分号隔开）
-  const assetDefLine = assetRefParts.join("；");
-  if (assetDefLine) {
-    textParts.push(assetDefLine);
-  }
-
-  // 后续行：每个提示词框一行
-  for (const box of sortedBoxes) {
-    if (box.content.trim()) {
-      textParts.push(box.content.trim());
-    }
-  }
-
-  // 添加所有图片（使用 URL）
+  // 第一步：添加所有图片（使用 URL）
+  // 序号规则：所有图片按顺序编号，从1开始
+  // 类型前缀：美术资产用"图片"，关键帧用"关键帧"
+  const imageRefMap = new Map<string, string>(); // asset.id -> 引用名称
+  let imageIndex = 0;
+  
   for (let i = 0; i < allImageAssets.length; i++) {
     const asset = allImageAssets[i];
     const isKeyframe = asset.asset_category === "keyframe" || asset.type === "keyframe" || asset.is_keyframe;
+    
+    imageIndex++;
+    const refName = isKeyframe ? `关键帧${imageIndex}` : `图片${imageIndex}`;
+    imageRefMap.set(asset.id, refName);
 
     content.push({
       type: "image_url",
@@ -180,8 +119,16 @@ function buildContent(
     });
   }
 
-  // 添加所有音频作为 reference_audio
-  for (const audio of audioRefs) {
+  // 第二步：添加所有音频（使用 URL）
+  // 序号规则：所有音频按顺序编号，从1开始
+  const audioRefMap = new Map<string, string>(); // asset.id -> 引用名称
+  let audioIndex = 0;
+  
+  for (const audio of audioToAdd) {
+    audioIndex++;
+    const refName = `音频${audioIndex}`;
+    audioRefMap.set(audio.id, refName);
+
     content.push({
       type: "audio_url",
       audio_url: {
@@ -191,7 +138,28 @@ function buildContent(
     });
   }
 
-  // 添加合并的文本（只有一个 text 对象）
+  // 第三步：构建文本内容
+  // 使用"素材类型+序号"格式引用素材
+  const textParts: string[] = [];
+
+  // 按顺序处理提示词框
+  const sortedBoxes = promptBoxes
+    .filter((box) => box.content.trim())
+    .sort((a, b) => a.order - b.order);
+
+  // 处理每个提示词框
+  for (const box of sortedBoxes) {
+    if (box.content.trim()) {
+      // 如果有激活的素材引用，将其作为第一行
+      if (box.activated_asset_id && imageRefMap.has(box.activated_asset_id)) {
+        const refName = imageRefMap.get(box.activated_asset_id)!;
+        textParts.push(refName);
+      }
+      textParts.push(box.content.trim());
+    }
+  }
+
+  // 添加合并的文本
   if (textParts.length > 0) {
     content.push({
       type: "text",
