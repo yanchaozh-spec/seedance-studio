@@ -613,7 +613,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     setGenerating(true);
     
     try {
-      await createTask({
+      const result = await createTask({
         project_id: resolvedParams.id,
         prompt_boxes: promptBoxes.map((box, idx) => ({
           id: box.id,
@@ -628,7 +628,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         model_id: modelId,
       }, arkApiKey);
 
-      toast.success("任务已创建");
+      if (result.status === "failed") {
+        toast.error("生成失败，请查看任务管理中的失败原因");
+      } else {
+        toast.success("任务已创建");
+      }
       
       // 后台刷新任务列表（不等待）
       refreshTasks();

@@ -1,25 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, toJsonField } from "@/storage/database/sqlite-client";
 
-/**
- * 将 Seedance API 英文错误翻译为用户友好的中文提示
- */
-function translateApiError(message: string): string {
-  if (/contain.*real.*person|真人/i.test(message)) {
-    return "素材中可能包含真人面部，无法生成视频。请替换为非真人图片后重试。";
-  }
-  if (/content.*violation|内容违规|sensitive/i.test(message)) {
-    return "素材内容未通过安全审核，请更换素材后重试。";
-  }
-  if (/quota|rate.*limit|限流/i.test(message)) {
-    return "请求过于频繁或配额不足，请稍后重试。";
-  }
-  if (/invalid.*model|model.*not.*found/i.test(message)) {
-    return "模型 ID 无效，请检查模型配置。";
-  }
-  return message;
-}
-
 // 轮询任务状态
 export async function POST(request: NextRequest) {
   try {
@@ -49,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const rawError = typeof data.error === "string" ? data.error : data.error?.message || "API request failed";
-      return NextResponse.json({ error: translateApiError(rawError) }, { status: response.status });
+      return NextResponse.json({ error: rawError }, { status: response.status });
     }
 
     // 计算进度
@@ -80,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.status === "failed") {
-      updateData.error_message = translateApiError(data.error?.message || "Generation failed");
+      updateData.error_message = data.error?.message || "Generation failed";
     }
 
     // 动态构建 UPDATE

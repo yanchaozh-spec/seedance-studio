@@ -98,7 +98,7 @@ export async function createTask(task: {
   selected_assets: string[];
   params: TaskParams;
   model_id?: string;
-}, apiKey?: string): Promise<{ id: string; model?: string }> {
+}, apiKey?: string): Promise<{ id: string; status?: string; model?: string; error?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) {
     headers["x-ark-api-key"] = apiKey;
@@ -109,17 +109,16 @@ export async function createTask(task: {
     headers,
     body: JSON.stringify(task),
   });
+  
+  const data = await response.json();
+  
   if (!response.ok) {
-    // 尝试解析 JSON 错误，如果失败则使用状态文本
-    let errorMessage = "Failed to create task";
-    try {
-      const error = await response.json();
-      errorMessage = error.error || errorMessage;
-    } catch {
-      // 响应不是 JSON，使用状态文本
-      errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    // 如果后端已写入 failed 任务记录（有 id），返回结果让前端刷新任务列表
+    if (data.id) {
+      return { id: data.id, status: "failed", error: data.error };
     }
-    throw new Error(errorMessage);
+    // 否则抛出错误
+    throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
   }
   return response.json();
 }
