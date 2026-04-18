@@ -38,6 +38,7 @@ interface ProjectDetailContextType {
   removeAssetFromPool: (assetId: string) => void;
   clearPool: () => void;
   toggleAssetActivation: (assetId: string) => void;
+  refreshTasks: () => void;
 }
 
 const ProjectDetailContext = createContext<ProjectDetailContextType>({
@@ -51,6 +52,7 @@ const ProjectDetailContext = createContext<ProjectDetailContextType>({
   removeAssetFromPool: () => {},
   clearPool: () => {},
   toggleAssetActivation: () => {},
+  refreshTasks: () => {},
 });
 
 export const useProjectDetail = () => useContext(ProjectDetailContext);
@@ -672,6 +674,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
         removeAssetFromPool,
         clearPool,
         toggleAssetActivation,
+        refreshTasks: loadTasks,
       }}
     >
       <div className="flex h-screen bg-background" suppressHydrationWarning>

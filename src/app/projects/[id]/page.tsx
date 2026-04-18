@@ -40,7 +40,7 @@ interface GeneratorParams {
 
 export default function VideoGeneratePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { selectedAssets, setSelectedAssets, materials, setMaterials, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation } = useProjectDetail();
+  const { selectedAssets, setSelectedAssets, materials, setMaterials, addAssetToPool, removeAssetFromPool, clearPool, toggleAssetActivation, refreshTasks } = useProjectDetail();
   const isDragging = useIsDragging();
   const setOverDropZone = useDragStore((state) => state.setOverDropZone);
   const isOverDropZone = useDragStore((state) => state.isOverDropZone);
@@ -515,6 +515,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       }, arkApiKey);
 
       toast.success("任务已创建");
+      
+      // 刷新任务列表
+      refreshTasks();
       
       // 保存当前任务数据到 sessionStorage，供回滚使用
       const taskData = {
