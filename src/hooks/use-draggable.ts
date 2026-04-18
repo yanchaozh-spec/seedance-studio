@@ -81,8 +81,12 @@ export function useDropZone({
       }
 
       if (jsonData) {
-        const data = JSON.parse(jsonData);
-        callbacksRef.current.onDrop?.(data);
+        // 检查是否为有效的 JSON（以 { 或 [ 开头）
+        const trimmed = jsonData.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          const data = JSON.parse(jsonData);
+          callbacksRef.current.onDrop?.(data);
+        }
       }
     } catch (err) {
       console.error("Failed to parse drop data:", err);
