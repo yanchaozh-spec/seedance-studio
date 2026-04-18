@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useDropZone } from "@/hooks/use-draggable";
 import { useDragStore, useIsDragging } from "@/lib/drag-store";
-import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music, GripVertical } from "lucide-react";
+import { Plus, X, Image, Play, Trash2, Copy, Scissors, Clock, Check, Music, GripVertical, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Asset } from "@/lib/assets";
 import { Task, createTask, getVideoUrl } from "@/lib/tasks";
@@ -85,6 +85,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const [generating, setGenerating] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<Asset | null>(null);
+  const [virtualAvatarDialogOpen, setVirtualAvatarDialogOpen] = useState(false);
+  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "" });
 
   // 恢复回滚数据（从 sessionStorage 读取）
   useEffect(() => {
@@ -363,13 +365,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     // 只使用激活的素材
     const activatedAssets = selectedAssets.filter((a) => a.isActivated);
 
-    // 按 activatedAssets 顺序收集所有图片，分配序号
+    // 按 activatedAssets 顺序收集所有图片（含虚拟人像），分配序号
     const imageRefMap = new Map<string, number>();
     let imageIndex = 0;
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      if (isImage || isKeyframe) {
+      const isVirtualAvatar = asset.type === "virtual_avatar";
+      if (isImage || isKeyframe || isVirtualAvatar) {
         imageIndex++;
         imageRefMap.set(asset.id, imageIndex);
       }
@@ -380,7 +383,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      if (isImage || isKeyframe) {
+      const isVirtualAvatar = asset.type === "virtual_avatar";
+      if (isImage || isKeyframe || isVirtualAvatar) {
         const refIndex = imageRefMap.get(asset.id)!;
         const refName = `图片${refIndex}`;
         const displayName = asset.display_name || asset.name;
@@ -420,8 +424,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
+      const isVirtualAvatar = asset.type === "virtual_avatar";
       
-      if (!isImage && !isKeyframe) continue;
+      if (!isImage && !isKeyframe && !isVirtualAvatar) continue;
       
       const refIndex = imageRefMap.get(asset.id)!;
       const refName = `图片${refIndex}`;
@@ -430,6 +435,14 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       if (isKeyframe) {
         const desc = (asset as { keyframe_description?: string }).keyframe_description || displayName;
         assetDefParts.push(`${refName}为${desc}`);
+      } else if (isVirtualAvatar) {
+        // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式
+        const assetId = (asset as { asset_id?: string }).asset_id;
+        if (assetId) {
+          assetDefParts.push(`@${refName} 为 ${displayName}（资产 ID: [${assetId}]）`);
+        } else {
+          assetDefParts.push(`${refName}为${displayName}`);
+        }
       } else {
         if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
           const audioRef = `音频${audioRefMap.get(asset.bound_audio_id)}`;
@@ -460,14 +473,19 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       });
     }
 
-    // 按 activatedAssets 顺序添加所有图片
+    // 按 activatedAssets 顺序添加所有图片（含虚拟人像）
     for (const asset of activatedAssets) {
       const isImage = asset.type === "image" && asset.asset_category !== "keyframe";
       const isKeyframe = asset.type === "keyframe" || asset.asset_category === "keyframe";
-      if (isImage || isKeyframe) {
+      const isVirtualAvatar = asset.type === "virtual_avatar";
+      if (isImage || isKeyframe || isVirtualAvatar) {
+        // 虚拟人像使用 asset:// 协议，普通素材使用原始 URL
+        const imageUrl = isVirtualAvatar && (asset as { asset_id?: string }).asset_id
+          ? `asset://${(asset as { asset_id?: string }).asset_id}`
+          : asset.url;
         contentItems.push({
           type: "image_url",
-          image_url: { url: asset.url },
+          image_url: { url: imageUrl },
           role: "reference_image",
         });
       }
@@ -588,15 +606,19 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     const firstBoxWithAsset = nonEmptyBoxes.find((box) => box.isActivated && box.activatedAssetId);
     const firstActivatedAsset = firstBoxWithAsset
       ? selectedAssets.find((a) => a.id === firstBoxWithAsset.activatedAssetId && a.isActivated)
-      : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe") && a.isActivated);
+      : selectedAssets.find((a) => (a.type === "image" || a.type === "keyframe" || a.type === "virtual_avatar") && a.isActivated);
 
     if (firstActivatedAsset) {
       const displayName = firstActivatedAsset.display_name || firstActivatedAsset.name;
       const isKeyframe = firstActivatedAsset.asset_category === "keyframe";
+      const isVirtualAvatar = firstActivatedAsset.type === "virtual_avatar";
       
       let assetLine = "";
 
-      if (isKeyframe) {
+      if (isVirtualAvatar) {
+        // 虚拟人像：角色名@这张图片
+        assetLine = `${displayName}@这张图片`;
+      } else if (isKeyframe) {
         // 关键帧：关键帧描述@文件名
         const keyframeDesc = firstBoxWithAsset?.keyframeDescription || firstActivatedAsset.keyframe_description || "";
         if (keyframeDesc) {
@@ -886,6 +908,10 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               清空
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setVirtualAvatarDialogOpen(true)}>
+            <UserRound className="w-3 h-3 mr-1" />
+            添加虚拟人像
+          </Button>
         </div>
         
         <div
@@ -939,26 +965,31 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
               {generateFinalPrompt() || "(空)"}
             </div>
             <div className="mt-4 space-y-3">
-              {/* 图片和关键帧素材 */}
+              {/* 图片、关键帧和虚拟人像素材 */}
               <div>
                 <h3 className="text-sm font-medium mb-2">图片素材:</h3>
                 <div className="flex flex-wrap gap-2">
                   {selectedAssets
                     .filter((asset) => 
-                      (asset.type === "image" || asset.type === "keyframe") && 
+                      (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && 
                       asset.isActivated
                     )
                     .map((asset) => (
                       <div 
                         key={asset.id} 
-                        className="bg-primary/10 text-primary rounded px-2 py-1 text-sm flex items-center gap-1"
+                        className={cn(
+                          "rounded px-2 py-1 text-sm flex items-center gap-1",
+                          asset.type === "virtual_avatar" 
+                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400" 
+                            : "bg-primary/10 text-primary"
+                        )}
                       >
-                        {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : <Image className="w-3 h-3" />}
+                        {asset.type === "keyframe" ? <Scissors className="w-3 h-3" /> : asset.type === "virtual_avatar" ? <UserRound className="w-3 h-3" /> : <Image className="w-3 h-3" />}
                         {asset.display_name || asset.name}
                       </div>
                     ))}
                   {selectedAssets.filter((asset) => 
-                    (asset.type === "image" || asset.type === "keyframe") && asset.isActivated
+                    (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && asset.isActivated
                   ).length === 0 && (
                     <span className="text-muted-foreground text-sm">无</span>
                   )}
@@ -1057,6 +1088,119 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
           }
         }}
       />
+
+      {/* 添加虚拟人像对话框 */}
+      {virtualAvatarDialogOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setVirtualAvatarDialogOpen(false)}>
+          <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <UserRound className="w-5 h-5" />
+                添加虚拟人像
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setVirtualAvatarDialogOpen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">
+                  Asset ID <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder="如：asset-202604011823-6d4x2"
+                  value={virtualAvatarForm.assetId}
+                  onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, assetId: e.target.value.trim() }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  从
+                  <a
+                    href="https://www.volcengine.com/docs/82379/2223965"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-primary transition-colors mx-0.5"
+                  >
+                    官方虚拟人像库
+                  </a>
+                  获取 Asset ID
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">
+                  角色名称 <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder="如：女主-李武"
+                  value={virtualAvatarForm.name}
+                  onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, name: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  用于提示词中引用，如 @角色名
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">
+                  预览图 URL <span className="text-muted-foreground font-normal">(可选)</span>
+                </label>
+                <Input
+                  placeholder="https://example.com/avatar.jpg"
+                  value={virtualAvatarForm.thumbnailUrl}
+                  onChange={(e) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: e.target.value.trim() }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  用于素材池中显示缩略图，不发送给 API
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setVirtualAvatarDialogOpen(false)}>
+                  取消
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!virtualAvatarForm.assetId.trim()) {
+                      toast.error("请输入 Asset ID");
+                      return;
+                    }
+                    if (!virtualAvatarForm.name.trim()) {
+                      toast.error("请输入角色名称");
+                      return;
+                    }
+                    try {
+                      const response = await fetch(`/api/projects/${resolvedParams.id}/assets`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          name: virtualAvatarForm.name.trim(),
+                          display_name: virtualAvatarForm.name.trim(),
+                          type: "virtual_avatar",
+                          asset_id: virtualAvatarForm.assetId.trim(),
+                          url: `asset://${virtualAvatarForm.assetId.trim()}`,
+                          thumbnail_url: virtualAvatarForm.thumbnailUrl.trim() || null,
+                        }),
+                      });
+                      if (!response.ok) throw new Error("创建失败");
+                      const newAsset = await response.json();
+                      // 刷新素材库
+                      await refreshMaterials();
+                      // 添加到素材池
+                      addAssetToPool({ ...newAsset, isActivated: true } as SelectedAsset);
+                      // 重置表单并关闭对话框
+                      setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "" });
+                      setVirtualAvatarDialogOpen(false);
+                      toast.success("虚拟人像已添加");
+                    } catch (error) {
+                      console.error("创建虚拟人像失败:", error);
+                      toast.error("创建虚拟人像失败");
+                    }
+                  }}
+                >
+                  添加
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

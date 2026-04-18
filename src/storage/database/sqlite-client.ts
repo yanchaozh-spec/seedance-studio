@@ -36,7 +36,22 @@ export function getDb(): Database.Database {
   // 初始化表结构
   initTables(_db);
 
+  // 迁移：为已有数据库添加 asset_id 列
+  migrate(_db);
+
   return _db;
+}
+
+/**
+ * 数据库迁移
+ */
+function migrate(db: Database.Database): void {
+  // 检查 assets 表是否有 asset_id 列
+  const columns = db.prepare("PRAGMA table_info(assets)").all() as Array<{ name: string }>;
+  const hasAssetId = columns.some((col) => col.name === "asset_id");
+  if (!hasAssetId) {
+    db.exec("ALTER TABLE assets ADD COLUMN asset_id TEXT");
+  }
 }
 
 /**
@@ -59,6 +74,7 @@ function initTables(db: Database.Database): void {
       display_name TEXT,
       type TEXT NOT NULL DEFAULT 'image',
       asset_category TEXT DEFAULT 'image',
+      asset_id TEXT,
       is_keyframe INTEGER DEFAULT 0,
       keyframe_description TEXT,
       keyframe_source_task_id TEXT,

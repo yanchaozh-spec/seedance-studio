@@ -2,7 +2,7 @@
 
 import { useSettingsStore } from "./settings";
 
-export type AssetType = "image" | "audio" | "keyframe";
+export type AssetType = "image" | "audio" | "keyframe" | "virtual_avatar";
 
 // 资产类别：关键帧（用于提示词拼接）| 美术资产（普通图片）
 export type AssetCategory = "keyframe" | "image";
@@ -14,6 +14,7 @@ export interface Asset {
   display_name?: string;
   type: AssetType;
   asset_category?: AssetCategory; // 'keyframe' | 'image'
+  asset_id?: string; // 虚拟人像的 Asset ID（如 asset-202604011823-6d4x2），用于构建 asset:// URL
   keyframe_description?: string;
   keyframe_source_task_id?: string;
   bound_audio_id?: string; // 绑定的音频素材ID

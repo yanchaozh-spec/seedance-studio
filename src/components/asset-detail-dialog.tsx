@@ -20,6 +20,7 @@ import {
   Scissors,
   Loader2,
   Download,
+  UserRound,
 } from "lucide-react";
 import { Asset, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
@@ -274,7 +275,7 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
           </div>
 
           {/* 预览 */}
-          {(asset.type === "image" || asset.type === "keyframe") && (
+          {(asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && (
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
               {asset.thumbnail_url || asset.url ? (
                 <img
@@ -284,13 +285,28 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Scissors className="w-16 h-16 text-primary" />
+                  {asset.type === "virtual_avatar" ? (
+                    <UserRound className="w-16 h-16 text-purple-400" />
+                  ) : (
+                    <Scissors className="w-16 h-16 text-primary" />
+                  )}
                 </div>
               )}
               {asset.asset_category === "keyframe" && (
                 <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
                   <Scissors className="w-3 h-3 inline mr-1" />
                   关键帧
+                </div>
+              )}
+              {asset.type === "virtual_avatar" && (
+                <div className="absolute top-2 left-2 bg-purple-600 text-white text-xs px-2 py-1 rounded">
+                  <UserRound className="w-3 h-3 inline mr-1" />
+                  虚拟人像
+                </div>
+              )}
+              {asset.type === "virtual_avatar" && asset.asset_id && (
+                <div className="absolute bottom-2 left-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono truncate">
+                  {asset.asset_id}
                 </div>
               )}
             </div>
@@ -313,8 +329,8 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
             </div>
           )}
 
-          {/* 音频参考（仅美术资产显示） */}
-          {assetCategory === "image" && (
+          {/* 音频参考（仅美术资产显示，非虚拟人像） */}
+          {assetCategory === "image" && asset.type !== "virtual_avatar" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">音频参考</label>

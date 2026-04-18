@@ -61,16 +61,17 @@ export async function POST(
     const nextSortOrder = (maxResult?.max_order ?? -1) + 1;
 
     const data = db.prepare(`
-      INSERT INTO assets (project_id, name, display_name, type, is_keyframe,
+      INSERT INTO assets (project_id, name, display_name, type, asset_id, is_keyframe,
         keyframe_description, keyframe_source_task_id, url, thumbnail_url,
         size, duration, storage_key, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `).get(
       resolvedParams.id,
       body.name || "",
       body.display_name || null,
       body.type || "image",
+      body.asset_id || null,
       body.is_keyframe ? 1 : 0,
       body.keyframe_description || null,
       body.keyframe_source_task_id || null,

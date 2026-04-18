@@ -68,6 +68,7 @@ function buildContent(
     display_name?: string;
     name: string;
     asset_category?: string;
+    asset_id?: string;
     bound_audio_id?: string;
     voice_description?: string;
     keyframe_description?: string;
@@ -76,9 +77,10 @@ function buildContent(
 ): ContentItem[] {
   const content: ContentItem[] = [];
 
-  const imageAssets = assets.filter((a) => a.type === "image" && a.asset_category !== "keyframe");
+  const imageAssets = assets.filter((a) => (a.type === "image" || a.type === "virtual_avatar") && a.asset_category !== "keyframe");
   const keyframeAssets = assets.filter((a) => a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe);
   const audioAssets = assets.filter((a) => a.type === "audio");
+  const virtualAvatarAssets = assets.filter((a) => a.type === "virtual_avatar" && a.asset_category !== "keyframe");
 
   const allImageAssets: typeof imageAssets = [];
   allImageAssets.push(...keyframeAssets);
@@ -159,7 +161,10 @@ function buildContent(
     const refName = imageRefMap.get(asset.id)!;
     const displayName = asset.display_name || asset.name;
 
-    if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+    // 虚拟人像：使用 @图N 为 角色名（资产 ID: [asset-xxx]）格式
+    if (asset.type === "virtual_avatar" && asset.asset_id) {
+      assetDefParts.push(`@${refName} 为 ${displayName}（资产 ID: [${asset.asset_id}]）`);
+    } else if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
       const audioRef = audioRefMap.get(asset.bound_audio_id)!;
       assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);
     } else {
@@ -189,10 +194,14 @@ function buildContent(
   }
 
   for (const asset of allImageAssets) {
+    // 虚拟人像使用 asset:// 协议，普通素材使用原始 URL
+    const imageUrl = asset.type === "virtual_avatar" && asset.asset_id
+      ? `asset://${asset.asset_id}`
+      : asset.url;
     content.push({
       type: "image_url",
       image_url: {
-        url: asset.url,
+        url: imageUrl,
       },
       role: "reference_image",
     });
@@ -259,6 +268,7 @@ export async function POST(request: NextRequest) {
       display_name?: string;
       name: string;
       asset_category?: string;
+      asset_id?: string;
       bound_audio_id?: string;
       voice_description?: string;
       keyframe_description?: string;

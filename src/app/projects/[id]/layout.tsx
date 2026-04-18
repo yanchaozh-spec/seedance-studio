@@ -4,7 +4,7 @@ import { useEffect, useState, createContext, useContext, ReactNode, use, useRef,
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Check, Sparkles, Coins, AlertCircle, RotateCcw, Upload } from "lucide-react";
+import { Video, FolderOpen, ListTodo, Settings, ChevronLeft, ChevronRight, PanelRightOpen, PanelRightClose, X, Scissors, Image, Music, Sun, Moon, Eye, Download, Camera, XCircle, Clock, Loader, CheckCircle, Check, Sparkles, Coins, AlertCircle, RotateCcw, Upload, UserRound } from "lucide-react";
 import { getProject, Project } from "@/lib/projects";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -120,7 +120,7 @@ export function DraggableAsset({
     if (isDragging.current) return;
     e.preventDefault();
     e.stopPropagation();
-    if (onClick && (asset.type === "image" || asset.type === "keyframe")) {
+    if (onClick && (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar")) {
       onClick(asset);
     }
   };
@@ -230,7 +230,7 @@ export function DraggableAsset({
     if (isDragging.current) return;
     e.preventDefault();
     e.stopPropagation();
-    if (onClick && (asset.type === "image" || asset.type === "keyframe")) {
+    if (onClick && (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar")) {
       onClick(asset);
     }
   };
@@ -246,7 +246,7 @@ export function DraggableAsset({
       onClick={handleCardClick}
       className={cn(
         "relative group bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none",
-        (asset.type === "image" || asset.type === "keyframe") && onClick && "cursor-pointer hover:ring-2 hover:ring-primary transition-all",
+        (asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && onClick && "cursor-pointer hover:ring-2 hover:ring-primary transition-all",
         size === "small" ? "w-20" : "w-full"
       )}
     >
@@ -260,7 +260,7 @@ export function DraggableAsset({
           crossOrigin="anonymous"
         />
       )}
-      {asset.type === "image" || asset.type === "keyframe" ? (
+      {asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar" ? (
         <div className="w-full">
           <div className={cn(
             "w-full flex items-center justify-center bg-muted",
@@ -276,6 +276,16 @@ export function DraggableAsset({
                 <span>关键帧</span>
               </div>
             )}
+            {/* 虚拟人像标识 */}
+            {asset.type === "virtual_avatar" && (
+              <div className={cn(
+                "absolute top-1 left-1 bg-purple-600 text-white rounded flex items-center gap-0.5 z-10",
+                size === "small" ? "text-[8px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5"
+              )}>
+                <UserRound className={size === "small" ? "w-2.5 h-2.5" : "w-3 h-3"} />
+                <span>虚拟人像</span>
+              </div>
+            )}
             {asset.thumbnail_url ? (
               <img
                 src={asset.thumbnail_url}
@@ -284,7 +294,11 @@ export function DraggableAsset({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted">
-                <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
+                {asset.type === "virtual_avatar" ? (
+                  <UserRound className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-purple-400")} />
+                ) : (
+                  <Image className={cn(size === "small" ? "w-6 h-6" : "w-8 h-8", "text-muted-foreground")} />
+                )}
               </div>
             )}
             {/* 删除按钮 */}
@@ -328,8 +342,8 @@ export function DraggableAsset({
                   {asset.keyframe_description || "-"}
                 </p>
               )}
-              {/* 音频参考按钮 - 仅美术资产显示 */}
-              {asset.asset_category !== "keyframe" && (
+              {/* 音频参考按钮 - 仅美术资产显示（非关键帧、非虚拟人像） */}
+              {asset.asset_category !== "keyframe" && asset.type !== "virtual_avatar" && (
                 <div className={cn(
                   "flex items-center justify-center gap-1 rounded text-xs",
                   asset.bound_audio_id 
@@ -751,7 +765,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const addAssetToPool = (asset: Asset) => {
     setSelectedAssets((prev) => {
       if (prev.find((a) => a.id === asset.id)) return prev;
-      // 图片和关键帧默认激活，音频不激活
+      // 图片、关键帧、虚拟人像默认激活，音频不激活
       const isActivated = asset.type !== "audio";
       // 保留原始 display_name 或 name，不生成"图1"这种格式
       return [...prev, { ...asset, isActivated }];
