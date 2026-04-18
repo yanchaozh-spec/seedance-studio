@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
-// GET /api/tasks/[id]/poll - 轮询任务状态（供前端定期调用）
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -10,19 +9,18 @@ export async function GET(
     const resolvedParams = await params;
     const client = getSupabaseClient();
     
-    // 获取任务信息
     const { data: task, error } = await client
       .from("tasks")
       .select("*")
       .eq("id", resolvedParams.id)
       .maybeSingle();
 
-    if (error) throw new Error(`获取任务失败: ${error.message}`);
+    if (error) throw new Error("Failed to fetch task");
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // 如果任务已完成或失败，直接返回
+    // 如果已完成或失败，直接返回
     if (task.status === "succeeded" || task.status === "failed") {
       return NextResponse.json({
         id: task.id,
@@ -30,35 +28,23 @@ export async function GET(
         progress: task.progress || 100,
         result: task.result,
         error_message: task.error_message,
-        completion_tokens: task.completion_tokens,
-        total_tokens: task.total_tokens,
-        queue_duration: task.queue_duration,
-        generation_duration: task.generation_duration,
-        completed_at: task.completed_at,
-        updated_at: task.updated_at,
       });
     }
 
     // 如果有外部任务ID，需要调用外部API更新状态
     if (task.task_id_external && task.status !== "pending") {
-      // 优先级：数据库保存的 API Key > 请求头 > 环境变量
       const apiKey = task.api_key || request.headers.get("x-ark-api-key") || process.env.ARK_API_KEY;
       
       if (!apiKey) {
-        console.warn("[POLL] ARK_API_KEY not configured, cannot poll external API");
-        // 返回当前状态，带警告信息
         return NextResponse.json({
           id: task.id,
           status: task.status,
           progress: task.progress || 0,
-          result: task.result,
-          error_message: task.error_message,
-          warning: "ARK_API_KEY not configured. Task status cannot be updated.",
+          warning: "ARK_API_KEY not configured",
         });
       }
       
       try {
-        // 生成请求追踪 ID
         const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
         
         const response = await fetch(
@@ -72,22 +58,17 @@ export async function GET(
           }
         );
 
-        // 检查 HTTP 状态码
         if (!response.ok) {
-          console.error(`[POLL] HTTP error: ${response.status}`);
           return NextResponse.json({
             id: task.id,
             status: task.status,
             progress: task.progress || 0,
-            error_message: `API returned ${response.status}`,
           });
         }
 
         const externalTask = await response.json();
         
-        // 检查业务错误
         if (externalTask.error) {
-          console.error("[POLL] Business error:", externalTask.error);
           return NextResponse.json({
             id: task.id,
             status: "failed",
@@ -95,117 +76,102 @@ export async function GET(
           });
         }
 
-        // 更新本地任务状态
         const updates: Record<string, unknown> = {
           updated_at: new Date().toISOString(),
         };
 
-        // 解析外部状态
+        // 解析状态
         if (externalTask.status === "succeeded") {
           updates.status = "succeeded";
           updates.progress = 100;
           updates.completed_at = new Date().toISOString();
           
-          // 解析 video_url 和 last_frame_url
-          // 优先按官方文档的对象格式解析，其次兼容数组格式
           let videoUrl = "";
           let lastFrameUrl = "";
           
           if (externalTask.content && typeof externalTask.content === "object") {
             if (!Array.isArray(externalTask.content)) {
-              // 对象格式 { video_url: "...", last_frame_url: "..." } - 官方文档格式
-              videoUrl = (externalTask.content as { video_url?: string }).video_url || "";
-              lastFrameUrl = (externalTask.content as { last_frame_url?: string }).last_frame_url || "";
+              // 对象格式 - 官方文档格式
+              const content = externalTask.content as { video_url?: string; last_frame_url?: string };
+              videoUrl = content.video_url || "";
+              lastFrameUrl = content.last_frame_url || "";
             } else {
               // 数组格式 - 兼容旧版 API
-              const contentItem = externalTask.content as Array<{ type: string; role?: string; video_url?: { url: string }; image_url?: { url: string } }>;
-              const videoItem = contentItem.find((c) => c.type === "video_url");
-              const lastFrameItem = contentItem.find((c) => c.type === "image_url" && c.role === "last_frame");
+              const items = externalTask.content as Array<{ type: string; role?: string; video_url?: { url: string }; image_url?: { url: string } }>;
+              const videoItem = items.find((c) => c.type === "video_url");
+              const lastFrameItem = items.find((c) => c.type === "image_url" && c.role === "last_frame");
               videoUrl = videoItem?.video_url?.url || "";
               lastFrameUrl = lastFrameItem?.image_url?.url || "";
             }
           }
             
-            updates.result = {
-              video_url: videoUrl,
-              resolution: task.params?.resolution,
-              duration: task.params?.duration,
-              last_frame_url: lastFrameUrl,
-            };
-            // 更新耗时
-            if (task.started_at) {
-              updates.generation_duration = Math.round(
-                (new Date(updates.completed_at as string).getTime() - new Date(task.started_at).getTime()) / 1000
-              );
-            }
-          } else if (externalTask.status === "failed") {
-            updates.status = "failed";
-            updates.error_message = externalTask.error?.message || "生成失败";
-            updates.completed_at = new Date().toISOString();
-          } else if (externalTask.status === "running" || externalTask.status === "processing") {
-            updates.status = "running";
-            updates.progress = 50;
-            if (!task.started_at) {
-              updates.started_at = new Date().toISOString();
-            }
-          } else if (externalTask.status === "queued") {
-            updates.status = "queued";
-            updates.queue_duration = task.queue_duration || 0;
+          updates.result = {
+            video_url: videoUrl,
+            resolution: task.params?.resolution,
+            duration: task.params?.duration,
+            last_frame_url: lastFrameUrl,
+          };
+          
+          if (task.started_at) {
+            updates.generation_duration = Math.round(
+              (new Date(updates.completed_at as string).getTime() - new Date(task.started_at).getTime()) / 1000
+            );
           }
-
-          // 如果有token消耗信息
-          if (externalTask.data?.usage) {
-            updates.completion_tokens = externalTask.data.usage.completion_tokens;
-            updates.total_tokens = externalTask.data.usage.total_tokens;
+        } else if (externalTask.status === "failed") {
+          updates.status = "failed";
+          updates.error_message = externalTask.error?.message || "Generation failed";
+          updates.completed_at = new Date().toISOString();
+        } else if (externalTask.status === "running" || externalTask.status === "processing") {
+          updates.status = "running";
+          updates.progress = 50;
+          if (!task.started_at) {
+            updates.started_at = new Date().toISOString();
           }
-
-          // 更新数据库
-          const { error: updateError } = await client
-            .from("tasks")
-            .update(updates)
-            .eq("id", task.id);
-
-          if (updateError) {
-            console.error("更新任务状态失败:", updateError);
-          }
-
-          // 返回最新状态
-          return NextResponse.json({
-            id: task.id,
-            status: updates.status,
-            progress: updates.progress,
-            result: updates.result,
-            error_message: updates.error_message,
-            completion_tokens: updates.completion_tokens,
-            total_tokens: updates.total_tokens,
-            queue_duration: updates.queue_duration,
-            generation_duration: updates.generation_duration,
-            completed_at: updates.completed_at,
-            updated_at: updates.updated_at,
-          });
+        } else if (externalTask.status === "queued") {
+          updates.status = "queued";
+          updates.queue_duration = task.queue_duration || 0;
         }
+
+        if (externalTask.data?.usage) {
+          updates.completion_tokens = externalTask.data.usage.completion_tokens;
+          updates.total_tokens = externalTask.data.usage.total_tokens;
+        }
+
+        await client.from("tasks").update(updates).eq("id", task.id);
+
+        return NextResponse.json({
+          id: task.id,
+          status: updates.status,
+          progress: updates.progress,
+          result: updates.result,
+          error_message: updates.error_message,
+          completion_tokens: updates.completion_tokens,
+          total_tokens: updates.total_tokens,
+          queue_duration: updates.queue_duration,
+          generation_duration: updates.generation_duration,
+          completed_at: updates.completed_at,
+          updated_at: updates.updated_at,
+        });
       } catch (apiError) {
-        console.error("调用外部API失败:", apiError);
-        // API调用失败时继续返回当前状态
+        console.error("External API call failed:", apiError);
+        return NextResponse.json({
+          id: task.id,
+          status: task.status,
+          progress: task.progress || 0,
+          warning: "Failed to poll external API",
+        });
       }
     }
 
-    // 返回当前状态
     return NextResponse.json({
       id: task.id,
       status: task.status,
       progress: task.progress || 0,
       result: task.result,
       error_message: task.error_message,
-      completion_tokens: task.completion_tokens,
-      total_tokens: task.total_tokens,
-      queue_duration: task.queue_duration,
-      generation_duration: task.generation_duration,
-      completed_at: task.completed_at,
-      updated_at: task.updated_at,
     });
   } catch (error) {
-    console.error("GET /api/tasks/[id]/poll error:", error);
+    console.error("Poll error:", error);
     return NextResponse.json({ error: "Failed to poll task" }, { status: 500 });
   }
 }
