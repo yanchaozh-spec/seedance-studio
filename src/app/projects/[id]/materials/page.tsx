@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { AssetCard } from "@/components/asset-card";
 import { uploadFile } from "@/lib/upload";
+import { emitAssetsChanged } from "@/lib/events";
 
 export default function MaterialsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -77,6 +78,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
       
       toast.success("上传成功");
       loadAssets();
+      emitAssetsChanged(resolvedParams.id, 'upload');
     } catch (error) {
       console.error("上传失败:", error);
       toast.error("上传失败");

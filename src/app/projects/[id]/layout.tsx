@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset, getAssets } from "@/lib/assets";
+import { onAssetsChanged } from "@/lib/events";
 import { Task, getTasks, TaskStatus, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useDraggable } from "@/hooks/use-draggable";
 import { useTheme } from "next-themes";
@@ -321,6 +322,16 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     projectIdRef.current = resolvedParams.id;
     loadProject(resolvedParams.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedParams.id]);
+
+  // 监听素材变更事件（从其他页面（如素材库）上传后触发刷新）
+  useEffect(() => {
+    const unsubscribe = onAssetsChanged((event) => {
+      if (event.projectId === resolvedParams.id) {
+        loadMaterials();
+      }
+    });
+    return unsubscribe;
   }, [resolvedParams.id]);
 
   // 任务轮询：持续获取任务列表（检测新任务）和更新运行中任务状态
