@@ -123,10 +123,17 @@ export async function GET(
             last_frame_url: lastFrameUrl,
           };
           
-          if (task.started_at) {
+          // 计算生成耗时
+          if (task.started_at && updates.completed_at) {
             updates.generation_duration = Math.round(
               (new Date(updates.completed_at as string).getTime() - new Date(task.started_at).getTime()) / 1000
             );
+          } else if (!task.generation_duration && updates.completed_at) {
+            // 如果数据库中没有 generation_duration 但有 completed_at，尝试计算
+            // 使用 completed_at 减去 queued_at 作为估算
+            const completedTime = new Date(updates.completed_at as string).getTime();
+            const queuedTime = task.queued_at ? new Date(task.queued_at).getTime() : completedTime - 180000; // 默认3分钟
+            updates.generation_duration = Math.max(0, Math.round((completedTime - queuedTime) / 1000));
           }
         } else if (externalTask.status === "failed") {
           updates.status = "failed";
