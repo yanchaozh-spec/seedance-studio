@@ -323,6 +323,69 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedParams.id]);
 
+  // 任务轮询：持续获取任务列表（检测新任务）和更新运行中任务状态
+  useEffect(() => {
+    // 轮询函数
+    const pollTasks = async () => {
+      try {
+        // 获取最新任务列表
+        const data = await getTasks(resolvedParams.id);
+        
+        // 检查是否有新任务或任务状态变化
+        setTasks((prevTasks) => {
+          // 如果任务数量变化或有任务状态变化，更新列表
+          if (prevTasks.length !== data.length) {
+            return data;
+          }
+          // 检查每个任务的状态是否有变化
+          const hasStatusChange = data.some((newTask) => {
+            const prevTask = prevTasks.find((t) => t.id === newTask.id);
+            return prevTask && prevTask.status !== newTask.status;
+          });
+          if (hasStatusChange) {
+            return data;
+          }
+          return prevTasks;
+        });
+
+        // 轮询运行中任务的状态
+        const runningTasks = data.filter((t) => t.status === "pending" || t.status === "queued" || t.status === "running");
+        for (const task of runningTasks) {
+          try {
+            const apiKey = useSettingsStore.getState().arkApiKey;
+            const headers: Record<string, string> = {};
+            if (apiKey) {
+              headers["x-ark-api-key"] = apiKey;
+            }
+            
+            const response = await fetch(`/api/tasks/${task.id}/poll`, { headers });
+            if (response.ok) {
+              const updatedTask = await response.json();
+              // 如果状态有变化，更新任务列表
+              if (updatedTask.status !== task.status) {
+                setTasks((prev) =>
+                  prev.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
+                );
+              }
+            }
+          } catch (error) {
+            console.error(`轮询任务 ${task.id} 状态失败:`, error);
+          }
+        }
+      } catch (error) {
+        console.error("轮询任务列表失败:", error);
+      }
+    };
+
+    // 首次加载
+    pollTasks();
+    
+    // 每 3 秒轮询一次
+    const interval = setInterval(pollTasks, 3000);
+    
+    return () => clearInterval(interval);
+  }, [resolvedParams.id]);
+
   // 组件卸载时清理 videoRefs，防止内存泄漏
   useEffect(() => {
     return () => {
