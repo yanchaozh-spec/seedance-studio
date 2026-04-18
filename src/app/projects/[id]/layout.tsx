@@ -949,6 +949,10 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               onClick={() => {
                                 if (!task.result || !task.result.video_url) return;
                                 
+                                // 获取当前播放时间
+                                const videoEl = videoRefs.current.get(task.id);
+                                const currentTime = videoEl?.currentTime ?? 0;
+                                
                                 toast.promise(
                                   async () => {
                                     // 获取 TOS 配置
@@ -957,6 +961,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                                       video_url: task.result!.video_url,
                                       project_id: resolvedParams.id,
                                       task_id: task.id,
+                                      timestamp: currentTime,
                                     };
                                     if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
                                       requestBody.tos_config = tosSettings;

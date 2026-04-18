@@ -276,11 +276,11 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
           }
         } else {
           // blob 为 null，表示 canvas 被污染
-          await fallbackExtractFrame(task.result.video_url, task.id);
+          await fallbackExtractFrame(task.result.video_url, task.id, video.currentTime);
         }
       } catch (e) {
         // 可能是 canvas 被污染，尝试降级
-        await fallbackExtractFrame(task.result.video_url, task.id);
+        await fallbackExtractFrame(task.result.video_url, task.id, video.currentTime);
       }
     } else {
       // 没有视频引用，降级到 API 方式
@@ -289,7 +289,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
   };
 
   // API 降级抽帧函数
-  const fallbackExtractFrame = async (videoUrl: string, taskId: string) => {
+  const fallbackExtractFrame = async (videoUrl: string, taskId: string, timestamp?: number) => {
     try {
       toast.loading("正在抽帧...", { id: "extract-frame" });
       // 获取 TOS 配置
@@ -298,6 +298,7 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
         video_url: videoUrl,
         project_id: resolvedParams.id,
         task_id: taskId,
+        timestamp: timestamp ?? 0,
       };
       if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
         requestBody.tos_config = tosSettings;

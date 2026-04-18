@@ -194,12 +194,14 @@ export function TaskDetailSheet({
         // 获取 TOS 配置
         const { tosEnabled, tosSettings } = useSettingsStore.getState();
         console.log("[ExtractFrame] Frontend - tosEnabled:", tosEnabled, "tosSettings:", tosSettings);
+        console.log("[ExtractFrame] Frontend - currentTime:", currentTime);
         
         // 构建请求体
         const requestBody: Record<string, unknown> = {
           video_url: task.result!.video_url,
           project_id: projectId,
           task_id: task.id,
+          timestamp: currentTime,
         };
         
         // 如果 TOS 已配置，将配置添加到请求体
