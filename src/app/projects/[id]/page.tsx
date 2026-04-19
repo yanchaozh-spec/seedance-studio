@@ -293,8 +293,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     },
   });
 
-  // 存储 textarea 引用的 Map
-  const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  // 存储 编辑器 引用的 Map
+  const editorRefs = useRef<Map<string, HTMLElement>>(new Map());
   // 记录上一次的长度，用于判断是否新增了行
   const prevLengthRef = useRef<number>(1);
 
@@ -304,26 +304,26 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // 检测到新增行，聚焦最后一行
       const newBox = promptBoxes.at(-1);
       if (newBox) {
-        const textarea = textareaRefs.current.get(newBox.id);
-        if (textarea) {
-          textarea.focus();
+        const editor = editorRefs.current.get(newBox.id);
+        if (editor) {
+          editor.focus();
         }
       }
     }
     prevLengthRef.current = promptBoxes.length;
   }, [promptBoxes]);
 
-  // 添加 textarea 引用
-  const setTextareaRef = (id: string) => (el: HTMLTextAreaElement | null) => {
+  // 添加 编辑器 引用
+  const setEditorRef = (id: string) => (el: HTMLElement | null) => {
     if (el) {
-      textareaRefs.current.set(id, el);
+      editorRefs.current.set(id, el);
     } else {
-      textareaRefs.current.delete(id);
+      editorRefs.current.delete(id);
     }
   };
 
   // TAB 键跳转到下一行
-  const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, currentIndex: number) => {
+  const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, currentIndex: number) => {
     if (e.key === "Tab") {
       e.preventDefault();
 
@@ -336,9 +336,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         // 不是最后一行 → 聚焦下一行
         const nextId = promptBoxes[currentIndex + 1]?.id;
         if (nextId) {
-          const textarea = textareaRefs.current.get(nextId);
-          if (textarea) {
-            textarea.focus();
+          const editor = editorRefs.current.get(nextId);
+          if (editor) {
+            editor.focus();
           }
         }
       }
@@ -654,7 +654,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
             <div key={box.id} className="space-y-1.5">
               <div className="flex gap-2">
                 <PromptTextarea
-                  ref={setTextareaRef(box.id)}
+                  ref={setEditorRef(box.id)}
                   value={box.content}
                   onChange={(val) => updatePromptBox(box.id, val)}
                   onKeyDown={(e) => handlePromptKeyDown(e, index)}
