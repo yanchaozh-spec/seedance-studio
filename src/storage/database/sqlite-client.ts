@@ -59,6 +59,23 @@ function migrate(db: Database.Database): void {
   if (!hasDisplayName) {
     db.exec("ALTER TABLE global_avatars ADD COLUMN display_name TEXT DEFAULT ''");
   }
+
+  // 检查 projects 表是否有 slug 列
+  const projectColumns = db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+  const hasSlug = projectColumns.some((col) => col.name === "slug");
+  if (!hasSlug) {
+    db.exec("ALTER TABLE projects ADD COLUMN slug TEXT");
+    // 为已有项目补充 slug
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { generateSlug } = require("@/lib/slug") as typeof import("@/lib/slug");
+    const projects = db.prepare("SELECT id, name FROM projects").all() as Array<{ id: string; name: string }>;
+    const updateStmt = db.prepare("UPDATE projects SET slug = ? WHERE id = ?");
+    for (const project of projects) {
+      const slug = generateSlug(project.name, project.id);
+      updateStmt.run(slug, project.id);
+    }
+    console.log(`[DB Migration] Generated slug for ${projects.length} existing projects`);
+  }
 }
 
 /**
@@ -69,6 +86,7 @@ function initTables(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
       name TEXT NOT NULL,
+      slug TEXT,
       description TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now', 'localtime')),
       updated_at TEXT DEFAULT (datetime('now', 'localtime'))

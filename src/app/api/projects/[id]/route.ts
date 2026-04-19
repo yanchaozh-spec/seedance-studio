@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/storage/database/sqlite-client";
 import { deleteFile, isTosConfigured } from "@/storage/tos/client";
+import { generateSlug } from "@/lib/slug";
 
 // GET /api/projects/[id] - 获取单个项目
 export async function GET(
@@ -29,7 +30,11 @@ export async function PATCH(
     const db = getDb();
 
     const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
+    if (body.name !== undefined) {
+      updateData.name = body.name;
+      // 名称变更时同步更新 slug
+      updateData.slug = generateSlug(body.name, resolvedParams.id);
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });

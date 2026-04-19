@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/storage/database/sqlite-client";
+import { generateSlug } from "@/lib/slug";
 
 // GET /api/projects - 获取所有项目
 export async function GET() {
@@ -23,7 +24,14 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDb();
+    // 先插入获取 ID，再生成 slug 并更新
     const data = db.prepare("INSERT INTO projects (name, description) VALUES (?, ?) RETURNING *").get(name.trim(), description || "") as Record<string, unknown>;
+    
+    // 生成 slug 并更新
+    const slug = generateSlug(name.trim(), data.id as string);
+    db.prepare("UPDATE projects SET slug = ? WHERE id = ?").run(slug, data.id);
+    data.slug = slug;
+    
     return NextResponse.json(data);
   } catch (error) {
     console.error("POST /api/projects error:", error);

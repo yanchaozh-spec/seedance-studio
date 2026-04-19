@@ -138,7 +138,7 @@ export async function GET(
           // 异步上传视频到 TOS（不阻塞响应）
           if (videoUrl && useTos) {
             console.log("[POLL] Task succeeded, will upload video to TOS:", videoUrl);
-            uploadVideoToTos(task.id as string, videoUrl, userTosConfig).catch((err) => {
+            uploadVideoToTos(task.id as string, videoUrl, task.project_id as string, userTosConfig).catch((err) => {
               console.error("[POLL] Failed to upload video to TOS:", err);
             });
           }
@@ -241,7 +241,7 @@ export async function GET(
 /**
  * 异步上传视频到 TOS
  */
-async function uploadVideoToTos(taskId: string, videoUrl: string, userConfig?: TosConfig | null): Promise<void> {
+async function uploadVideoToTos(taskId: string, videoUrl: string, projectId: string, userConfig?: TosConfig | null): Promise<void> {
   if (!isUserTosConfigured(userConfig ?? null) && !isTosConfigured()) {
     console.log("[TOS] TOS not configured, skipping video upload");
     return;
@@ -251,7 +251,7 @@ async function uploadVideoToTos(taskId: string, videoUrl: string, userConfig?: T
     console.log("[TOS] Starting video upload for task:", taskId);
     console.log("[TOS] Source URL:", videoUrl);
 
-    const result = await uploadVideo(videoUrl, taskId, true, userConfig || undefined);
+    const result = await uploadVideo(videoUrl, taskId, projectId, true, userConfig || undefined);
 
     console.log("[TOS] Video uploaded successfully!");
     console.log("[TOS] Storage key:", result.key);

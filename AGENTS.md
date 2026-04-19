@@ -103,9 +103,35 @@
 
 ## 数据库表
 
-- `projects`: 项目表
+- `projects`: 项目表（含 `slug` 字段，用于 TOS 存储路径）
 - `assets`: 素材表（图片+音频+虚拟人像统一存储，`asset_id` 字段存储虚拟人像 Asset ID）
 - `tasks`: 任务表
+- `global_avatars`: 全局虚拟人像库（跨项目共享）
+
+## TOS 存储路径规范
+
+```
+TOS Bucket
+├── projects/
+│   └── {slug}/                    ← slug = ID前8位 + _ + 名称拼音首字母/英文
+│       ├── assets/
+│       │   ├── image/xxx.jpg
+│       │   ├── audio/xxx.wav
+│       │   ├── video/xxx.mp4
+│       │   └── keyframe/xxx.png
+│       └── videos/
+│           └── cgt-xxx.mp4
+├── global-avatars/
+│   ├── global-avatars.json
+│   └── thumbnails/
+│       └── xxx.jpg
+```
+
+### Slug 生成规则
+- 中文→拼音首字母大写，英文/数字→原样保留，符号/空格→跳过
+- 示例：`婚礼视频` → `HLSP`，`Project婚礼` → `ProjectHL`，`Updated Project` → `UpdatedProject`
+- 完整 slug 格式：`{id前8位}_{label}`，如 `d4c1c095_HLSP`
+- 工具函数：`src/lib/slug.ts` 的 `generateSlug()`
 
 ## 环境变量
 

@@ -71,6 +71,9 @@ export default function ProjectsPage() {
   const [editingDisplayName, setEditingDisplayName] = useState("");
   const [savingDisplayName, setSavingDisplayName] = useState(false);
 
+  // 人像详情对话框
+  const [detailAvatar, setDetailAvatar] = useState<GlobalAvatar | null>(null);
+
   // TOS 同步状态
   const [syncingUp, setSyncingUp] = useState(false);
   const [syncingDown, setSyncingDown] = useState(false);
@@ -509,7 +512,8 @@ export default function ProjectsPage() {
               {globalAvatars.map((avatar) => (
                 <div
                   key={avatar.id}
-                  className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all"
+                  className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => setDetailAvatar(avatar)}
                 >
                   {/* 删除按钮 */}
                   <button
@@ -718,6 +722,88 @@ export default function ProjectsPage() {
               {avatarAdding ? "添加中..." : "添加"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 人像详情对话框 */}
+      <Dialog open={!!detailAvatar} onOpenChange={(open) => { if (!open) setDetailAvatar(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserRound className="w-5 h-5 text-purple-500" />
+              {detailAvatar?.display_name || "虚拟人像详情"}
+            </DialogTitle>
+          </DialogHeader>
+          {detailAvatar && (
+            <div className="space-y-4 py-2">
+              {/* 缩略图大图 */}
+              {detailAvatar.thumbnail_url && (
+                <div className="w-full aspect-square max-w-xs mx-auto rounded-xl overflow-hidden bg-muted">
+                  <img
+                    src={detailAvatar.thumbnail_url}
+                    alt={detailAvatar.display_name || detailAvatar.asset_id}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* 基本信息 */}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Asset ID</Label>
+                  <p className="font-mono text-sm mt-0.5 break-all select-all">{detailAvatar.asset_id}</p>
+                </div>
+                {detailAvatar.display_name && (
+                  <div>
+                    <Label className="text-muted-foreground text-xs">显示名称</Label>
+                    <p className="text-sm mt-0.5">{detailAvatar.display_name}</p>
+                  </div>
+                )}
+                {detailAvatar.description && (
+                  <div>
+                    <Label className="text-muted-foreground text-xs">描述</Label>
+                    <p className="text-sm mt-0.5">{detailAvatar.description}</p>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-muted-foreground text-xs">添加时间</Label>
+                  <p className="text-sm mt-0.5">{formatDistanceToNow(new Date(detailAvatar.created_at), { addSuffix: true })}</p>
+                </div>
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDetailAvatar(null);
+                    setEditingAvatarId(detailAvatar.id);
+                    setEditingDisplayName(detailAvatar.display_name || "");
+                  }}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  编辑名称
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-1.5 flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDetailAvatar(null);
+                    handleDeleteGlobalAvatar(detailAvatar.id);
+                  }}
+                  disabled={deletingAvatarId === detailAvatar.id}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  删除
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

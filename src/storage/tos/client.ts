@@ -113,7 +113,7 @@ export function isUserTosConfigured(config: TosConfig | null): boolean {
  * @param buffer 文件内容
  * @param fileName 文件名
  * @param contentType MIME 类型
- * @param projectId 项目 ID（用于组织文件路径）
+ * @param projectId 项目 ID（用于查找 slug 构建路径）
  * @param type 素材类型（image/audio/keyframe/video）
  * @param config 可选的用户配置
  */
@@ -173,9 +173,19 @@ export async function uploadAsset(
     throw new Error("TOS not configured");
   }
   
-  // 生成路径：assets/{projectId}/{type}/{timestamp}-{uuid}.{ext}
+  // 生成路径
   const ext = fileName.split(".").pop() || "bin";
-  const key = `assets/${projectId}/${type}/${Date.now()}.${ext}`;
+  let key: string;
+  if (projectId === "global-avatars") {
+    // 全局人像缩略图使用独立路径
+    key = `global-avatars/thumbnails/${Date.now()}.${ext}`;
+  } else {
+    // 项目素材使用 slug 路径
+    const slug = await getProjectSlug(projectId);
+    key = slug
+      ? `projects/${slug}/assets/${type}/${Date.now()}.${ext}`
+      : `assets/${projectId}/${type}/${Date.now()}.${ext}`; // 兼容旧路径
+  }
   
   console.log("[TOS] Uploading to key:", key, "with contentType:", contentType);
   
@@ -245,12 +255,14 @@ export async function uploadAsset(
  * 上传视频文件
  * @param bufferOrUrl 视频内容或 URL
  * @param taskId 任务 ID（用于组织文件路径）
+ * @param projectId 项目 ID（用于查找 slug 构建路径）
  * @param isUrl 是否为 URL（如果是 URL 则下载后上传）
  * @param config 可选的用户配置
  */
 export async function uploadVideo(
   bufferOrUrl: Buffer | string,
   taskId: string,
+  projectId: string,
   isUrl: boolean = false,
   config?: TosConfig
 ): Promise<{ key: string; url: string }> {
@@ -283,7 +295,11 @@ export async function uploadVideo(
       buffer = bufferOrUrl as Buffer;
     }
     
-    const key = `videos/${taskId}.mp4`;
+    // 使用 slug 路径（如果有 slug）
+    const slug = await getProjectSlug(projectId);
+    const key = slug
+      ? `projects/${slug}/videos/${taskId}.mp4`
+      : `videos/${taskId}.mp4`;
     
     // 使用原生 SDK 上传
     const putCommand = new PutObjectCommand({
@@ -316,6 +332,12 @@ export async function uploadVideo(
     throw new Error("TOS not configured");
   }
   
+  // 使用 slug 路径（如果有 slug）
+  const slug = await getProjectSlug(projectId);
+  const videoPath = slug
+    ? `projects/${slug}/videos/${taskId}.mp4`
+    : `videos/${taskId}.mp4`;
+  
   let key: string;
   
   if (isUrl && typeof bufferOrUrl === "string") {
@@ -330,7 +352,7 @@ export async function uploadVideo(
     const buffer = bufferOrUrl as Buffer;
     key = await storage.uploadFile({
       fileContent: buffer,
-      fileName: `videos/${taskId}.mp4`,
+      fileName: videoPath,
       contentType: "video/mp4",
     });
   }
@@ -431,4 +453,19 @@ export async function deleteFile(key: string, config?: TosConfig): Promise<boole
     throw new Error("TOS not configured");
   }
   return storage.deleteFile({ fileKey: key });
+}
+
+/**
+ * 从数据库获取项目 slug
+ * 用于构建 TOS 存储路径
+ */
+async function getProjectSlug(projectId: string): Promise<string | null> {
+  try {
+    const { getDb } = await import("@/storage/database/sqlite-client");
+    const db = getDb();
+    const row = db.prepare("SELECT slug FROM projects WHERE id = ?").get(projectId) as { slug: string | null } | undefined;
+    return row?.slug || null;
+  } catch {
+    return null;
+  }
 }
