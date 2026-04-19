@@ -75,14 +75,12 @@ export function buildSeedanceContent(
 
   // 预计算每个素材的 AssetKind，避免重复调用 getAssetKind
   const kindMap = new Map(activatedAssets.map((a) => [a.id, getAssetKind(toKindInput(a))]));
-  const imageAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "image");
-  const keyframeAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "keyframe");
-  const virtualAvatarAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "virtualAvatar");
+
+  // 图片类素材：保持用户排列顺序（keyframe+image+virtual_avatar 统一按原始顺序）
+  const IMAGE_KINDS = new Set(["keyframe", "image", "virtualAvatar"]);
+  const allImageAssets = activatedAssets.filter((a) => IMAGE_KINDS.has(kindMap.get(a.id) || ""));
   const audioAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "audio");
   const videoAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "video");
-
-  // 所有图片类素材：关键帧在前，然后普通图片，最后虚拟人像
-  const allImageAssets = [...keyframeAssets, ...imageAssets, ...virtualAvatarAssets];
 
   // 音频排序：已绑定的在前，未绑定的在后
   const usedAudioIds = new Set<string>();
@@ -153,38 +151,36 @@ export function buildSeedanceContent(
     return result;
   }
 
-  // 构建素材定义行
+  // 构建素材定义行（按用户排列顺序）
   const assetDefParts: string[] = [];
 
-  for (const asset of keyframeAssets) {
+  for (const asset of allImageAssets) {
     const refName = imageRefMap.get(asset.id)!;
-    const desc = asset.keyframe_description || asset.display_name || asset.name;
-    assetDefParts.push(`${refName}为${desc}`);
-  }
-
-  for (const asset of imageAssets) {
-    const refName = imageRefMap.get(asset.id)!;
+    const kind = kindMap.get(asset.id)!;
     const displayName = asset.display_name || asset.name;
-    if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
-      const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-      assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);
+
+    if (kind === "keyframe") {
+      const desc = asset.keyframe_description || displayName;
+      assetDefParts.push(`${refName}为${desc}`);
+    } else if (kind === "virtualAvatar") {
+      if (asset.asset_id) {
+        let defPart = `@${refName} 为 ${displayName}（资产 ID: [${asset.asset_id}]）`;
+        if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
+          const audioRef = audioRefMap.get(asset.bound_audio_id)!;
+          defPart += `，声线为${audioRef}`;
+        }
+        assetDefParts.push(defPart);
+      } else {
+        assetDefParts.push(`${refName}为${displayName}`);
+      }
     } else {
-      assetDefParts.push(`${refName}为${displayName}`);
-    }
-  }
-
-  for (const asset of virtualAvatarAssets) {
-    const refName = imageRefMap.get(asset.id)!;
-    const displayName = asset.display_name || asset.name;
-    if (asset.asset_id) {
-      let defPart = `@${refName} 为 ${displayName}（资产 ID: [${asset.asset_id}]）`;
+      // 普通图片
       if (asset.bound_audio_id && audioRefMap.has(asset.bound_audio_id)) {
         const audioRef = audioRefMap.get(asset.bound_audio_id)!;
-        defPart += `，声线为${audioRef}`;
+        assetDefParts.push(`${refName}为${displayName}，声线为${audioRef}`);
+      } else {
+        assetDefParts.push(`${refName}为${displayName}`);
       }
-      assetDefParts.push(defPart);
-    } else {
-      assetDefParts.push(`${refName}为${displayName}`);
     }
   }
 
