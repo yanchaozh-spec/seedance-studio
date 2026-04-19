@@ -1,6 +1,6 @@
 /**
  * SQLite 本地数据库客户端
- * 替代 Supabase，数据存储在本地文件中
+ * 数据存储在本地文件中
  */
 import Database from "better-sqlite3";
 import path from "path";

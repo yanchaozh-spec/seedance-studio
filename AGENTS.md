@@ -137,7 +137,6 @@ TOS Bucket
 
 - `ARK_API_KEY`: Seedance API 密钥（必需）
 - `ARK_MODEL_ID`: Seedance 模型 ID（可选，默认空）
-- Supabase 相关变量由平台自动注入
 
 ## Seedance API 提示词规范
 
