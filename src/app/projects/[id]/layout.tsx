@@ -559,7 +559,12 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     setMounted(true);
   }, []);
 
-  // 加载全局虚拟人像库
+  // 加载全局虚拟人像库（页面初始化时加载，用于缩略图解析）
+  useEffect(() => {
+    getGlobalAvatars().then(setGlobalAvatars).catch(console.error);
+  }, []);
+
+  // 对话框打开时刷新全局人像库
   useEffect(() => {
     if (virtualAvatarDialogOpen) {
       getGlobalAvatars().then(setGlobalAvatars).catch(console.error);
