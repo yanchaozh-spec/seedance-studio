@@ -245,49 +245,45 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     key={i}
                     className={cn(
                       /*
-                       * isolate 创建层叠上下文，让缩略图 z-[-1] 在背景之上、文字之下
+                       * 缩略图 absolute 定位到 span 左侧（right-full），ml-5 为其腾出空间
                        * inline 保持文本基线对齐，确保与 textarea 字符位置精确匹配
-                       * 不使用 padding+负margin，避免缩略图向左侵占前文空间
+                       * @ 符号可见，缩略图在 @ 前方，视觉：[缩略图] @名字
+                       * isolate 创建层叠上下文
                        */
-                      "relative isolate inline rounded-sm font-medium",
+                      "relative isolate inline rounded-sm font-medium ml-5",
                       item?.type === "audio"
-                        ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                        ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                         : item?.type === "video"
-                          ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
-                          : "bg-primary/10 text-primary"
+                          ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 ring-1 ring-cyan-200 dark:ring-cyan-700/40"
+                          : "bg-primary/20 text-primary ring-1 ring-primary/20"
                     )}
                   >
                     {/*
-                      @ 字符：invisible 保留占位宽度（对齐 textarea），但不可见
-                      缩略图 absolute 覆盖在 @ 位置，视觉替代 @
-                      z-[-1] 让缩略图在名字文字下方，名字始终可读
-                      缩略图 w-4 宽于 @ 字符，但 extend-to-right 部分在名字文字之后 (z-1)，
-                      视觉上只露出 @ 占位区内的部分
+                      缩略图 absolute 定位到 span 左侧（right-full），
+                      ml-5 在 span 左侧腾出 20px 空间放置缩略图
                     */}
-                    <span className="invisible">@</span>
                     {item?.thumbnail_url ? (
                       <img
                         src={item.thumbnail_url}
                         alt=""
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
-                        style={{ zIndex: -1 }}
+                        className="absolute right-full top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
                       />
                     ) : item ? (
                       <span
                         className={cn(
-                          "absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
+                          "absolute right-full top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
                           item.type === "audio"
                             ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
                             : item.type === "video"
                               ? "bg-cyan-200 dark:bg-cyan-800/50 text-cyan-600 dark:text-cyan-300"
                               : "bg-primary/20 text-primary"
                         )}
-                        style={{ zIndex: -1, fontSize: 9, lineHeight: 1 }}
+                        style={{ fontSize: 9, lineHeight: 1 }}
                       >
                         {item.type === "audio" ? "♪" : item.type === "video" ? "▶" : "🖼"}
                       </span>
                     ) : null}
-                    {seg.mentionName}
+                    @{seg.mentionName}
                   </span>
                 );
               }
