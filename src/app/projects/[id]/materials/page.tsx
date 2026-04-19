@@ -744,8 +744,8 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                         name: virtualAvatarForm.name.trim(),
                         display_name: virtualAvatarForm.name.trim(),
                         type: "virtual_avatar",
-                        asset_id: virtualAvatarForm.assetId.trim(),
-                        url: `asset://${virtualAvatarForm.assetId.trim()}`,
+                        asset_id: virtualAvatarForm.assetId.trim().replace(/^asset:\/\//, ""),
+                        url: `asset://${virtualAvatarForm.assetId.trim().replace(/^asset:\/\//, "")}`,
                         thumbnail_url: thumbnailUrl,
                         keyframe_description: virtualAvatarForm.description.trim() || null,
                       }),
@@ -756,7 +756,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                     try {
                       const { tosEnabled: syncTosEnabled, tosSettings: syncTosSettings } = useSettingsStore.getState();
                       await addGlobalAvatar({
-                        asset_id: virtualAvatarForm.assetId.trim(),
+                        asset_id: virtualAvatarForm.assetId.trim().replace(/^asset:\/\//, ""),
                         thumbnail_url: thumbnailUrl || undefined,
                         description: virtualAvatarForm.description.trim() || undefined,
                         source_project_id: resolvedParams.id,

@@ -3,7 +3,7 @@
  * 前后端共享的请求参数构建逻辑
  */
 
-import { getAssetKind } from "./assets";
+import { getAssetKind, type AssetKindInput, type AssetType, type AssetCategory } from "./assets";
 
 export interface SeedanceParams {
   ratio: string;
@@ -64,11 +64,22 @@ export function buildSeedanceContent(
     : assets;
 
   // 按类型分类素材
-  const imageAssets = activatedAssets.filter((a) => getAssetKind(a as Parameters<typeof getAssetKind>[0]) === "image");
-  const keyframeAssets = activatedAssets.filter((a) => getAssetKind(a as Parameters<typeof getAssetKind>[0]) === "keyframe");
-  const virtualAvatarAssets = activatedAssets.filter((a) => getAssetKind(a as Parameters<typeof getAssetKind>[0]) === "virtualAvatar");
-  const audioAssets = activatedAssets.filter((a) => getAssetKind(a as Parameters<typeof getAssetKind>[0]) === "audio");
-  const videoAssets = activatedAssets.filter((a) => getAssetKind(a as Parameters<typeof getAssetKind>[0]) === "video");
+  const VALID_ASSET_TYPES = new Set<string>(["image", "audio", "video", "keyframe", "virtual_avatar"]);
+  const VALID_CATEGORIES = new Set<string>(["keyframe", "image", "audio", "video"]);
+
+  const toKindInput = (a: SeedanceAssetInput): AssetKindInput => ({
+    type: (VALID_ASSET_TYPES.has(a.type) ? a.type : "image") as AssetType,
+    asset_category: a.asset_category && VALID_CATEGORIES.has(a.asset_category) ? a.asset_category as AssetCategory : undefined,
+    is_keyframe: a.is_keyframe,
+  });
+
+  // 预计算每个素材的 AssetKind，避免重复调用 getAssetKind
+  const kindMap = new Map(activatedAssets.map((a) => [a.id, getAssetKind(toKindInput(a))]));
+  const imageAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "image");
+  const keyframeAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "keyframe");
+  const virtualAvatarAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "virtualAvatar");
+  const audioAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "audio");
+  const videoAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "video");
 
   // 所有图片类素材：关键帧在前，然后普通图片，最后虚拟人像
   const allImageAssets = [...keyframeAssets, ...imageAssets, ...virtualAvatarAssets];
@@ -210,7 +221,7 @@ export function buildSeedanceContent(
   // 按 allImageAssets 顺序添加所有图片
   for (const asset of allImageAssets) {
     const imageUrl = asset.type === "virtual_avatar" && asset.asset_id
-      ? `asset://${asset.asset_id}`
+      ? (asset.asset_id.startsWith("asset://") ? asset.asset_id : `asset://${asset.asset_id}`)
       : asset.url;
     content.push({
       type: "image_url",

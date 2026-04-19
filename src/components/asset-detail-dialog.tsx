@@ -109,11 +109,6 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       if (!bindResponse.ok) throw new Error("绑定失败");
       const updatedAsset = await bindResponse.json();
       
-      console.log("[AssetDetailDialog] Audio bound:", { 
-        audioId: uploadResult.id, 
-        updatedAsset 
-      });
-      
       toast.success("音频上传并绑定成功");
       onUpdate(updatedAsset);
       setCurrentAsset(updatedAsset);

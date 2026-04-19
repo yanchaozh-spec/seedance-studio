@@ -210,8 +210,6 @@ export function TaskDetailSheet({
         
         // 获取 TOS 配置
         const { tosEnabled, tosSettings } = useSettingsStore.getState();
-        console.log("[ExtractFrame] Frontend - tosEnabled:", tosEnabled, "tosSettings:", tosSettings);
-        console.log("[ExtractFrame] Frontend - currentTime:", currentTime);
         
         // 构建请求体
         const requestBody: Record<string, unknown> = {
@@ -224,9 +222,6 @@ export function TaskDetailSheet({
         // 如果 TOS 已配置，将配置添加到请求体
         if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
           requestBody.tos_config = tosSettings;
-          console.log("[ExtractFrame] Frontend - Added tos_config to request body");
-        } else {
-          console.log("[ExtractFrame] Frontend - TOS not enabled or config incomplete");
         }
         
         const response = await fetch("/api/assets/extract-frame", {

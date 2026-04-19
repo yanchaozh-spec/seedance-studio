@@ -17,7 +17,14 @@ export type AssetCategory = "keyframe" | "image" | "audio" | "video";
  */
 export type AssetKind = "image" | "keyframe" | "virtualAvatar" | "audio" | "video";
 
-export function getAssetKind(asset: Asset): AssetKind {
+/** getAssetKind 所需的最小字段集合 */
+export interface AssetKindInput {
+  type: AssetType;
+  asset_category?: AssetCategory;
+  is_keyframe?: number | boolean;
+}
+
+export function getAssetKind(asset: AssetKindInput): AssetKind {
   if (asset.type === "virtual_avatar") return "virtualAvatar";
   if (asset.type === "audio") return "audio";
   if (asset.type === "video") return "video";
@@ -262,12 +269,8 @@ export async function submitFrameFromCanvas(
 
           // 添加 TOS 配置到 FormData
           const { tosEnabled, tosSettings } = useSettingsStore.getState();
-          console.log("[submitFrameFromCanvas] tosEnabled:", tosEnabled, "tosSettings:", JSON.stringify(tosSettings));
           if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
             formData.append("tos_config", JSON.stringify(tosSettings));
-            console.log("[submitFrameFromCanvas] Added tos_config to FormData");
-          } else {
-            console.log("[submitFrameFromCanvas] TOS not enabled or config incomplete");
           }
 
           const response = await fetch("/api/assets/extract-frame", {

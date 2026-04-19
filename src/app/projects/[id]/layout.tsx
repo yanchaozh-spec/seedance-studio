@@ -461,11 +461,13 @@ function SortableMaterialItem({
   isInPool,
   onClick,
   onRemove,
+  globalAvatars = [],
 }: {
   asset: Asset;
   isInPool: boolean;
   onClick: (asset: Asset) => void;
   onRemove: (id: string) => void;
+  globalAvatars?: GlobalAvatar[];
 }) {
   const {
     attributes,
@@ -507,6 +509,7 @@ function SortableMaterialItem({
         onClick={onClick}
         showRemove
         onRemove={onRemove}
+        globalAvatars={globalAvatars}
       />
     </div>
   );
@@ -604,35 +607,48 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           return prevTasks;
         });
 
-        // 轮询运行中任务的状态
+        // 轮询运行中任务的状态（并行请求）
         const runningTasks = data.filter((t) => t.status === "pending" || t.status === "queued" || t.status === "running");
-        for (const task of runningTasks) {
-          try {
-            const apiKey = useSettingsStore.getState().arkApiKey;
-            const headers: Record<string, string> = {};
-            if (apiKey) {
-              headers["x-ark-api-key"] = apiKey;
-            }
-            
-            // 传递 TOS 配置到后端（用于视频上传）
-            const tosEnabled = useSettingsStore.getState().tosEnabled;
-            const tosSettings = useSettingsStore.getState().tosSettings;
-            if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
-              headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
-            }
-            
-            const response = await fetch(`/api/tasks/${task.id}/poll`, { headers });
-            if (response.ok) {
-              const updatedTask = await response.json();
-              // 如果状态有变化，更新任务列表
-              if (updatedTask.status !== task.status) {
-                setTasks((prev) =>
-                  prev.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
-                );
+        if (runningTasks.length > 0) {
+          const apiKey = useSettingsStore.getState().arkApiKey;
+          const headers: Record<string, string> = {};
+          if (apiKey) {
+            headers["x-ark-api-key"] = apiKey;
+          }
+
+          // 传递 TOS 配置到后端（用于视频上传）
+          const tosEnabled = useSettingsStore.getState().tosEnabled;
+          const tosSettings = useSettingsStore.getState().tosSettings;
+          if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+            headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+          }
+
+          const pollResults = await Promise.allSettled(
+            runningTasks.map(async (task) => {
+              const response = await fetch(`/api/tasks/${task.id}/poll`, { headers });
+              if (response.ok) {
+                const updatedTask = await response.json();
+                return { task, updatedTask };
               }
-            }
-          } catch (error) {
-            console.error(`轮询任务 ${task.id} 状态失败:`, error);
+              return null;
+            })
+          );
+
+          // 批量更新有变化的任务
+          const changedTasks = pollResults
+            .filter((r): r is PromiseFulfilledResult<{ task: Task; updatedTask: Record<string, unknown> } | null> => r.status === "fulfilled" && r.value !== null)
+            .map((r) => r.value!);
+
+          if (changedTasks.length > 0) {
+            setTasks((prev) => {
+              let updated = prev;
+              for (const { task, updatedTask } of changedTasks) {
+                if (updatedTask.status !== task.status) {
+                  updated = updated.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t));
+                }
+              }
+              return updated;
+            });
           }
         }
       } catch (error) {
@@ -1174,6 +1190,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               isInPool={selectedAssets.some((s) => s.id === asset.id)}
                               onClick={setSelectedDetailAsset}
                               onRemove={handleDeleteMaterial}
+                              globalAvatars={globalAvatars}
                             />
                           ))}
                         </div>
@@ -1196,6 +1213,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               isInPool={selectedAssets.some((s) => s.id === asset.id)}
                               onClick={setSelectedDetailAsset}
                               onRemove={handleDeleteMaterial}
+                              globalAvatars={globalAvatars}
                             />
                           ))}
                         </div>
@@ -1218,6 +1236,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               isInPool={selectedAssets.some((s) => s.id === asset.id)}
                               onClick={setSelectedDetailAsset}
                               onRemove={handleDeleteMaterial}
+                              globalAvatars={globalAvatars}
                             />
                           ))}
                         </div>
@@ -1240,6 +1259,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               isInPool={selectedAssets.some((s) => s.id === asset.id)}
                               onClick={setSelectedDetailAsset}
                               onRemove={handleDeleteMaterial}
+                              globalAvatars={globalAvatars}
                             />
                           ))}
                         </div>
@@ -1262,6 +1282,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                               isInPool={selectedAssets.some((s) => s.id === asset.id)}
                               onClick={setSelectedDetailAsset}
                               onRemove={handleDeleteMaterial}
+                              globalAvatars={globalAvatars}
                             />
                           ))}
                         </div>
@@ -1710,8 +1731,8 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           name: virtualAvatarForm.name.trim(),
                           display_name: virtualAvatarForm.name.trim(),
                           type: "virtual_avatar",
-                          asset_id: virtualAvatarForm.assetId.trim(),
-                          url: `asset://${virtualAvatarForm.assetId.trim()}`,
+                          asset_id: virtualAvatarForm.assetId.trim().replace(/^asset:\/\//, ""),
+                          url: `asset://${virtualAvatarForm.assetId.trim().replace(/^asset:\/\//, "")}`,
                           thumbnail_url: thumbnailUrl,
                           keyframe_description: virtualAvatarForm.description.trim() || null,
                         }),
@@ -1723,7 +1744,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       try {
                         const { tosEnabled: syncTosEnabled, tosSettings: syncTosSettings } = useSettingsStore.getState();
                         await addGlobalAvatar({
-                          asset_id: virtualAvatarForm.assetId.trim(),
+                          asset_id: virtualAvatarForm.assetId.trim().replace(/^asset:\/\//, ""),
                           thumbnail_url: thumbnailUrl || undefined,
                           description: virtualAvatarForm.description.trim() || undefined,
                           source_project_id: resolvedParams.id,

@@ -21,8 +21,6 @@ export async function uploadFile(
 ): Promise<{ url: string; storageKey: string; id?: string }> {
   const { tosSettings, tosEnabled } = useSettingsStore.getState();
   
-  console.log("[Upload] TOS Config:", { tosEnabled, tosSettings });
-  
   const formData = new FormData();
   formData.append("file", file);
   formData.append("projectId", options.projectId);
@@ -36,10 +34,7 @@ export async function uploadFile(
   // 如果启用了用户 TOS 配置，添加到表单
   if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey && 
       tosSettings.secretKey && tosSettings.bucket) {
-    console.log("[Upload] Adding TOS config to upload request");
     formData.append("tosConfig", JSON.stringify(tosSettings));
-  } else {
-    console.log("[Upload] TOS not enabled or not configured, using platform storage");
   }
   
   const response = await fetch("/api/assets/upload", {

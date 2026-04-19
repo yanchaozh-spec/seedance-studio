@@ -40,10 +40,12 @@ export async function PATCH(
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    // 动态构建 SET 子句
+    // 白名单校验：只允许更新 name 和 slug
+    const allowedKeys = new Set(["name", "slug"]);
     const setClauses: string[] = [];
     const values: unknown[] = [];
     for (const [key, value] of Object.entries(updateData)) {
+      if (!allowedKeys.has(key)) continue;
       setClauses.push(`${key} = ?`);
       values.push(value);
     }

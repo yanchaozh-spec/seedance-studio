@@ -97,13 +97,9 @@ export async function GET(
           });
         }
 
-        console.log("[POLL] Full external task response:", JSON.stringify(externalTask));
-
-        const updates: Record<string, unknown> = {
-          updated_at: new Date().toISOString(),
-        };
-
         console.log("[POLL] External task status:", externalTask.status, "Task ID:", task.id, "DB Status:", task.status);
+
+        const updates: Record<string, unknown> = {};
 
         // 解析状态
         if (externalTask.status === "succeeded") {
@@ -186,8 +182,6 @@ export async function GET(
           updates.completion_tokens = externalTask.usage.completion_tokens;
           updates.total_tokens = externalTask.usage.total_tokens;
         }
-
-        console.log("[POLL] Updating DB with:", JSON.stringify(updates));
 
         // 动态构建 UPDATE 语句
         const setClauses: string[] = [];

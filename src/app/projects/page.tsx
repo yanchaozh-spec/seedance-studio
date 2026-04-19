@@ -248,6 +248,7 @@ export default function ProjectsPage() {
           const uploadResult = await uploadFile(avatarThumbnailFile, {
             projectId: "global-avatars",
             type: "image",
+            skipDb: true,
           });
           thumbnailUrl = uploadResult.url;
         } catch (uploadError) {
@@ -366,6 +367,7 @@ export default function ProjectsPage() {
       const uploadResult = await uploadFile(detailThumbnailFile, {
         projectId: "global-avatars",
         type: "image",
+        skipDb: true,
       });
       thumbnailUrl = uploadResult.url;
       const tosConfig = getTosConfig();

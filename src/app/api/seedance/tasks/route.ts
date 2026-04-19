@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
         asset_category?: string;
         asset_id?: string;
         bound_audio_id?: string;
-        voice_description?: string;
         keyframe_description?: string;
         is_keyframe?: boolean;
       }>,
