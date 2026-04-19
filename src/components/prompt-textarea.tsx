@@ -214,7 +214,7 @@ export const PromptTextarea = forwardRef<HTMLDivElement, PromptTextareaProps>(
             chip.dataset.mention = "true";
             chip.dataset.mentionName = seg.mentionName;
             chip.className = cn(
-              "inline-flex items-center gap-0.5 rounded-sm font-medium px-1 select-none",
+              "inline-flex items-center gap-0.5 align-middle rounded-sm font-medium px-1 select-none",
               item?.type === "audio"
                 ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                 : item?.type === "video"
