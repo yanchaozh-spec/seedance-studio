@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     // 如果有图片绑定了音频，也需要获取这些音频素材
     const allAssetRows = [...assets];
     const boundAudioIds = assets
-      .filter((a) => (a.type === "image" || a.type === "keyframe" || a.asset_category === "keyframe" || a.is_keyframe) && a.bound_audio_id)
+      .filter((a) => (a.type === "image" || a.type === "keyframe" || a.type === "virtual_avatar" || a.asset_category === "keyframe" || a.is_keyframe) && a.bound_audio_id)
       .map((a) => a.bound_audio_id as string)
       .filter((id): id is string => !!id);
 

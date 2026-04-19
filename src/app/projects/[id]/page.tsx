@@ -383,8 +383,19 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       assetId: box.activatedAssetId,
     }));
 
+    // 补充绑定音频：素材池中的图片/虚拟人像绑定的音频可能不在素材池中，需要从 materials 中补充
+    const selectedIds = new Set(selectedAssets.map((a) => a.id));
+    const boundAudioIds = selectedAssets
+      .filter((a) => a.bound_audio_id && !selectedIds.has(a.bound_audio_id))
+      .map((a) => a.bound_audio_id!)
+      .filter((id, idx, arr) => arr.indexOf(id) === idx); // 去重
+    const missingAudios = materials
+      .filter((m) => boundAudioIds.includes(m.id))
+      .map((m) => ({ ...m, isActivated: true }));
+    const allAssetsForPrompt = [...selectedAssets, ...missingAudios];
+
     const contentItems = buildSeedanceContent(
-      selectedAssets,
+      allAssetsForPrompt,
       promptBoxesForApi,
       true // 只使用素材池中激活的素材
     );
