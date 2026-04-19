@@ -245,12 +245,12 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     key={i}
                     className={cn(
                       /*
-                       * 缩略图 absolute 定位到 span 左侧（right-full），ml-5 为其腾出空间
+                       * 缩略图 absolute 定位到 span 左侧（right-full），不占文本流空间
                        * inline 保持文本基线对齐，确保与 textarea 字符位置精确匹配
-                       * @ 符号可见，缩略图在 @ 前方，视觉：[缩略图] @名字
+                       * @ 符号可见，缩略图在 @ 前方，视觉：[缩略图]@名字
                        * isolate 创建层叠上下文
                        */
-                      "relative isolate inline rounded-sm font-medium ml-5",
+                      "relative isolate inline rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                         : item?.type === "video"
@@ -260,7 +260,7 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                   >
                     {/*
                       缩略图 absolute 定位到 span 左侧（right-full），
-                      ml-5 在 span 左侧腾出 20px 空间放置缩略图
+                      不占文本流空间，不影响光标位置
                     */}
                     {item?.thumbnail_url ? (
                       <img
