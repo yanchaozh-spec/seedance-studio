@@ -245,12 +245,11 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     key={i}
                     className={cn(
                       /*
-                       * inline-flex 让缩略图、@、名字在同一行内排列
-                       * 缩略图在高亮框内部，不溢出容器
-                       * 光标位置与视觉位置基本对齐（mention 内部有 ~16px 偏移，
-                       * 与 Slack/Discord 等 mention 组件体验一致）
+                       * inline 保持文本基线对齐，与周围普通文本无错位
+                       * 缩略图 inline align-middle 垂直居中，不脱离文本流
+                       * 高亮框包裹缩略图+@+名字，不溢出容器
                        */
-                      "inline-flex items-center gap-0.5 rounded-sm font-medium",
+                      "inline rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                         : item?.type === "video"
@@ -262,12 +261,12 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                       <img
                         src={item.thumbnail_url}
                         alt=""
-                        className="w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80 shrink-0"
+                        className="inline w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80 align-middle mr-0.5"
                       />
                     ) : item ? (
                       <span
                         className={cn(
-                          "w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none shrink-0",
+                          "inline-flex w-4 h-4 rounded-sm items-center justify-center pointer-events-none align-middle mr-0.5",
                           item.type === "audio"
                             ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
                             : item.type === "video"
