@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -31,9 +32,11 @@ import {
   RefreshCw,
   CloudUpload,
   CloudDownload,
+  Cloud,
+  Check,
   Loader2,
 } from "lucide-react";
-import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
+import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, pushProjectToCloud, getCloudProjects, pullProjectFromCloud, Project } from "@/lib/projects";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, updateGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
 import { uploadFile } from "@/lib/upload";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
@@ -85,6 +88,21 @@ export default function ProjectsPage() {
   // TOS 同步状态
   const [syncingUp, setSyncingUp] = useState(false);
   const [syncingDown, setSyncingDown] = useState(false);
+
+  // 云端项目同步状态
+  const [cloudDialogOpen, setCloudDialogOpen] = useState(false);
+  const [cloudProjects, setCloudProjects] = useState<{
+    slug: string;
+    name: string;
+    exportedAt: string;
+    assetCount: number;
+    taskCount: number;
+    key: string;
+    isLocal: boolean;
+  }[]>([]);
+  const [cloudLoading, setCloudLoading] = useState(false);
+  const [pushingProjectId, setPushingProjectId] = useState<string | null>(null);
+  const [pullingKey, setPullingKey] = useState<string | null>(null);
 
   const { tosEnabled, tosSettings } = useSettingsStore();
 
@@ -186,6 +204,65 @@ export default function ProjectsPage() {
       console.error("创建项目失败:", error);
     } finally {
       setCreating(false);
+    }
+  };
+
+  // 推送项目到云端
+  const handlePushProject = async (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const config = getTosConfig();
+    if (!config) {
+      toast.error("请先在设置中配置 TOS 存储");
+      return;
+    }
+    try {
+      setPushingProjectId(projectId);
+      const result = await pushProjectToCloud(projectId, config);
+      toast.success(`已推送 ${result.assetCount} 个素材、${result.taskCount} 个任务到云端`);
+    } catch (error) {
+      console.error("推送项目失败:", error);
+      toast.error(error instanceof Error ? error.message : "推送失败");
+    } finally {
+      setPushingProjectId(null);
+    }
+  };
+
+  // 打开云端拉取弹窗
+  const handleOpenCloudDialog = async () => {
+    const config = getTosConfig();
+    if (!config) {
+      toast.error("请先在设置中配置 TOS 存储");
+      return;
+    }
+    setCloudDialogOpen(true);
+    try {
+      setCloudLoading(true);
+      const result = await getCloudProjects(config);
+      setCloudProjects(result.projects);
+    } catch (error) {
+      console.error("获取云端项目失败:", error);
+      toast.error("获取云端项目失败");
+    } finally {
+      setCloudLoading(false);
+    }
+  };
+
+  // 从云端拉取项目
+  const handlePullProject = async (key: string) => {
+    const config = getTosConfig();
+    if (!config) return;
+    try {
+      setPullingKey(key);
+      const result = await pullProjectFromCloud(key, config);
+      toast.success(`已拉取项目「${result.project.name}」，导入 ${result.importedAssets} 个素材、${result.importedTasks} 个任务`);
+      await loadProjects();
+      // 更新云端列表中的 isLocal 状态
+      setCloudProjects((prev) => prev.map((p) => p.key === key ? { ...p, isLocal: true } : p));
+    } catch (error) {
+      console.error("拉取项目失败:", error);
+      toast.error(error instanceof Error ? error.message : "拉取失败");
+    } finally {
+      setPullingKey(null);
     }
   };
 
@@ -415,6 +492,12 @@ export default function ProjectsPage() {
 
           {/* 右侧操作 */}
           <div className="flex items-center gap-2">
+            {tosEnabled && tosSettings.endpoint && (
+              <Button variant="ghost" size="sm" onClick={handleOpenCloudDialog} className="gap-2">
+                <Cloud className="w-4 h-4" />
+                拉取项目
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)} className="gap-2">
               <Settings className="w-4 h-4" />
               设置
@@ -473,6 +556,13 @@ export default function ProjectsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => handlePushProject(project.id, e)}
+                        disabled={pushingProjectId === project.id}
+                      >
+                        {pushingProjectId === project.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CloudUpload className="w-4 h-4 mr-2" />}
+                        推送到云端
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={(e) => openRenameDialog(project.id, project.name, e)}
                       >
@@ -662,6 +752,7 @@ export default function ProjectsPage() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>新建项目</DialogTitle>
+            <DialogDescription>创建一个新的视频生成项目</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -688,6 +779,7 @@ export default function ProjectsPage() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>重命名项目</DialogTitle>
+            <DialogDescription>修改项目名称</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -717,6 +809,7 @@ export default function ProjectsPage() {
               <UserRound className="w-5 h-5 text-purple-500" />
               添加虚拟人像
             </DialogTitle>
+            <DialogDescription>添加一个虚拟人像到全局库</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -797,6 +890,7 @@ export default function ProjectsPage() {
               <UserRound className="w-5 h-5 text-purple-500" />
               虚拟人像详情
             </DialogTitle>
+            <DialogDescription>查看和编辑虚拟人像信息</DialogDescription>
           </DialogHeader>
           {detailAvatar && (
             <div className="space-y-4 py-2">
@@ -957,6 +1051,86 @@ export default function ProjectsPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 云端项目拉取对话框 */}
+      <Dialog open={cloudDialogOpen} onOpenChange={setCloudDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cloud className="w-5 h-5 text-blue-500" />
+              从云端拉取项目
+            </DialogTitle>
+            <DialogDescription>从 TOS 云端存储拉取其他设备推送的项目</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {cloudLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">正在扫描云端项目...</span>
+              </div>
+            ) : cloudProjects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Cloud className="w-10 h-10 text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">云端暂无项目</p>
+                <p className="text-xs text-muted-foreground mt-1">在项目卡片菜单中选择"推送到云端"来上传项目</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {cloudProjects.map((cp) => (
+                  <div
+                    key={cp.key}
+                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-500/5 rounded-lg flex items-center justify-center shrink-0">
+                      <Cloud className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium truncate">{cp.name}</h4>
+                        {cp.isLocal && (
+                          <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950 dark:text-green-400 px-1.5 py-0.5 rounded-full shrink-0">
+                            <Check className="w-3 h-3" />
+                            已存在
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                        <span className="flex items-center gap-1">
+                          <ListTodo className="w-3 h-3" />
+                          {cp.taskCount} 个任务
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {formatDistanceToNow(new Date(cp.exportedAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={cp.isLocal ? "outline" : "default"}
+                      onClick={() => handlePullProject(cp.key)}
+                      disabled={pullingKey === cp.key}
+                      className="shrink-0 gap-1.5"
+                    >
+                      {pullingKey === cp.key ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <CloudDownload className="w-3.5 h-3.5" />
+                      )}
+                      {cp.isLocal ? "重新拉取" : "拉取"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloudDialogOpen(false)}>
+              关闭
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

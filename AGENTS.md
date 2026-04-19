@@ -175,3 +175,6 @@ TOS Bucket
 - `GET /api/assets/[id]` - 获取单个素材
 - `PATCH /api/assets/[id]` - 更新素材
 - `DELETE /api/assets/[id]` - 删除素材
+- `POST /api/projects/sync` - 推送项目到云端（导出 project.json 到 TOS）
+- `GET /api/projects/sync` - 列出云端可拉取的项目
+- `PUT /api/projects/sync` - 从云端拉取项目（导入 project.json 到本地 SQLite）

@@ -5,7 +5,7 @@
  */
 
 import { S3Storage } from "coze-coding-dev-sdk";
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // TOS 配置类型
@@ -468,4 +468,110 @@ async function getProjectSlug(projectId: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * 列出 TOS 中指定前缀下的对象
+ * @param prefix 前缀，如 "projects/"
+ * @param config 可选的用户配置
+ */
+export async function listObjects(
+  prefix: string,
+  config?: TosConfig
+): Promise<{ key: string; size: number; lastModified: Date | undefined }[]> {
+  if (config && isUserTosConfigured(config)) {
+    const { client, bucket } = createS3Client(config);
+    const command = new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix });
+    const response = await client.send(command);
+    return (response.Contents || []).map((obj) => ({
+      key: obj.Key!,
+      size: obj.Size || 0,
+      lastModified: obj.LastModified,
+    }));
+  }
+
+  // 环境变量路径
+  const storage = getTosStorage();
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
+  // SDK 没有 listFiles 方法，用原生 S3Client
+  const envConfig = getEnvConfig();
+  if (!isConfigValid(envConfig)) {
+    throw new Error("TOS not configured");
+  }
+  const { client, bucket } = createS3Client(envConfig);
+  const command = new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix });
+  const response = await client.send(command);
+  return (response.Contents || []).map((obj) => ({
+    key: obj.Key!,
+    size: obj.Size || 0,
+    lastModified: obj.LastModified,
+  }));
+}
+
+/**
+ * 上传 JSON 对象到 TOS
+ * @param key 存储路径
+ * @param data 要序列化的对象
+ * @param config 可选的用户配置
+ */
+export async function putJson(
+  key: string,
+  data: unknown,
+  config?: TosConfig
+): Promise<void> {
+  const buffer = Buffer.from(JSON.stringify(data, null, 2), "utf-8");
+
+  if (config && isUserTosConfigured(config)) {
+    const { client, bucket } = createS3Client(config);
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: "application/json",
+    });
+    await client.send(command);
+    return;
+  }
+
+  // 环境变量路径
+  const storage = getTosStorage();
+  if (!storage) {
+    throw new Error("TOS not configured");
+  }
+  await storage.uploadFile({
+    fileContent: buffer,
+    fileName: key,
+    contentType: "application/json",
+  });
+}
+
+/**
+ * 从 TOS 读取 JSON 对象
+ * @param key 存储路径
+ * @param config 可选的用户配置
+ */
+export async function getJson<T = unknown>(
+  key: string,
+  config?: TosConfig
+): Promise<T> {
+  if (config && isUserTosConfigured(config)) {
+    const { client, bucket } = createS3Client(config);
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const response = await client.send(command);
+    const body = await response.Body!.transformToString("utf-8");
+    return JSON.parse(body) as T;
+  }
+
+  // 环境变量路径
+  const envConfig = getEnvConfig();
+  if (!isConfigValid(envConfig)) {
+    throw new Error("TOS not configured");
+  }
+  const { client, bucket } = createS3Client(envConfig);
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const response = await client.send(command);
+  const body = await response.Body!.transformToString("utf-8");
+  return JSON.parse(body) as T;
 }
