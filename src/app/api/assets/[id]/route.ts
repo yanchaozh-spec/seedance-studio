@@ -1,6 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/storage/database/sqlite-client";
-import { deleteFile, isTosConfigured } from "@/storage/tos/client";
+import { deleteFile, getFileUrl, isTosConfigured } from "@/storage/tos/client";
+
+// GET /api/assets/[id] - 获取单个素材
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const resolvedParams = await params;
+    const db = getDb();
+    const data = db.prepare("SELECT * FROM assets WHERE id = ?").get(resolvedParams.id) as Record<string, unknown> | undefined;
+
+    if (!data) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    // 如果 TOS 已配置且有 storage_key，生成签名 URL
+    if (isTosConfigured() && data.storage_key) {
+      try {
+        const signedUrl = await getFileUrl(data.storage_key as string);
+        data.url = signedUrl;
+        if (data.type === "image") {
+          data.thumbnail_url = signedUrl;
+        }
+      } catch (err) {
+        console.error("Failed to generate signed URL for asset:", data.id, err);
+      }
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("GET /api/assets/[id] error:", error);
+    return NextResponse.json({ error: "Failed to fetch asset" }, { status: 500 });
+  }
+}
 
 // DELETE /api/assets/[id] - 删除素材
 export async function DELETE(

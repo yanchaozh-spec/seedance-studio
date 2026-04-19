@@ -620,7 +620,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
           const tosEnabled = useSettingsStore.getState().tosEnabled;
           const tosSettings = useSettingsStore.getState().tosSettings;
           if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
-            headers["x-tos-config"] = Buffer.from(JSON.stringify(tosSettings)).toString("base64");
+            headers["x-tos-config"] = btoa(unescape(encodeURIComponent(JSON.stringify(tosSettings))));
           }
 
           const pollResults = await Promise.allSettled(
