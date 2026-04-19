@@ -896,12 +896,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                 <div className="flex flex-wrap gap-2">
                   {selectedAssets
                     .filter((asset) => {
-                      // 找出所有绑定到激活图片的音频
+                      // 找出所有绑定到激活图片/虚拟人像的音频
                       const isBoundAudio = selectedAssets.some(a => 
                         a.type === "audio" && 
                         a.isActivated &&
+                        (asset.type === "image" || asset.type === "virtual_avatar") &&
                         asset.asset_category !== "keyframe" &&
-                        asset.type === "image" &&
                         asset.isActivated &&
                         a.id === asset.bound_audio_id
                       );
@@ -928,8 +928,8 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                     return selectedAssets.some(a => 
                       a.type === "audio" && 
                       a.isActivated &&
+                      (asset.type === "image" || asset.type === "virtual_avatar") &&
                       asset.asset_category !== "keyframe" &&
-                      asset.type === "image" &&
                       asset.isActivated &&
                       a.id === asset.bound_audio_id
                     );
