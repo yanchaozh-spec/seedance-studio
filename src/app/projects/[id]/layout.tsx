@@ -1713,12 +1713,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
 
                       // 同步到全局人像库
                       try {
+                        const { tosEnabled: syncTosEnabled, tosSettings: syncTosSettings } = useSettingsStore.getState();
                         await addGlobalAvatar({
                           asset_id: virtualAvatarForm.assetId.trim(),
                           thumbnail_url: thumbnailUrl || undefined,
                           description: virtualAvatarForm.description.trim() || undefined,
                           source_project_id: resolvedParams.id,
-                        });
+                        }, syncTosEnabled && syncTosSettings.endpoint ? syncTosSettings : undefined);
                       } catch (syncError) {
                         console.warn("同步到全局人像库失败:", syncError);
                       }

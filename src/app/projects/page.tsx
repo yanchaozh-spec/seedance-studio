@@ -28,14 +28,18 @@ import {
   Settings,
   Pencil,
   UserRound,
+  RefreshCw,
+  CloudUpload,
+  CloudDownload,
+  Loader2,
 } from "lucide-react";
 import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
-import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
+import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, updateGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
 import { uploadFile } from "@/lib/upload";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
-import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
 
 export default function ProjectsPage() {
@@ -55,17 +59,35 @@ export default function ProjectsPage() {
   // 全局虚拟人像库
   const [globalAvatars, setGlobalAvatars] = useState<GlobalAvatar[]>([]);
   const [globalAvatarDialogOpen, setGlobalAvatarDialogOpen] = useState(false);
-  const [avatarForm, setAvatarForm] = useState({ assetId: "", thumbnailUrl: "", description: "" });
+  const [avatarForm, setAvatarForm] = useState({ assetId: "", displayName: "", thumbnailUrl: "", description: "" });
   const [avatarThumbnailFile, setAvatarThumbnailFile] = useState<File | null>(null);
   const [avatarThumbnailPreview, setAvatarThumbnailPreview] = useState<string | null>(null);
-  const [selectedAvatarDetail, setSelectedAvatarDetail] = useState<GlobalAvatar | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarAdding, setAvatarAdding] = useState(false);
   const [deletingAvatarId, setDeletingAvatarId] = useState<string | null>(null);
 
+  // 编辑显示名称
+  const [editingAvatarId, setEditingAvatarId] = useState<string | null>(null);
+  const [editingDisplayName, setEditingDisplayName] = useState("");
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+
+  // TOS 同步状态
+  const [syncingUp, setSyncingUp] = useState(false);
+  const [syncingDown, setSyncingDown] = useState(false);
+
+  const { tosEnabled, tosSettings } = useSettingsStore();
+
   useEffect(() => {
     loadProjects();
     loadGlobalAvatars();
+  }, []);
+
+  // 启动时尝试从 TOS 拉取数据
+  useEffect(() => {
+    if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
+      syncFromTos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadProjects = async () => {
@@ -92,6 +114,62 @@ export default function ProjectsPage() {
       setGlobalAvatars(data);
     } catch (error) {
       console.error("加载虚拟人像库失败:", error);
+    }
+  };
+
+  const getTosConfig = () => {
+    if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey && tosSettings.secretKey && tosSettings.bucket) {
+      return tosSettings;
+    }
+    return undefined;
+  };
+
+  // 从 TOS 拉取数据并合并
+  const syncFromTos = async () => {
+    const config = getTosConfig();
+    if (!config) return;
+
+    try {
+      setSyncingDown(true);
+      const response = await fetch(`/api/global-avatars/sync?tosConfig=${encodeURIComponent(JSON.stringify(config))}`);
+      const result = await response.json();
+      if (result.success && result.synced > 0) {
+        await loadGlobalAvatars();
+        toast.success(`已从云端同步 ${result.synced} 个人像`);
+      }
+    } catch (error) {
+      console.warn("从 TOS 同步失败:", error);
+    } finally {
+      setSyncingDown(false);
+    }
+  };
+
+  // 上传到 TOS
+  const syncToTos = async () => {
+    const config = getTosConfig();
+    if (!config) {
+      toast.error("请先配置 TOS 存储");
+      return;
+    }
+
+    try {
+      setSyncingUp(true);
+      const response = await fetch("/api/global-avatars/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tosConfig: config }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        toast.success(`已上传 ${result.count} 个人像到云端`);
+      } else {
+        toast.error("上传失败");
+      }
+    } catch (error) {
+      console.error("上传到 TOS 失败:", error);
+      toast.error("上传失败");
+    } finally {
+      setSyncingUp(false);
     }
   };
 
@@ -165,7 +243,6 @@ export default function ProjectsPage() {
         try {
           setAvatarUploading(true);
           const uploadResult = await uploadFile(avatarThumbnailFile, {
-            // global_avatars 没有 project_id，使用临时目录占位
             projectId: "global-avatars",
             type: "image",
           });
@@ -178,14 +255,17 @@ export default function ProjectsPage() {
         }
       }
 
+      const tosConfig = getTosConfig();
       await addGlobalAvatar({
         asset_id: avatarForm.assetId.trim(),
+        display_name: avatarForm.displayName.trim(),
         thumbnail_url: thumbnailUrl,
         description: avatarForm.description.trim(),
-      });
+        // 传递 TOS 配置以触发同步
+      }, tosConfig);
 
       toast.success("虚拟人像已添加到全局库");
-      setAvatarForm({ assetId: "", thumbnailUrl: "", description: "" });
+      setAvatarForm({ assetId: "", displayName: "", thumbnailUrl: "", description: "" });
       setAvatarThumbnailFile(null);
       setAvatarThumbnailPreview(null);
       setGlobalAvatarDialogOpen(false);
@@ -195,6 +275,33 @@ export default function ProjectsPage() {
       toast.error("添加虚拟人像失败");
     } finally {
       setAvatarAdding(false);
+    }
+  };
+
+  // 更新显示名称
+  const handleSaveDisplayName = async (avatarId: string) => {
+    if (!editingDisplayName.trim()) {
+      setEditingAvatarId(null);
+      return;
+    }
+
+    try {
+      setSavingDisplayName(true);
+      const tosConfig = getTosConfig();
+      await updateGlobalAvatar(avatarId, {
+        display_name: editingDisplayName.trim(),
+      }, tosConfig);
+
+      setGlobalAvatars(globalAvatars.map((a) =>
+        a.id === avatarId ? { ...a, display_name: editingDisplayName.trim() } : a
+      ));
+      setEditingAvatarId(null);
+      toast.success("名称已更新");
+    } catch (error) {
+      console.error("更新名称失败:", error);
+      toast.error("更新失败");
+    } finally {
+      setSavingDisplayName(false);
     }
   };
 
@@ -216,7 +323,7 @@ export default function ProjectsPage() {
   // 重置人像对话框
   const closeAvatarDialog = () => {
     setGlobalAvatarDialogOpen(false);
-    setAvatarForm({ assetId: "", thumbnailUrl: "", description: "" });
+    setAvatarForm({ assetId: "", displayName: "", thumbnailUrl: "", description: "" });
     setAvatarThumbnailFile(null);
     setAvatarThumbnailPreview(null);
   };
@@ -353,10 +460,38 @@ export default function ProjectsPage() {
               </h2>
               <p className="text-sm text-muted-foreground">跨项目共享的虚拟人像，在项目中使用时可分别设置角色名</p>
             </div>
-            <Button size="sm" onClick={() => setGlobalAvatarDialogOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              添加人像
-            </Button>
+            <div className="flex items-center gap-2">
+              {tosEnabled && tosSettings.endpoint && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={syncFromTos}
+                    disabled={syncingDown}
+                    title="从云端拉取"
+                    className="gap-1"
+                  >
+                    {syncingDown ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudDownload className="w-3.5 h-3.5" />}
+                    拉取
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={syncToTos}
+                    disabled={syncingUp}
+                    title="上传到云端"
+                    className="gap-1"
+                  >
+                    {syncingUp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
+                    上传
+                  </Button>
+                </>
+              )}
+              <Button size="sm" onClick={() => setGlobalAvatarDialogOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                添加人像
+              </Button>
+            </div>
           </div>
 
           {globalAvatars.length === 0 ? (
@@ -374,8 +509,7 @@ export default function ProjectsPage() {
               {globalAvatars.map((avatar) => (
                 <div
                   key={avatar.id}
-                  className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => setSelectedAvatarDetail(avatar)}
+                  className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all"
                 >
                   {/* 删除按钮 */}
                   <button
@@ -391,7 +525,7 @@ export default function ProjectsPage() {
                     {avatar.thumbnail_url ? (
                       <img
                         src={avatar.thumbnail_url}
-                        alt={avatar.asset_id}
+                        alt={avatar.display_name || avatar.asset_id}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -401,6 +535,38 @@ export default function ProjectsPage() {
 
                   {/* 信息 */}
                   <div className="p-3 space-y-1.5">
+                    {/* 显示名称 - 可编辑 */}
+                    {editingAvatarId === avatar.id ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={editingDisplayName}
+                          onChange={(e) => setEditingDisplayName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveDisplayName(avatar.id);
+                            if (e.key === "Escape") setEditingAvatarId(null);
+                          }}
+                          onBlur={() => handleSaveDisplayName(avatar.id)}
+                          className="h-6 text-xs px-1.5 py-0"
+                          autoFocus
+                          disabled={savingDisplayName}
+                        />
+                        {savingDisplayName && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center gap-1 cursor-pointer group/name"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingAvatarId(avatar.id);
+                          setEditingDisplayName(avatar.display_name || "");
+                        }}
+                      >
+                        <span className="text-sm font-medium truncate flex-1" title="点击编辑名称">
+                          {avatar.display_name || "未命名"}
+                        </span>
+                        <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover/name:opacity-100 transition-opacity shrink-0" />
+                      </div>
+                    )}
                     <div className="flex items-center gap-1">
                       <UserRound className="w-3 h-3 text-purple-500 shrink-0" />
                       <span className="text-[10px] font-mono text-muted-foreground truncate" title={avatar.asset_id}>
@@ -507,6 +673,16 @@ export default function ProjectsPage() {
               </p>
             </div>
             <div>
+              <Label>显示名称 <span className="text-muted-foreground font-normal">(便于管理，仅在此库中显示)</span></Label>
+              <Input
+                placeholder="如：美妆博主小美"
+                value={avatarForm.displayName}
+                onChange={(e) => setAvatarForm((prev) => ({ ...prev, displayName: e.target.value }))}
+                className="mt-1.5"
+              />
+              <p className="text-xs text-muted-foreground mt-1">仅用于人像库管理辨识，不影响项目内的角色名设置</p>
+            </div>
+            <div>
               <Label>缩略图 <span className="text-muted-foreground font-normal">(可选)</span></Label>
               <div className="mt-1.5">
                 <ThumbnailUpload
@@ -544,28 +720,6 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* 全局人像详情对话框 */}
-      <AssetDetailDialog
-        asset={selectedAvatarDetail ? {
-          id: selectedAvatarDetail.id,
-          project_id: selectedAvatarDetail.source_project_id || "",
-          name: selectedAvatarDetail.asset_id,
-          display_name: selectedAvatarDetail.description || selectedAvatarDetail.asset_id,
-          type: "virtual_avatar" as const,
-          asset_id: selectedAvatarDetail.asset_id,
-          url: selectedAvatarDetail.thumbnail_url || "",
-          thumbnail_url: selectedAvatarDetail.thumbnail_url || undefined,
-          created_at: selectedAvatarDetail.created_at,
-        } : null}
-        allAssets={[]}
-        onClose={() => setSelectedAvatarDetail(null)}
-        onUpdate={() => {
-          // 全局人像库的详情对话框不支持编辑，关闭即可
-          setSelectedAvatarDetail(null);
-          loadGlobalAvatars();
-        }}
-      />
     </>
   );
 }

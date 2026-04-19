@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/storage/database/sqlite-client";
+import { syncGlobalAvatarsToTos } from "@/lib/global-avatars-sync";
 
 // GET /api/global-avatars - 获取所有全局虚拟人像
 export async function GET() {
@@ -30,37 +31,46 @@ export async function POST(request: NextRequest) {
       .prepare("SELECT id FROM global_avatars WHERE asset_id = ?")
       .get(body.asset_id.trim()) as { id: string } | undefined;
 
+    let result: Record<string, unknown>;
+
     if (existing) {
       // 已存在则更新
-      const updated = db.prepare(`
+      result = db.prepare(`
         UPDATE global_avatars
-        SET thumbnail_url = COALESCE(?, thumbnail_url),
+        SET display_name = COALESCE(?, display_name),
+            thumbnail_url = COALESCE(?, thumbnail_url),
             description = COALESCE(?, description),
             source_project_id = COALESCE(?, source_project_id),
             updated_at = datetime('now', 'localtime')
         WHERE asset_id = ?
         RETURNING *
       `).get(
+        body.display_name || null,
         body.thumbnail_url || null,
         body.description || null,
         body.source_project_id || null,
         body.asset_id.trim()
       ) as Record<string, unknown>;
-      return NextResponse.json(updated);
+    } else {
+      result = db.prepare(`
+        INSERT INTO global_avatars (asset_id, display_name, thumbnail_url, description, source_project_id)
+        VALUES (?, ?, ?, ?, ?)
+        RETURNING *
+      `).get(
+        body.asset_id.trim(),
+        body.display_name || "",
+        body.thumbnail_url || null,
+        body.description || "",
+        body.source_project_id || null
+      ) as Record<string, unknown>;
     }
 
-    const data = db.prepare(`
-      INSERT INTO global_avatars (asset_id, thumbnail_url, description, source_project_id)
-      VALUES (?, ?, ?, ?)
-      RETURNING *
-    `).get(
-      body.asset_id.trim(),
-      body.thumbnail_url || null,
-      body.description || "",
-      body.source_project_id || null
-    ) as Record<string, unknown>;
+    // 异步同步到 TOS
+    syncGlobalAvatarsToTos(body.tosConfig).catch((err) =>
+      console.warn("[global-avatars] TOS sync failed:", err)
+    );
 
-    return NextResponse.json(data);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("POST /api/global-avatars error:", error);
     return NextResponse.json({ error: "Failed to create global avatar" }, { status: 500 });

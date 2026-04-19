@@ -26,6 +26,7 @@ import { emitAssetsChanged } from "@/lib/events";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
+import { useSettingsStore } from "@/lib/settings";
 
 // dnd-kit 拖拽排序
 import {
@@ -753,12 +754,13 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
 
                     // 同步到全局人像库
                     try {
+                      const { tosEnabled: syncTosEnabled, tosSettings: syncTosSettings } = useSettingsStore.getState();
                       await addGlobalAvatar({
                         asset_id: virtualAvatarForm.assetId.trim(),
                         thumbnail_url: thumbnailUrl || undefined,
                         description: virtualAvatarForm.description.trim() || undefined,
                         source_project_id: resolvedParams.id,
-                      });
+                      }, syncTosEnabled && syncTosSettings.endpoint ? syncTosSettings : undefined);
                     } catch (syncError) {
                       console.warn("同步到全局人像库失败:", syncError);
                     }

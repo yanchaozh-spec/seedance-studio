@@ -47,10 +47,17 @@ export function getDb(): Database.Database {
  */
 function migrate(db: Database.Database): void {
   // 检查 assets 表是否有 asset_id 列
-  const columns = db.prepare("PRAGMA table_info(assets)").all() as Array<{ name: string }>;
-  const hasAssetId = columns.some((col) => col.name === "asset_id");
+  const assetColumns = db.prepare("PRAGMA table_info(assets)").all() as Array<{ name: string }>;
+  const hasAssetId = assetColumns.some((col) => col.name === "asset_id");
   if (!hasAssetId) {
     db.exec("ALTER TABLE assets ADD COLUMN asset_id TEXT");
+  }
+
+  // 检查 global_avatars 表是否有 display_name 列
+  const gaColumns = db.prepare("PRAGMA table_info(global_avatars)").all() as Array<{ name: string }>;
+  const hasDisplayName = gaColumns.some((col) => col.name === "display_name");
+  if (!hasDisplayName) {
+    db.exec("ALTER TABLE global_avatars ADD COLUMN display_name TEXT DEFAULT ''");
   }
 }
 
@@ -127,6 +134,7 @@ function initTables(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS global_avatars (
       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
       asset_id TEXT NOT NULL UNIQUE,
+      display_name TEXT DEFAULT '',
       thumbnail_url TEXT,
       description TEXT DEFAULT '',
       source_project_id TEXT,
