@@ -82,15 +82,21 @@ export function buildSeedanceContent(
   const audioAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "audio");
   const videoAssets = activatedAssets.filter((a) => kindMap.get(a.id) === "video");
 
-  // 音频排序：已绑定的在前，未绑定的在后
-  const usedAudioIds = new Set<string>();
-  for (const asset of allImageAssets) {
+  // 音频排序：按绑定图片的顺序排列，未绑定的在后
+  // 这样 音频1 就对应 图片1 绑定的音频，提示词中的"声线为音频N"不会错位
+  const boundAudioOrder: { audioId: string; imageIndex: number }[] = [];
+  for (let i = 0; i < allImageAssets.length; i++) {
+    const asset = allImageAssets[i];
     if (asset.bound_audio_id) {
-      usedAudioIds.add(asset.bound_audio_id);
+      boundAudioOrder.push({ audioId: asset.bound_audio_id, imageIndex: i });
     }
   }
+  const usedAudioIds = new Set(boundAudioOrder.map((b) => b.audioId));
+  const boundAudioMap = new Map(boundAudioOrder.map((b) => [b.audioId, b.imageIndex]));
   const allAudioAssets = [
-    ...audioAssets.filter((a) => usedAudioIds.has(a.id)),
+    ...audioAssets
+      .filter((a) => usedAudioIds.has(a.id))
+      .sort((a, b) => (boundAudioMap.get(a.id) ?? 0) - (boundAudioMap.get(b.id) ?? 0)),
     ...audioAssets.filter((a) => !usedAudioIds.has(a.id)),
   ];
 
