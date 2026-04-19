@@ -253,12 +253,12 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     key={i}
                     className={cn(
                       /*
-                       * inline 保持文本基线对齐，与 textarea 字符逐像素对应
-                       * 缩略图/图标通过 ::before 伪元素 absolute 定位到 @ 左侧
-                       * 不占文本流宽度，零偏移，光标/选区精确对齐
-                       * 高亮背景覆盖 @+名字，缩略图视觉上与之衔接
+                       * inline 保持文本基线对齐（垂直无偏移）
+                       * pl-[18px] 为缩略图腾出空间，缩略图在高亮框内部
+                       * ::before absolute 定位在 padding 区域，视觉：[高亮框[缩略图]@名字]
+                       * 光标在 mention 内部有 ~18px 水平偏移，离开 mention 后恢复精确对齐
                        */
-                      "relative inline rounded-sm font-medium",
+                      "relative inline rounded-sm font-medium pl-[18px]",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                         : item?.type === "video"

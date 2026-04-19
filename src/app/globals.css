@@ -137,13 +137,14 @@ body {
 }
 
 /* @提及 缩略图/图标伪元素样式
- * ::before 伪元素 absolute 定位到 @ 左侧，不占文本流宽度
- * 保证镜像层与 textarea 字符精确对齐，光标/选区无偏移
+ * ::before 伪元素 absolute 定位在 mention span 的 padding-left 区域内
+ * mention span 有 pl-[18px]，::before 放在 left:1px 位置
+ * 缩略图在高亮框内部，不盖住前面文字
  */
 .mention-thumb::before,
 .mention-icon::before {
   position: absolute;
-  right: 100%;
+  left: 1px;
   top: 50%;
   transform: translateY(-50%);
   width: 16px;
