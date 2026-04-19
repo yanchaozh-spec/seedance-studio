@@ -384,9 +384,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
     }));
 
     const contentItems = buildSeedanceContent(
-      [...selectedAssets, ...materials.filter(m => !selectedAssets.some(s => s.id === m.id))],
+      selectedAssets,
       promptBoxesForApi,
-      true // 只使用激活的素材
+      true // 只使用素材池中激活的素材
     );
 
     const requestBody = buildSeedanceRequestBody(modelId || "", contentItems, {
