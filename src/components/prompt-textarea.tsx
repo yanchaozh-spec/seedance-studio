@@ -245,12 +245,12 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                     key={i}
                     className={cn(
                       /*
-                       * 缩略图 absolute 定位到 span 左侧（right-full），不占文本流空间
-                       * inline 保持文本基线对齐，确保与 textarea 字符位置精确匹配
-                       * @ 符号可见，缩略图在 @ 前方，视觉：[缩略图]@名字
-                       * isolate 创建层叠上下文
+                       * inline-flex 让缩略图、@、名字在同一行内排列
+                       * 缩略图在高亮框内部，不溢出容器
+                       * 光标位置与视觉位置基本对齐（mention 内部有 ~16px 偏移，
+                       * 与 Slack/Discord 等 mention 组件体验一致）
                        */
-                      "relative isolate inline rounded-sm font-medium",
+                      "inline-flex items-center gap-0.5 rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                         : item?.type === "video"
@@ -258,20 +258,16 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
                           : "bg-primary/20 text-primary ring-1 ring-primary/20"
                     )}
                   >
-                    {/*
-                      缩略图 absolute 定位到 span 左侧（right-full），
-                      不占文本流空间，不影响光标位置
-                    */}
                     {item?.thumbnail_url ? (
                       <img
                         src={item.thumbnail_url}
                         alt=""
-                        className="absolute right-full top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80"
+                        className="w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80 shrink-0"
                       />
                     ) : item ? (
                       <span
                         className={cn(
-                          "absolute right-full top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none",
+                          "w-4 h-4 rounded-sm flex items-center justify-center pointer-events-none shrink-0",
                           item.type === "audio"
                             ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
                             : item.type === "video"
