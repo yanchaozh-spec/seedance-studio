@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Asset, getAssets, deleteAsset, reorderAssets, getAssetKind } from "@/lib/assets";
 import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
+import { schedulePush } from "@/lib/auto-sync";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
@@ -577,6 +578,11 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
     const unsubscribe = onAssetsChanged((event) => {
       if (event.projectId === resolvedParams.id) {
         loadMaterials();
+        // 自动推送到云端
+        const { tosEnabled, tosSettings } = useSettingsStore.getState();
+        if (tosEnabled && tosSettings.endpoint) {
+          schedulePush(resolvedParams.id, tosSettings);
+        }
       }
     });
     return unsubscribe;

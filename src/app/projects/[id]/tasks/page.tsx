@@ -33,6 +33,7 @@ import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/settings";
+import { schedulePush } from "@/lib/auto-sync";
 import { formatSeconds } from "@/components/tasks/TaskCard";
 import { VideoPlayer } from "@/components/ui/video-player";
 
@@ -152,6 +153,11 @@ export default function TasksPage({ params }: { params: Promise<{ id: string }> 
       await deleteTask(taskId, taskIdExternal);
       setTasks(tasks.filter((t) => t.id !== taskId));
       toast.success("删除成功");
+      // 任务删除后自动推送
+      const { tosEnabled, tosSettings } = useSettingsStore.getState();
+      if (tosEnabled && tosSettings.endpoint) {
+        schedulePush(resolvedParams.id, tosSettings);
+      }
     } catch (error) {
       toast.error("删除失败");
     }

@@ -5,8 +5,26 @@ export interface Project {
   name: string;
   slug: string;
   description?: string;
+  cloud_version?: number;
+  last_pushed_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type SyncStatus = "synced" | "local_ahead" | "cloud_ahead" | "conflict" | "cloud_only" | "local_only";
+
+export interface CloudProjectInfo {
+  slug: string;
+  name: string;
+  exportedAt: string;
+  cloudVersion: number;
+  assetCount: number;
+  taskCount: number;
+  key: string;
+  isLocal: boolean;
+  localId: string | null;
+  localVersion: number;
+  syncStatus: SyncStatus;
 }
 
 // 获取所有项目
@@ -74,9 +92,10 @@ export async function getProjectTaskCount(projectId: string): Promise<number> {
   return Array.isArray(tasks) ? tasks.length : 0;
 }
 
-// 推送项目到云端
+// 推送项目到云端（自动同步用）
 export async function pushProjectToCloud(projectId: string, tosConfig: unknown): Promise<{
   success: boolean;
+  cloudVersion: number;
   key: string;
   assetCount: number;
   taskCount: number;
@@ -93,36 +112,29 @@ export async function pushProjectToCloud(projectId: string, tosConfig: unknown):
   return response.json();
 }
 
-// 获取云端项目列表
-export async function getCloudProjects(tosConfig: unknown): Promise<{
-  projects: {
-    slug: string;
-    name: string;
-    exportedAt: string;
-    assetCount: number;
-    taskCount: number;
-    key: string;
-    isLocal: boolean;
-  }[];
+// 获取云端同步状态
+export async function getSyncStatus(tosConfig: unknown): Promise<{
+  projects: CloudProjectInfo[];
 }> {
   const response = await fetch(`/api/projects/sync?tosConfig=${encodeURIComponent(JSON.stringify(tosConfig))}`);
   if (!response.ok) {
-    throw new Error("获取云端项目失败");
+    throw new Error("获取同步状态失败");
   }
   return response.json();
 }
 
 // 从云端拉取项目
-export async function pullProjectFromCloud(key: string, tosConfig: unknown): Promise<{
+export async function pullProjectFromCloud(key: string, tosConfig: unknown, forceOverwrite: boolean = false): Promise<{
   success: boolean;
   project: { id: string; name: string; slug: string };
   importedAssets: number;
   importedTasks: number;
+  cloudVersion: number;
 }> {
   const response = await fetch("/api/projects/sync", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key, tosConfig }),
+    body: JSON.stringify({ key, tosConfig, forceOverwrite }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));

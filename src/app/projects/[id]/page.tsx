@@ -18,6 +18,7 @@ import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { useProjectDetail } from "./layout";
 import { useSettingsStore } from "@/lib/settings";
 import { uploadFile } from "@/lib/upload";
+import { schedulePush } from "@/lib/auto-sync";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
@@ -593,6 +594,11 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         toast.error("生成失败，请查看任务管理中的失败原因");
       } else {
         toast.success("任务已创建");
+        // 任务创建后自动推送到云端
+        const { tosEnabled, tosSettings } = useSettingsStore.getState();
+        if (tosEnabled && tosSettings.endpoint) {
+          schedulePush(resolvedParams.id, tosSettings);
+        }
       }
       
       // 后台刷新任务列表（不等待）

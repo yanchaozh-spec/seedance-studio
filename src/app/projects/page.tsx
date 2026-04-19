@@ -30,13 +30,12 @@ import {
   Pencil,
   UserRound,
   RefreshCw,
+  Cloud,
   CloudUpload,
   CloudDownload,
-  Cloud,
-  Check,
   Loader2,
 } from "lucide-react";
-import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, pushProjectToCloud, getCloudProjects, pullProjectFromCloud, Project } from "@/lib/projects";
+import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, updateGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
 import { uploadFile } from "@/lib/upload";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
@@ -44,6 +43,8 @@ import { formatDistanceToNow } from "date-fns";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { useSettingsStore } from "@/lib/settings";
 import { toast } from "sonner";
+import { schedulePush, cancelPush, checkAndPullUpdates, getSyncStatusDisplay } from "@/lib/auto-sync";
+import { SyncStatus } from "@/lib/projects";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<(Project & { taskCount?: number })[]>([]);
@@ -88,27 +89,18 @@ export default function ProjectsPage() {
   // TOS 同步状态
   const [syncingUp, setSyncingUp] = useState(false);
   const [syncingDown, setSyncingDown] = useState(false);
-
-  // 云端项目同步状态
-  const [cloudDialogOpen, setCloudDialogOpen] = useState(false);
-  const [cloudProjects, setCloudProjects] = useState<{
-    slug: string;
-    name: string;
-    exportedAt: string;
-    assetCount: number;
-    taskCount: number;
-    key: string;
-    isLocal: boolean;
-  }[]>([]);
-  const [cloudLoading, setCloudLoading] = useState(false);
-  const [pushingProjectId, setPushingProjectId] = useState<string | null>(null);
-  const [pullingKey, setPullingKey] = useState<string | null>(null);
+  // 项目同步状态映射：projectId -> SyncStatus
+  const [syncStatuses, setSyncStatuses] = useState<Record<string, SyncStatus>>({});
+  // 冲突项目列表
+  const [conflictProjects, setConflictProjects] = useState<{ name: string; slug: string }[]>([]);
 
   const { tosEnabled, tosSettings } = useSettingsStore();
 
   useEffect(() => {
     loadProjects();
     loadGlobalAvatars();
+    // 页面加载时检查云端更新并自动拉取
+    autoPullFromCloud();
   }, []);
 
   const loadProjects = async () => {
@@ -135,6 +127,47 @@ export default function ProjectsPage() {
       setGlobalAvatars(data);
     } catch (error) {
       console.error("加载虚拟人像库失败:", error);
+    }
+  };
+
+  // 自动拉取云端更新
+  const autoPullFromCloud = async () => {
+    const config = getTosConfig();
+    if (!config) return;
+
+    try {
+      const { pulled, conflicts } = await checkAndPullUpdates(config);
+      if (pulled.length > 0) {
+        toast.success(`已从云端同步 ${pulled.length} 个项目`);
+        await loadProjects(); // 刷新列表
+      }
+      if (conflicts.length > 0) {
+        setConflictProjects(conflicts.map((c) => ({ name: c.name, slug: c.slug })));
+      }
+      // 刷新同步状态指示器
+      await refreshSyncStatuses();
+    } catch (error) {
+      console.warn("[AutoSync] 自动拉取失败:", error);
+    }
+  };
+
+  // 刷新项目同步状态
+  const refreshSyncStatuses = async () => {
+    const config = getTosConfig();
+    if (!config) return;
+
+    try {
+      const { getSyncStatus } = await import("@/lib/projects");
+      const { projects } = await getSyncStatus(config);
+      const statusMap: Record<string, SyncStatus> = {};
+      for (const cp of projects) {
+        if (cp.localId) {
+          statusMap[cp.localId] = cp.syncStatus;
+        }
+      }
+      setSyncStatuses(statusMap);
+    } catch (error) {
+      console.warn("[AutoSync] 刷新同步状态失败:", error);
     }
   };
 
@@ -199,6 +232,8 @@ export default function ProjectsPage() {
     try {
       setCreating(true);
       const project = await createProject(newProjectName.trim());
+      // 自动推送到云端
+      schedulePush(project.id, getTosConfig() ?? null);
       router.push(`/projects/${project.id}`);
     } catch (error) {
       console.error("创建项目失败:", error);
@@ -207,70 +242,18 @@ export default function ProjectsPage() {
     }
   };
 
-  // 推送项目到云端
-  const handlePushProject = async (projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const config = getTosConfig();
-    if (!config) {
-      toast.error("请先在设置中配置 TOS 存储");
-      return;
-    }
-    try {
-      setPushingProjectId(projectId);
-      const result = await pushProjectToCloud(projectId, config);
-      toast.success(`已推送 ${result.assetCount} 个素材、${result.taskCount} 个任务到云端`);
-    } catch (error) {
-      console.error("推送项目失败:", error);
-      toast.error(error instanceof Error ? error.message : "推送失败");
-    } finally {
-      setPushingProjectId(null);
-    }
-  };
-
-  // 打开云端拉取弹窗
-  const handleOpenCloudDialog = async () => {
-    const config = getTosConfig();
-    if (!config) {
-      toast.error("请先在设置中配置 TOS 存储");
-      return;
-    }
-    setCloudDialogOpen(true);
-    try {
-      setCloudLoading(true);
-      const result = await getCloudProjects(config);
-      setCloudProjects(result.projects);
-    } catch (error) {
-      console.error("获取云端项目失败:", error);
-      toast.error("获取云端项目失败");
-    } finally {
-      setCloudLoading(false);
-    }
-  };
-
-  // 从云端拉取项目
-  const handlePullProject = async (key: string) => {
-    const config = getTosConfig();
-    if (!config) return;
-    try {
-      setPullingKey(key);
-      const result = await pullProjectFromCloud(key, config);
-      toast.success(`已拉取项目「${result.project.name}」，导入 ${result.importedAssets} 个素材、${result.importedTasks} 个任务`);
-      await loadProjects();
-      // 更新云端列表中的 isLocal 状态
-      setCloudProjects((prev) => prev.map((p) => p.key === key ? { ...p, isLocal: true } : p));
-    } catch (error) {
-      console.error("拉取项目失败:", error);
-      toast.error(error instanceof Error ? error.message : "拉取失败");
-    } finally {
-      setPullingKey(null);
-    }
-  };
-
   const handleDelete = async (id: string) => {
     try {
       setDeletingId(id);
+      cancelPush(id); // 取消待执行的推送
       await deleteProject(id);
       setProjects(projects.filter((p) => p.id !== id));
+      // 从同步状态中移除
+      setSyncStatuses((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } catch (error) {
       console.error("删除项目失败:", error);
     } finally {
@@ -286,6 +269,8 @@ export default function ProjectsPage() {
       setProjects(projects.map((p) =>
         p.id === renameProjectId ? { ...p, name: renameProjectName.trim() } : p
       ));
+      // 重命名后自动推送
+      schedulePush(renameProjectId, getTosConfig() ?? null);
       setRenameDialogOpen(false);
       setRenameProjectId(null);
       setRenameProjectName("");
@@ -492,12 +477,6 @@ export default function ProjectsPage() {
 
           {/* 右侧操作 */}
           <div className="flex items-center gap-2">
-            {tosEnabled && tosSettings.endpoint && (
-              <Button variant="ghost" size="sm" onClick={handleOpenCloudDialog} className="gap-2">
-                <Cloud className="w-4 h-4" />
-                拉取项目
-              </Button>
-            )}
             <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)} className="gap-2">
               <Settings className="w-4 h-4" />
               设置
@@ -557,13 +536,6 @@ export default function ProjectsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={(e) => handlePushProject(project.id, e)}
-                        disabled={pushingProjectId === project.id}
-                      >
-                        {pushingProjectId === project.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CloudUpload className="w-4 h-4 mr-2" />}
-                        推送到云端
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
                         onClick={(e) => openRenameDialog(project.id, project.name, e)}
                       >
                         <Pencil className="w-4 h-4 mr-2" />
@@ -598,6 +570,12 @@ export default function ProjectsPage() {
                           <Calendar className="w-3 h-3" />
                           {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
                         </span>
+                        {syncStatuses[project.id] && syncStatuses[project.id] !== "synced" && syncStatuses[project.id] !== "local_only" && (
+                          <span className={`flex items-center gap-1 ${getSyncStatusDisplay(syncStatuses[project.id]).color}`}>
+                            <Cloud className="w-3 h-3" />
+                            {getSyncStatusDisplay(syncStatuses[project.id]).label}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -606,6 +584,17 @@ export default function ProjectsPage() {
             </div>
           )}
         </div>
+
+        {/* 同步冲突提示 */}
+        {conflictProjects.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-sm">
+            <p className="font-medium text-amber-600 mb-1">检测到同步冲突</p>
+            <p className="text-muted-foreground">
+              以下项目本地和云端均有修改：{conflictProjects.map((p) => p.name).join("、")}
+              。请手动选择保留版本。
+            </p>
+          </div>
+        )}
 
         {/* 虚拟人像库 */}
         <div>
@@ -1054,85 +1043,6 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 云端项目拉取对话框 */}
-      <Dialog open={cloudDialogOpen} onOpenChange={setCloudDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Cloud className="w-5 h-5 text-blue-500" />
-              从云端拉取项目
-            </DialogTitle>
-            <DialogDescription>从 TOS 云端存储拉取其他设备推送的项目</DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            {cloudLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">正在扫描云端项目...</span>
-              </div>
-            ) : cloudProjects.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Cloud className="w-10 h-10 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">云端暂无项目</p>
-                <p className="text-xs text-muted-foreground mt-1">在项目卡片菜单中选择"推送到云端"来上传项目</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {cloudProjects.map((cp) => (
-                  <div
-                    key={cp.key}
-                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-500/5 rounded-lg flex items-center justify-center shrink-0">
-                      <Cloud className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium truncate">{cp.name}</h4>
-                        {cp.isLocal && (
-                          <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 dark:bg-green-950 dark:text-green-400 px-1.5 py-0.5 rounded-full shrink-0">
-                            <Check className="w-3 h-3" />
-                            已存在
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                        <span className="flex items-center gap-1">
-                          <ListTodo className="w-3 h-3" />
-                          {cp.taskCount} 个任务
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {formatDistanceToNow(new Date(cp.exportedAt), { addSuffix: true })}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={cp.isLocal ? "outline" : "default"}
-                      onClick={() => handlePullProject(cp.key)}
-                      disabled={pullingKey === cp.key}
-                      className="shrink-0 gap-1.5"
-                    >
-                      {pullingKey === cp.key ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <CloudDownload className="w-3.5 h-3.5" />
-                      )}
-                      {cp.isLocal ? "重新拉取" : "拉取"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCloudDialogOpen(false)}>
-              关闭
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

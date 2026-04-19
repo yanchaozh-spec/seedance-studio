@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/storage/database/sqlite-client";
 import { deleteFile, isTosConfigured } from "@/storage/tos/client";
-import { generateSlug } from "@/lib/slug";
 
 // GET /api/projects/[id] - 获取单个项目
 export async function GET(
@@ -32,16 +31,15 @@ export async function PATCH(
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) {
       updateData.name = body.name;
-      // 名称变更时同步更新 slug
-      updateData.slug = generateSlug(body.name, resolvedParams.id);
+      // slug 不可变：名称变更不更新 slug，保证 TOS 路径稳定
     }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    // 白名单校验：只允许更新 name 和 slug
-    const allowedKeys = new Set(["name", "slug"]);
+    // 白名单校验：只允许更新 name（slug 不可变）
+    const allowedKeys = new Set(["name"]);
     const setClauses: string[] = [];
     const values: unknown[] = [];
     for (const [key, value] of Object.entries(updateData)) {

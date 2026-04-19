@@ -88,6 +88,8 @@ function initTables(db: Database.Database): void {
       name TEXT NOT NULL,
       slug TEXT,
       description TEXT DEFAULT '',
+      cloud_version INTEGER DEFAULT 0,
+      last_pushed_at TEXT,
       created_at TEXT DEFAULT (datetime('now', 'localtime')),
       updated_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
@@ -162,6 +164,25 @@ function initTables(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_global_avatars_asset_id ON global_avatars(asset_id);
   `);
+
+  // 迁移：为已有 projects 表添加 cloud_version 和 last_pushed_at 字段
+  migrateTable(db, "projects", [
+    { column: "cloud_version", type: "INTEGER DEFAULT 0" },
+    { column: "last_pushed_at", type: "TEXT" },
+  ]);
+}
+
+/**
+ * 安全地为已有表添加新字段（幂等，字段已存在则跳过）
+ */
+function migrateTable(db: Database.Database, table: string, columns: { column: string; type: string }[]): void {
+  for (const { column, type } of columns) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    } catch {
+      // 字段已存在，忽略
+    }
+  }
 }
 
 /**
