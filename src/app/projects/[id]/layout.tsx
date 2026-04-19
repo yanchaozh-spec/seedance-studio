@@ -14,7 +14,7 @@ import { schedulePush } from "@/lib/auto-sync";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
-import { uploadFile } from "@/lib/upload";
+import { uploadFile, transferUrlIfTemporary } from "@/lib/upload";
 import { extractVideoThumbnail } from "@/lib/video-thumbnail";
 import { Task, getTasks, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useTheme } from "next-themes";
@@ -105,6 +105,7 @@ export function DraggableAsset({
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const [thumbnailError, setThumbnailError] = useState(false);
   const isDragging = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -112,6 +113,11 @@ export function DraggableAsset({
   const resolvedThumbnail = asset.type === "virtual_avatar"
     ? resolveVirtualAvatarThumbnail(asset.asset_id, asset.thumbnail_url, globalAvatars)
     : asset.thumbnail_url;
+
+  // 缩略图 URL 变化时重置错误状态
+  useEffect(() => {
+    setThumbnailError(false);
+  }, [resolvedThumbnail]);
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -329,11 +335,12 @@ export function DraggableAsset({
                 <span>视频</span>
               </div>
             )}
-            {resolvedThumbnail ? (
+            {resolvedThumbnail && !thumbnailError ? (
               <img
                 src={resolvedThumbnail}
                 alt={asset.name}
                 className="max-w-full max-h-full object-contain"
+                onError={() => setThumbnailError(true)}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -1732,6 +1739,13 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           toast.error("缩略图上传失败，将使用 URL 或留空");
                         } finally {
                           setVirtualAvatarUploading(false);
+                        }
+                      } else if (thumbnailUrl) {
+                        // 如果是临时签名 URL，自动转存到自有 TOS 获取永久地址
+                        try {
+                          thumbnailUrl = await transferUrlIfTemporary(thumbnailUrl, resolvedParams.id);
+                        } catch (e) {
+                          console.warn("缩略图转存失败，保留原 URL:", e);
                         }
                       }
 

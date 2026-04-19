@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Image as ImageIcon, Music, Video, X, Check, Scissors, UserRound } from "lucide-react";
 import type { Asset } from "@/lib/assets";
@@ -29,6 +30,7 @@ export function AssetCard({
   className,
 }: AssetCardProps) {
   const isKeyframe = getAssetKind(asset) === "keyframe";
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div
@@ -82,12 +84,13 @@ export function AssetCard({
       )}
 
       {/* 图片/缩略图 */}
-      {asset.thumbnail_url ? (
+      {asset.thumbnail_url && !imgError ? (
         <div className={cn("w-full flex items-center justify-center bg-muted", size === "sm" ? "aspect-square" : "aspect-video")}>
           <img
             src={asset.thumbnail_url}
             alt={asset.name}
             className="max-w-full max-h-full object-contain"
+            onError={() => setImgError(true)}
           />
         </div>
       ) : asset.type === "audio" ? (

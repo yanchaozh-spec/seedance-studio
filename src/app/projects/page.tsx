@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, updateGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
-import { uploadFile } from "@/lib/upload";
+import { uploadFile, transferUrlIfTemporary } from "@/lib/upload";
 import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { formatDistanceToNow } from "date-fns";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
@@ -318,6 +318,13 @@ export default function ProjectsPage() {
           toast.error("缩略图上传失败");
         } finally {
           setAvatarUploading(false);
+        }
+      } else if (thumbnailUrl) {
+        // 如果是临时签名 URL，自动转存到自有 TOS 获取永久地址
+        try {
+          thumbnailUrl = await transferUrlIfTemporary(thumbnailUrl, "global-avatars");
+        } catch (e) {
+          console.warn("缩略图转存失败，保留原 URL:", e);
         }
       }
 
