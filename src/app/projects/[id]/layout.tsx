@@ -21,6 +21,7 @@ import { useSettingsStore } from "@/lib/settings";
 import { useDragStore } from "@/lib/drag-store";
 import { SelectedAsset } from "./page";
 import { toast } from "sonner";
+import { resolveVirtualAvatarThumbnail } from "@/lib/virtual-avatar-resolve";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
@@ -86,6 +87,7 @@ interface DraggableAssetProps {
   showLabel?: boolean;
   isActivated?: boolean;
   onToggleActivation?: () => void;
+  globalAvatars?: GlobalAvatar[];
 }
 
 export function DraggableAsset({ 
@@ -97,12 +99,18 @@ export function DraggableAsset({
   showLabel = false,
   isActivated,
   onToggleActivation,
+  globalAvatars = [],
 }: DraggableAssetProps) {
   const setDragging = useDragStore((state) => state.setDragging);
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 虚拟人像缩略图：优先从全局库取
+  const resolvedThumbnail = asset.type === "virtual_avatar"
+    ? resolveVirtualAvatarThumbnail(asset.asset_id, asset.thumbnail_url, globalAvatars)
+    : asset.thumbnail_url;
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -150,7 +158,7 @@ export function DraggableAsset({
     e.dataTransfer.setData("text/plain", JSON.stringify(asset));
 
     // 设置自定义拖拽图片（使用缩略图）
-    if (asset.thumbnail_url && imageRef.current) {
+    if (resolvedThumbnail && imageRef.current) {
       // 检查图片是否已加载且状态正常
       const img = imageRef.current;
       if (img.complete && img.naturalWidth > 0) {
@@ -265,10 +273,10 @@ export function DraggableAsset({
       )}
     >
       {/* 隐藏的图片元素用于拖拽 */}
-      {asset.thumbnail_url && (
+      {resolvedThumbnail && (
         <img
           ref={imageRef}
-          src={asset.thumbnail_url}
+          src={resolvedThumbnail}
           alt=""
           className="hidden"
           crossOrigin="anonymous"
@@ -320,9 +328,9 @@ export function DraggableAsset({
                 <span>视频</span>
               </div>
             )}
-            {asset.thumbnail_url ? (
+            {resolvedThumbnail ? (
               <img
-                src={asset.thumbnail_url}
+                src={resolvedThumbnail}
                 alt={asset.name}
                 className="max-w-full max-h-full object-contain"
               />

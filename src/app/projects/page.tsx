@@ -73,6 +73,14 @@ export default function ProjectsPage() {
 
   // 人像详情对话框
   const [detailAvatar, setDetailAvatar] = useState<GlobalAvatar | null>(null);
+  // 详情页编辑态
+  const [detailEditingField, setDetailEditingField] = useState<"display_name" | "description" | null>(null);
+  const [detailEditValue, setDetailEditValue] = useState("");
+  const [detailSaving, setDetailSaving] = useState(false);
+  // 详情页缩略图更换
+  const [detailThumbnailFile, setDetailThumbnailFile] = useState<File | null>(null);
+  const [detailThumbnailPreview, setDetailThumbnailPreview] = useState<string | null>(null);
+  const [detailThumbnailUploading, setDetailThumbnailUploading] = useState(false);
 
   // TOS 同步状态
   const [syncingUp, setSyncingUp] = useState(false);
@@ -83,14 +91,6 @@ export default function ProjectsPage() {
   useEffect(() => {
     loadProjects();
     loadGlobalAvatars();
-  }, []);
-
-  // 启动时尝试从 TOS 拉取数据
-  useEffect(() => {
-    if (tosEnabled && tosSettings.endpoint && tosSettings.accessKey) {
-      syncFromTos();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadProjects = async () => {
@@ -331,6 +331,68 @@ export default function ProjectsPage() {
     setAvatarThumbnailPreview(null);
   };
 
+  // 详情页保存字段
+  const handleDetailSave = async (field: "display_name" | "description", value: string) => {
+    if (!detailAvatar) return;
+    const trimmed = value.trim();
+    if (field === "display_name" && !trimmed) {
+      setDetailEditingField(null);
+      return;
+    }
+    try {
+      setDetailSaving(true);
+      const tosConfig = getTosConfig();
+      const updated = await updateGlobalAvatar(detailAvatar.id, {
+        [field]: trimmed,
+      }, tosConfig);
+      setDetailAvatar(updated);
+      setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
+      toast.success("已保存");
+    } catch (error) {
+      console.error("保存失败:", error);
+      toast.error("保存失败");
+    } finally {
+      setDetailSaving(false);
+      setDetailEditingField(null);
+    }
+  };
+
+  // 详情页更换缩略图
+  const handleDetailThumbnailChange = async () => {
+    if (!detailAvatar || !detailThumbnailFile) return;
+    try {
+      setDetailThumbnailUploading(true);
+      let thumbnailUrl = detailAvatar.thumbnail_url || undefined;
+      const uploadResult = await uploadFile(detailThumbnailFile, {
+        projectId: "global-avatars",
+        type: "image",
+      });
+      thumbnailUrl = uploadResult.url;
+      const tosConfig = getTosConfig();
+      const updated = await updateGlobalAvatar(detailAvatar.id, {
+        thumbnail_url: thumbnailUrl,
+      }, tosConfig);
+      setDetailAvatar(updated);
+      setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
+      setDetailThumbnailFile(null);
+      setDetailThumbnailPreview(null);
+      toast.success("缩略图已更新");
+    } catch (error) {
+      console.error("缩略图更换失败:", error);
+      toast.error("缩略图更换失败");
+    } finally {
+      setDetailThumbnailUploading(false);
+    }
+  };
+
+  // 打开详情页时重置编辑态
+  const openDetailAvatar = (avatar: GlobalAvatar) => {
+    setDetailAvatar(avatar);
+    setDetailEditingField(null);
+    setDetailThumbnailFile(null);
+    setDetailThumbnailPreview(null);
+  };
+
   return (
     <>
       {/* 顶部导航 */}
@@ -513,7 +575,7 @@ export default function ProjectsPage() {
                 <div
                   key={avatar.id}
                   className="group relative bg-card border rounded-xl overflow-hidden hover:border-purple-500/50 hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => setDetailAvatar(avatar)}
+                  onClick={() => openDetailAvatar(avatar)}
                 >
                   {/* 删除按钮 */}
                   <button
@@ -725,76 +787,165 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 人像详情对话框 */}
+      {/* 人像详情对话框（可编辑） */}
       <Dialog open={!!detailAvatar} onOpenChange={(open) => { if (!open) setDetailAvatar(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserRound className="w-5 h-5 text-purple-500" />
-              {detailAvatar?.display_name || "虚拟人像详情"}
+              虚拟人像详情
             </DialogTitle>
           </DialogHeader>
           {detailAvatar && (
             <div className="space-y-4 py-2">
-              {/* 缩略图大图 */}
-              {detailAvatar.thumbnail_url && (
-                <div className="w-full aspect-square max-w-xs mx-auto rounded-xl overflow-hidden bg-muted">
+              {/* 缩略图区域 - 可更换 */}
+              <div className="w-full aspect-square max-w-xs mx-auto rounded-xl overflow-hidden bg-muted relative group/thumb">
+                {detailAvatar.thumbnail_url ? (
                   <img
-                    src={detailAvatar.thumbnail_url}
+                    src={detailThumbnailPreview || detailAvatar.thumbnail_url}
                     alt={detailAvatar.display_name || detailAvatar.asset_id}
                     className="w-full h-full object-cover"
                   />
-                </div>
-              )}
-
-              {/* 基本信息 */}
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Asset ID</Label>
-                  <p className="font-mono text-sm mt-0.5 break-all select-all">{detailAvatar.asset_id}</p>
-                </div>
-                {detailAvatar.display_name && (
-                  <div>
-                    <Label className="text-muted-foreground text-xs">显示名称</Label>
-                    <p className="text-sm mt-0.5">{detailAvatar.display_name}</p>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <UserRound className="w-16 h-16 text-purple-300" />
                   </div>
                 )}
-                {detailAvatar.description && (
-                  <div>
-                    <Label className="text-muted-foreground text-xs">描述</Label>
-                    <p className="text-sm mt-0.5">{detailAvatar.description}</p>
-                  </div>
-                )}
-                <div>
-                  <Label className="text-muted-foreground text-xs">添加时间</Label>
-                  <p className="text-sm mt-0.5">{formatDistanceToNow(new Date(detailAvatar.created_at), { addSuffix: true })}</p>
+                {/* 更换缩略图覆盖层 */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                  <ThumbnailUpload
+                    url=""
+                    onUrlChange={() => {}}
+                    preview={detailThumbnailPreview}
+                    onPreviewChange={setDetailThumbnailPreview}
+                    file={detailThumbnailFile}
+                    onFileChange={(file: File | null) => {
+                      setDetailThumbnailFile(file);
+                      // 选完文件后立即上传
+                      if (file) {
+                        setDetailThumbnailUploading(true);
+                        uploadFile(file, {
+                          projectId: "global-avatars",
+                          type: "image",
+                        }).then(async (result) => {
+                          const tosConfig = getTosConfig();
+                          const updated = await updateGlobalAvatar(detailAvatar.id, {
+                            thumbnail_url: result.url,
+                          }, tosConfig);
+                          setDetailAvatar(updated);
+                          setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
+                          toast.success("缩略图已更新");
+                        }).catch((err) => {
+                          console.error("缩略图更换失败:", err);
+                          toast.error("缩略图更换失败");
+                        }).finally(() => {
+                          setDetailThumbnailUploading(false);
+                          setDetailThumbnailFile(null);
+                          setDetailThumbnailPreview(null);
+                        });
+                      }
+                    }}
+                    uploading={detailThumbnailUploading}
+                  />
                 </div>
               </div>
 
-              {/* 操作按钮 */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDetailAvatar(null);
-                    setEditingAvatarId(detailAvatar.id);
-                    setEditingDisplayName(detailAvatar.display_name || "");
-                  }}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  编辑名称
-                </Button>
+              {/* Asset ID - 只读 */}
+              <div>
+                <Label className="text-muted-foreground text-xs">Asset ID</Label>
+                <p className="font-mono text-sm mt-0.5 break-all select-all">{detailAvatar.asset_id}</p>
+              </div>
+
+              {/* 显示名称 - 可编辑 */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground text-xs">显示名称</Label>
+                  {detailEditingField !== "display_name" && (
+                    <button
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => {
+                        setDetailEditingField("display_name");
+                        setDetailEditValue(detailAvatar.display_name || "");
+                      }}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {detailEditingField === "display_name" ? (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Input
+                      value={detailEditValue}
+                      onChange={(e) => setDetailEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleDetailSave("display_name", detailEditValue);
+                        if (e.key === "Escape") setDetailEditingField(null);
+                      }}
+                      onBlur={() => handleDetailSave("display_name", detailEditValue)}
+                      className="h-7 text-sm"
+                      autoFocus
+                      disabled={detailSaving}
+                    />
+                    {detailSaving && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
+                  </div>
+                ) : (
+                  <p className="text-sm mt-0.5">{detailAvatar.display_name || "未命名"}</p>
+                )}
+              </div>
+
+              {/* 描述 - 可编辑 */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground text-xs">描述</Label>
+                  {detailEditingField !== "description" && (
+                    <button
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => {
+                        setDetailEditingField("description");
+                        setDetailEditValue(detailAvatar.description || "");
+                      }}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {detailEditingField === "description" ? (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Input
+                      value={detailEditValue}
+                      onChange={(e) => setDetailEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleDetailSave("description", detailEditValue);
+                        if (e.key === "Escape") setDetailEditingField(null);
+                      }}
+                      onBlur={() => handleDetailSave("description", detailEditValue)}
+                      placeholder="如：30岁女性，短发，专业形象"
+                      className="h-7 text-sm"
+                      autoFocus
+                      disabled={detailSaving}
+                    />
+                    {detailSaving && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
+                  </div>
+                ) : (
+                  <p className="text-sm mt-0.5">{detailAvatar.description || "暂无描述"}</p>
+                )}
+              </div>
+
+              {/* 添加时间 - 只读 */}
+              <div>
+                <Label className="text-muted-foreground text-xs">添加时间</Label>
+                <p className="text-sm mt-0.5">{formatDistanceToNow(new Date(detailAvatar.created_at), { addSuffix: true })}</p>
+              </div>
+
+              {/* 删除按钮 */}
+              <div className="pt-2 border-t">
                 <Button
                   variant="destructive"
                   size="sm"
-                  className="gap-1.5 flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDetailAvatar(null);
+                  className="w-full gap-1.5"
+                  onClick={() => {
                     handleDeleteGlobalAvatar(detailAvatar.id);
+                    setDetailAvatar(null);
                   }}
                   disabled={deletingAvatarId === detailAvatar.id}
                 >

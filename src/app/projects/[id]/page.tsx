@@ -23,6 +23,7 @@ import { formatDistanceToNow } from "date-fns";
 import { AssetDetailDialog } from "@/components/asset-detail-dialog";
 import { buildSeedanceRequestBody, buildSeedanceContent } from "@/lib/seedance";
 import { DraggableAsset } from "./layout";
+import { resolveVirtualAvatarThumbnail } from "@/lib/virtual-avatar-resolve";
 
 // dnd-kit 导入
 import {
@@ -615,7 +616,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       id: a.id,
       name: a.display_name || a.name,
       type: a.type,
-      thumbnail_url: a.thumbnail_url,
+      thumbnail_url: a.type === "virtual_avatar"
+        ? resolveVirtualAvatarThumbnail(a.asset_id, a.thumbnail_url, globalAvatars) ?? undefined
+        : a.thumbnail_url ?? undefined,
     }));
 
   return (
@@ -1027,7 +1030,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                         onClick={() => {
                           setVirtualAvatarForm({
                             assetId: ga.asset_id,
-                            name: "",
+                            name: ga.display_name || "",
                             thumbnailUrl: ga.thumbnail_url || "",
                             description: ga.description || "",
                           });
@@ -1148,8 +1151,9 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
                       try {
                         setVirtualAvatarUploading(true);
                         const uploadResult = await uploadFile(virtualAvatarThumbnailFile, {
-                          projectId: resolvedParams.id,
+                          projectId: "global-avatars",
                           type: "image",
+                          skipDb: true,
                         });
                         thumbnailUrl = uploadResult.url;
                       } catch (uploadError) {
