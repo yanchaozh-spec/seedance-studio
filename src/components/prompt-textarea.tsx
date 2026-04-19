@@ -64,11 +64,10 @@ function parseMentionSegments(
  * - 两层共享完全相同的字体、行高、内边距 → 字符位置精确对齐
  *
  * 缩略图定位策略：
- * - 将 @ 字符渲染为 invisible（占位但不可见），保留字符宽度以对齐 textarea
- * - 缩略图 absolute; left:0; top:1/2;-translate-y-1/2 覆盖在 @ 位置，垂直居中
- * - 缩略图(w-4=16px)宽于 @(~8px)，向右延伸部分在名字文字下方(z-[-1])
- * - span 使用 inline（非 inline-flex），保持文本基线对齐与 textarea 精确匹配
- * - isolate 创建层叠上下文，缩略图 z-[-1] 绘制在背景之上、文字之下
+ * - 缩略图通过 ::before 伪元素实现，position:absolute + right:100% 定位到 @ 左侧
+ * - 不占文本流宽度，字符位置与 textarea 精确对齐
+ * - @ 字符保持可见，缩略图在 @ 前方浮出
+ * - 高亮背景只覆盖 @+名字 区域（文本流范围），缩略图视觉上与之衔接
  */
 export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProps>(
   function PromptTextarea(
@@ -240,44 +239,39 @@ export const PromptTextarea = forwardRef<HTMLTextAreaElement, PromptTextareaProp
             segments.map((seg, i) => {
               if (seg.isMention && seg.mentionName) {
                 const item = mentionMap.get(seg.mentionName);
+                const hasThumb = !!item?.thumbnail_url;
+                const iconChar = item?.type === "audio" ? "♪" : item?.type === "video" ? "▶" : "🖼";
+                const iconBg =
+                  item?.type === "audio"
+                    ? "rgba(139,92,246,0.2)"
+                    : item?.type === "video"
+                      ? "rgba(6,182,212,0.2)"
+                      : "rgba(59,130,246,0.15)";
+
                 return (
                   <span
                     key={i}
                     className={cn(
                       /*
-                       * inline 保持文本基线对齐，与周围普通文本无错位
-                       * 缩略图 inline align-middle 垂直居中，不脱离文本流
-                       * 高亮框包裹缩略图+@+名字，不溢出容器
+                       * inline 保持文本基线对齐，与 textarea 字符逐像素对应
+                       * 缩略图/图标通过 ::before 伪元素 absolute 定位到 @ 左侧
+                       * 不占文本流宽度，零偏移，光标/选区精确对齐
+                       * 高亮背景覆盖 @+名字，缩略图视觉上与之衔接
                        */
-                      "inline rounded-sm font-medium",
+                      "relative inline rounded-sm font-medium",
                       item?.type === "audio"
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-700/40"
                         : item?.type === "video"
                           ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 ring-1 ring-cyan-200 dark:ring-cyan-700/40"
-                          : "bg-primary/20 text-primary ring-1 ring-primary/20"
+                          : "bg-primary/20 text-primary ring-1 ring-primary/20",
+                      hasThumb ? "mention-thumb" : "mention-icon"
                     )}
+                    style={{
+                      ...(hasThumb
+                        ? { "--thumb-url": `url(${item!.thumbnail_url})` } as React.CSSProperties
+                        : { "--icon-char": `"${iconChar}"`, "--icon-bg": iconBg } as React.CSSProperties),
+                    }}
                   >
-                    {item?.thumbnail_url ? (
-                      <img
-                        src={item.thumbnail_url}
-                        alt=""
-                        className="inline w-4 h-4 rounded-sm object-cover pointer-events-none ring-1 ring-background/80 align-middle mr-0.5"
-                      />
-                    ) : item ? (
-                      <span
-                        className={cn(
-                          "inline-flex w-4 h-4 rounded-sm items-center justify-center pointer-events-none align-middle mr-0.5",
-                          item.type === "audio"
-                            ? "bg-violet-200 dark:bg-violet-800/50 text-violet-600 dark:text-violet-300"
-                            : item.type === "video"
-                              ? "bg-cyan-200 dark:bg-cyan-800/50 text-cyan-600 dark:text-cyan-300"
-                              : "bg-primary/20 text-primary"
-                        )}
-                        style={{ fontSize: 9, lineHeight: 1 }}
-                      >
-                        {item.type === "audio" ? "♪" : item.type === "video" ? "▶" : "🖼"}
-                      </span>
-                    ) : null}
                     @{seg.mentionName}
                   </span>
                 );
