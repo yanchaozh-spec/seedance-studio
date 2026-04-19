@@ -75,6 +75,10 @@ export const PromptTextarea = forwardRef<HTMLDivElement, PromptTextareaProps>(
     // 标记是否由内部操作触发 value 变更，避免重复渲染
     const isInternalChange = useRef(false);
 
+    // 用 ref 保存最新的回调，避免 effect 因回调引用变化而重复触发
+    const onKeyDownRef = useRef(onKeyDown);
+    onKeyDownRef.current = onKeyDown;
+
     const mergedRef = useCallback(
       (el: HTMLDivElement | null) => {
         (editorRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -99,6 +103,9 @@ export const PromptTextarea = forwardRef<HTMLDivElement, PromptTextareaProps>(
       () => mentionItems.map((i) => i.name),
       [mentionItems]
     );
+
+    // 序列化 key：只有名字真正变化时才触发 effect
+    const mentionNamesKey = mentionNames.join("\0");
 
     const filteredItems = mentionItems.filter((item) => {
       const search = mentionSearch.toLowerCase();
@@ -131,28 +138,10 @@ export const PromptTextarea = forwardRef<HTMLDivElement, PromptTextareaProps>(
       const preRange = document.createRange();
       preRange.selectNodeContents(editorRef.current);
       preRange.setEnd(range.startContainer, range.startOffset);
-      // 计算纯文本偏移（跳过 mention 芯片的文本长度）
-      let offset = 0;
-      const walk = (node: Node) => {
-        if (node === range.startContainer) return true;
-        if (node.nodeType === Node.TEXT_NODE) {
-          offset += (node.textContent || "").length;
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement;
-          if (el.dataset.mention === "true") {
-            offset += 1 + (el.dataset.mentionName || "").length; // @ + name
-          } else {
-            for (const child of Array.from(el.childNodes)) {
-              if (walk(child)) return true;
-            }
-          }
-        }
-        return false;
-      };
       // 简化：用 preRange 的文本内容长度
       const container = document.createElement("div");
       container.appendChild(preRange.cloneContents());
-      offset = extractText(container).length;
+      const offset = extractText(container).length;
       return offset;
     }, [extractText]);
 
@@ -275,26 +264,32 @@ export const PromptTextarea = forwardRef<HTMLDivElement, PromptTextareaProps>(
       [mentionNames, mentionMap, getCursorOffset, setCursorOffset]
     );
 
+    // 用 ref 保持 renderFromValue 的最新引用，避免 effect 因回调引用变化而重复触发
+    const renderFromValueRef = useRef(renderFromValue);
+    renderFromValueRef.current = renderFromValue;
+
     // 当 value 从外部变更时，重新渲染 DOM
+    // 注意：依赖仅用 value，通过 ref 读取最新 renderFromValue
     useEffect(() => {
       if (isInternalChange.current) {
         isInternalChange.current = false;
         return;
       }
-      renderFromValue(value, false);
-    }, [value, renderFromValue]);
+      renderFromValueRef.current(value, false);
+    }, [value]);
 
     // 首次渲染
     useEffect(() => {
-      renderFromValue(value, false);
+      renderFromValueRef.current(value, false);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // mentionNames 变化时重新渲染（新增/删除素材时高亮可能变化）
+    // mentionNames 真正变化时重新渲染（新增/删除素材时高亮可能变化）
+    // 使用序列化 key 做依赖，避免数组引用变化导致误触发
     useEffect(() => {
-      renderFromValue(value, true);
+      renderFromValueRef.current(value, true);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mentionNames]);
+    }, [mentionNamesKey]);
 
     // 检测 @提及触发
     const checkMention = useCallback((text: string, cursorPos: number) => {
@@ -389,9 +384,17 @@ export const PromptTextarea = forwardRef<HTMLDivElement, PromptTextareaProps>(
             return;
           }
         }
-        onKeyDown?.(e);
+
+        // Tab 键在 contentEditable 中必须始终阻止默认行为（浏览器默认会跳转焦点）
+        if (e.key === "Tab" && !mentionOpen) {
+          e.preventDefault();
+          onKeyDownRef.current?.(e);
+          return;
+        }
+
+        onKeyDownRef.current?.(e);
       },
-      [mentionOpen, filteredItems, selectedIndex, insertMention, onKeyDown]
+      [mentionOpen, filteredItems, selectedIndex, insertMention]
     );
 
     useEffect(() => {

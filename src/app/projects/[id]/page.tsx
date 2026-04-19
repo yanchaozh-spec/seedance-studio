@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { use } from "react";
 import { Button } from "@/components/ui/button";
 import { PromptTextarea } from "@/components/prompt-textarea";
@@ -304,10 +304,13 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       // 检测到新增行，聚焦最后一行
       const newBox = promptBoxes.at(-1);
       if (newBox) {
-        const editor = editorRefs.current.get(newBox.id);
-        if (editor) {
-          editor.focus();
-        }
+        // 使用 requestAnimationFrame 确保 DOM 已就绪
+        requestAnimationFrame(() => {
+          const editor = editorRefs.current.get(newBox.id);
+          if (editor) {
+            editor.focus();
+          }
+        });
       }
     }
     prevLengthRef.current = promptBoxes.length;
@@ -323,8 +326,22 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   };
 
   // TAB 键跳转到下一行
+  const focusEditorAtEnd = useCallback((editor: HTMLElement) => {
+    editor.focus();
+    // 将光标放到内容末尾
+    const sel = window.getSelection();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false); // collapse to end
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }, []);
+
   const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, currentIndex: number) => {
     if (e.key === "Tab") {
+      // 注意：preventDefault 已在 PromptTextarea 中调用，此处为双重保障
       e.preventDefault();
 
       const isLastLine = currentIndex === promptBoxes.length - 1;
@@ -333,12 +350,12 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
         // 最后一行 → 新增一行
         addPromptBox();
       } else {
-        // 不是最后一行 → 聚焦下一行
+        // 不是最后一行 → 聚焦下一行末尾
         const nextId = promptBoxes[currentIndex + 1]?.id;
         if (nextId) {
           const editor = editorRefs.current.get(nextId);
           if (editor) {
-            editor.focus();
+            focusEditorAtEnd(editor);
           }
         }
       }
@@ -620,7 +637,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
   const imageAssets = selectedAssets.filter((a) => a.type === "image");
 
   // 为 @提及 构建素材列表（已激活的所有素材类型）
-  const mentionItems = selectedAssets
+  const mentionItems = useMemo(() => selectedAssets
     .filter((a) => a.isActivated)
     .map((a) => ({
       id: a.id,
@@ -629,7 +646,7 @@ export default function VideoGeneratePage({ params }: { params: Promise<{ id: st
       thumbnail_url: a.type === "virtual_avatar"
         ? resolveVirtualAvatarThumbnail(a.asset_id, a.thumbnail_url, globalAvatars) ?? undefined
         : a.thumbnail_url ?? undefined,
-    }));
+    })), [selectedAssets, globalAvatars]);
 
   return (
     <div className="p-4 max-w-4xl mx-auto" suppressHydrationWarning>
