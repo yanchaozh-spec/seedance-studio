@@ -34,6 +34,7 @@ import {
   CloudUpload,
   CloudDownload,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { getProjects, createProject, deleteProject, renameProject, getProjectTaskCount, Project } from "@/lib/projects";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar, updateGlobalAvatar, deleteGlobalAvatar } from "@/lib/global-avatars";
@@ -85,6 +86,7 @@ export default function ProjectsPage() {
   const [detailThumbnailFile, setDetailThumbnailFile] = useState<File | null>(null);
   const [detailThumbnailPreview, setDetailThumbnailPreview] = useState<string | null>(null);
   const [detailThumbnailUploading, setDetailThumbnailUploading] = useState(false);
+  const [detailThumbnailUrl, setDetailThumbnailUrl] = useState("");
 
   // TOS 同步状态
   const [syncingUp, setSyncingUp] = useState(false);
@@ -462,6 +464,31 @@ export default function ProjectsPage() {
     setDetailEditingField(null);
     setDetailThumbnailFile(null);
     setDetailThumbnailPreview(null);
+    setDetailThumbnailUrl("");
+  };
+
+  // 详情页通过 URL 更新缩略图（支持自动转存签名 URL）
+  const handleDetailThumbnailUrlSave = async () => {
+    if (!detailAvatar || !detailThumbnailUrl.trim()) return;
+    try {
+      setDetailThumbnailUploading(true);
+      let finalUrl = detailThumbnailUrl.trim();
+      // 自动转存临时签名 URL
+      finalUrl = await transferUrlIfTemporary(finalUrl, "global-avatars");
+      const tosConfig = getTosConfig();
+      const updated = await updateGlobalAvatar(detailAvatar.id, {
+        thumbnail_url: finalUrl,
+      }, tosConfig);
+      setDetailAvatar(updated);
+      setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
+      setDetailThumbnailUrl("");
+      toast.success("缩略图已更新");
+    } catch (error) {
+      console.error("缩略图 URL 保存失败:", error);
+      toast.error("缩略图更新失败");
+    } finally {
+      setDetailThumbnailUploading(false);
+    }
   };
 
   return (
@@ -891,55 +918,145 @@ export default function ProjectsPage() {
           {detailAvatar && (
             <div className="space-y-4 py-2">
               {/* 缩略图区域 - 可更换 */}
-              <div className="w-full aspect-square max-w-xs mx-auto rounded-xl overflow-hidden bg-muted relative group/thumb">
-                {detailAvatar.thumbnail_url ? (
-                  <img
-                    src={detailThumbnailPreview || detailAvatar.thumbnail_url}
-                    alt={detailAvatar.display_name || detailAvatar.asset_id}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <UserRound className="w-16 h-16 text-purple-300" />
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">缩略图</Label>
+                <div className="w-full aspect-video max-w-xs mx-auto rounded-xl overflow-hidden bg-muted relative group/thumb">
+                  {(detailThumbnailPreview || detailAvatar.thumbnail_url) ? (
+                    <img
+                      src={detailThumbnailPreview || detailAvatar.thumbnail_url!}
+                      alt={detailAvatar.display_name || detailAvatar.asset_id}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UserRound className="w-16 h-16 text-purple-300" />
+                    </div>
+                  )}
+                  {/* 更换缩略图覆盖层 */}
+                  {(detailThumbnailPreview || detailAvatar.thumbnail_url) && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                      <label className="flex items-center justify-center gap-1.5 h-9 px-4 bg-white/90 text-black rounded-md cursor-pointer hover:bg-white transition-colors text-xs">
+                        {detailThumbnailUploading ? (
+                          <span className="animate-pulse">上传中...</span>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>更换图片</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={detailThumbnailUploading}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setDetailThumbnailFile(file);
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setDetailThumbnailPreview(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                            // 选完文件后立即上传
+                            setDetailThumbnailUploading(true);
+                            uploadFile(file, {
+                              projectId: "global-avatars",
+                              type: "image",
+                            }).then(async (result) => {
+                              const tosConfig = getTosConfig();
+                              const updated = await updateGlobalAvatar(detailAvatar.id, {
+                                thumbnail_url: result.url,
+                              }, tosConfig);
+                              setDetailAvatar(updated);
+                              setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
+                              toast.success("缩略图已更新");
+                            }).catch((err) => {
+                              console.error("缩略图更换失败:", err);
+                              toast.error("缩略图更换失败");
+                            }).finally(() => {
+                              setDetailThumbnailUploading(false);
+                              setDetailThumbnailFile(null);
+                              setDetailThumbnailPreview(null);
+                            });
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+                {/* 无缩略图时，显示上传和 URL 输入 */}
+                {!detailAvatar.thumbnail_url && !detailThumbnailPreview && (
+                  <div className="space-y-2">
+                    <label className="flex items-center justify-center gap-1.5 h-9 w-full border border-dashed border-muted-foreground/25 rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                      {detailThumbnailUploading ? (
+                        <span className="animate-pulse">上传中...</span>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>上传本地图片</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={detailThumbnailUploading}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setDetailThumbnailFile(file);
+                          const reader = new FileReader();
+                          reader.onload = (ev) => setDetailThumbnailPreview(ev.target?.result as string);
+                          reader.readAsDataURL(file);
+                          setDetailThumbnailUploading(true);
+                          uploadFile(file, {
+                            projectId: "global-avatars",
+                            type: "image",
+                          }).then(async (result) => {
+                            const tosConfig = getTosConfig();
+                            const updated = await updateGlobalAvatar(detailAvatar.id, {
+                              thumbnail_url: result.url,
+                            }, tosConfig);
+                            setDetailAvatar(updated);
+                            setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
+                            toast.success("缩略图已更新");
+                          }).catch((err) => {
+                            console.error("缩略图更换失败:", err);
+                            toast.error("缩略图更换失败");
+                          }).finally(() => {
+                            setDetailThumbnailUploading(false);
+                            setDetailThumbnailFile(null);
+                            setDetailThumbnailPreview(null);
+                          });
+                        }}
+                      />
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 border-t border-muted-foreground/15" />
+                      <span className="text-[10px] text-muted-foreground/50">或</span>
+                      <div className="flex-1 border-t border-muted-foreground/15" />
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input
+                        placeholder="粘贴图片 URL（支持火山方舟签名 URL，自动转存）"
+                        value={detailThumbnailUrl}
+                        onChange={(e) => setDetailThumbnailUrl(e.target.value)}
+                        className="text-xs h-9"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleDetailThumbnailUrlSave();
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 shrink-0"
+                        disabled={detailThumbnailUploading || !detailThumbnailUrl.trim()}
+                        onClick={handleDetailThumbnailUrlSave}
+                      >
+                        确认
+                      </Button>
+                    </div>
                   </div>
                 )}
-                {/* 更换缩略图覆盖层 */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                  <ThumbnailUpload
-                    url=""
-                    onUrlChange={() => {}}
-                    preview={detailThumbnailPreview}
-                    onPreviewChange={setDetailThumbnailPreview}
-                    file={detailThumbnailFile}
-                    onFileChange={(file: File | null) => {
-                      setDetailThumbnailFile(file);
-                      // 选完文件后立即上传
-                      if (file) {
-                        setDetailThumbnailUploading(true);
-                        uploadFile(file, {
-                          projectId: "global-avatars",
-                          type: "image",
-                        }).then(async (result) => {
-                          const tosConfig = getTosConfig();
-                          const updated = await updateGlobalAvatar(detailAvatar.id, {
-                            thumbnail_url: result.url,
-                          }, tosConfig);
-                          setDetailAvatar(updated);
-                          setGlobalAvatars(globalAvatars.map((a) => a.id === updated.id ? updated : a));
-                          toast.success("缩略图已更新");
-                        }).catch((err) => {
-                          console.error("缩略图更换失败:", err);
-                          toast.error("缩略图更换失败");
-                        }).finally(() => {
-                          setDetailThumbnailUploading(false);
-                          setDetailThumbnailFile(null);
-                          setDetailThumbnailPreview(null);
-                        });
-                      }
-                    }}
-                    uploading={detailThumbnailUploading}
-                  />
-                </div>
               </div>
 
               {/* Asset ID - 只读 */}

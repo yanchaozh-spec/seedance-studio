@@ -23,7 +23,10 @@ import {
 } from "lucide-react";
 import { Asset, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
-import { uploadFile } from "@/lib/upload";
+import { uploadFile, transferUrlIfTemporary } from "@/lib/upload";
+import { ThumbnailUpload } from "@/components/thumbnail-upload";
+import { updateGlobalAvatar } from "@/lib/global-avatars";
+import { useSettingsStore } from "@/lib/settings";
 
 interface AssetDetailDialogProps {
   asset: Asset | null;
@@ -42,6 +45,11 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
   const [assetCategory, setAssetCategory] = useState<"keyframe" | "image" | "audio" | "video">("image");
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
   const [showAudioPicker, setShowAudioPicker] = useState(false);
+  // 缩略图更新相关状态
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
 
   // 合并 allAssets 和 localNewAudios 用于搜索
   const allAssetsWithNew = [...allAssets, ...localNewAudios];
@@ -56,6 +64,10 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       setKeyframeDescription(asset.keyframe_description || "");
       setDisplayName(asset.display_name || asset.name);
       setAssetCategory(asset.asset_category || "image");
+      // 初始化缩略图状态
+      setThumbnailUrl(asset.thumbnail_url || "");
+      setThumbnailPreview(null);
+      setThumbnailFile(null);
     }
   }, [asset]);
 
@@ -144,6 +156,45 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       if (keyframeDescription !== (asset.keyframe_description || "")) {
         updates.keyframe_description = keyframeDescription;
       }
+
+      // 处理虚拟人像缩略图更新
+      if (asset.type === "virtual_avatar") {
+        let newThumbnailUrl: string | null = null;
+
+        // 优先处理上传的文件
+        if (thumbnailFile) {
+          try {
+            setThumbnailUploading(true);
+            const uploadResult = await uploadFile(thumbnailFile, {
+              projectId: asset.project_id,
+              type: "image",
+            });
+            newThumbnailUrl = uploadResult.url;
+          } catch (uploadError) {
+            console.error("缩略图上传失败:", uploadError);
+            toast.error("缩略图上传失败");
+          } finally {
+            setThumbnailUploading(false);
+          }
+        } else if (thumbnailUrl.trim() && thumbnailUrl.trim() !== (asset.thumbnail_url || "")) {
+          // URL 有变化，检查是否需要转存
+          try {
+            newThumbnailUrl = await transferUrlIfTemporary(thumbnailUrl.trim(), asset.project_id);
+          } catch (e) {
+            console.warn("缩略图转存失败，保留原 URL:", e);
+            newThumbnailUrl = thumbnailUrl.trim();
+          }
+        } else if (!thumbnailUrl.trim() && asset.thumbnail_url) {
+          // 用户清空了缩略图 URL
+          newThumbnailUrl = null;
+        }
+
+        if (newThumbnailUrl !== null && newThumbnailUrl !== (asset.thumbnail_url || null)) {
+          updates.thumbnail_url = newThumbnailUrl;
+        } else if (newThumbnailUrl === null && !thumbnailUrl.trim() && asset.thumbnail_url) {
+          updates.thumbnail_url = null;
+        }
+      }
       
       // 如果没有变化，直接关闭
       if (Object.keys(updates).length === 0) {
@@ -159,6 +210,29 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       
       if (!response.ok) throw new Error("更新失败");
       const updatedAsset = await response.json();
+      
+      // 如果更新了虚拟人像缩略图，同步到全局人像库
+      if (asset.type === "virtual_avatar" && updates.thumbnail_url !== undefined && asset.asset_id) {
+        try {
+          const { tosEnabled, tosSettings } = useSettingsStore.getState();
+          const tosConfig = tosEnabled && tosSettings.endpoint ? tosSettings : undefined;
+          // 查找对应的全局人像并更新缩略图
+          const gaResponse = await fetch("/api/global-avatars");
+          if (gaResponse.ok) {
+            const gaList = await gaResponse.json();
+            const matched = (gaList as Array<{ id: string; asset_id: string }>).find(
+              (g) => g.asset_id === asset.asset_id
+            );
+            if (matched) {
+              await updateGlobalAvatar(matched.id, {
+                thumbnail_url: (updates.thumbnail_url as string | null) ?? undefined,
+              }, tosConfig);
+            }
+          }
+        } catch (syncErr) {
+          console.warn("同步缩略图到全局人像库失败:", syncErr);
+        }
+      }
       
       toast.success("保存成功");
       onUpdate(updatedAsset);
@@ -297,9 +371,9 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
           {/* 预览 */}
           {(asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && (
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-              {asset.thumbnail_url || asset.url ? (
+              {(thumbnailPreview || thumbnailUrl || asset.thumbnail_url || asset.url) ? (
                 <img
-                  src={asset.thumbnail_url || asset.url}
+                  src={thumbnailPreview || thumbnailUrl || asset.thumbnail_url || asset.url}
                   alt={asset.name}
                   className="w-full h-full object-contain"
                 />
@@ -329,6 +403,23 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
                   {asset.asset_id}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 虚拟人像缩略图更新 */}
+          {asset.type === "virtual_avatar" && (
+            <div className="space-y-2">
+              <Label>缩略图</Label>
+              <ThumbnailUpload
+                url={thumbnailUrl}
+                onUrlChange={setThumbnailUrl}
+                preview={thumbnailPreview}
+                onPreviewChange={setThumbnailPreview}
+                file={thumbnailFile}
+                onFileChange={setThumbnailFile}
+                uploading={thumbnailUploading}
+                hint="从火山方舟体验中心复制人像图片地址，或上传本地图片（临时签名 URL 会自动转存为永久地址）"
+              />
             </div>
           )}
           
