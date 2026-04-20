@@ -96,6 +96,11 @@ Desktop.ini
 # TypeScript
 *.tsbuildinfo
 
+# Coze platform files
+.coze
+.cozeproj/
+SKILLS/
+
 # Misc
 .vercel
 .turbo
