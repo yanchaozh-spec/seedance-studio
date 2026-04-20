@@ -101,6 +101,9 @@ Desktop.ini
 .cozeproj/
 SKILLS/
 
+# Large binaries (Tauri embedded Node.js)
+src-tauri/resources/node.exe
+
 # Misc
 .vercel
 .turbo
