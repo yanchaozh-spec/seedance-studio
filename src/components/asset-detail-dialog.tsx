@@ -23,8 +23,7 @@ import {
 } from "lucide-react";
 import { Asset, deleteAsset } from "@/lib/assets";
 import { toast } from "sonner";
-import { uploadFile, transferUrlIfTemporary } from "@/lib/upload";
-import { ThumbnailUpload } from "@/components/thumbnail-upload";
+import { uploadFile } from "@/lib/upload";
 import { updateGlobalAvatar } from "@/lib/global-avatars";
 import { useSettingsStore } from "@/lib/settings";
 
@@ -46,7 +45,6 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
   const [currentAsset, setCurrentAsset] = useState<Asset | null>(asset);
   const [showAudioPicker, setShowAudioPicker] = useState(false);
   // 缩略图更新相关状态
-  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
@@ -65,7 +63,6 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       setDisplayName(asset.display_name || asset.name);
       setAssetCategory(asset.asset_category || "image");
       // 初始化缩略图状态
-      setThumbnailUrl(asset.thumbnail_url || "");
       setThumbnailPreview(null);
       setThumbnailFile(null);
     }
@@ -158,41 +155,19 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
       }
 
       // 处理虚拟人像缩略图更新
-      if (asset.type === "virtual_avatar") {
-        let newThumbnailUrl: string | null = null;
-
-        // 优先处理上传的文件
-        if (thumbnailFile) {
-          try {
-            setThumbnailUploading(true);
-            const uploadResult = await uploadFile(thumbnailFile, {
-              projectId: asset.project_id,
-              type: "image",
-            });
-            newThumbnailUrl = uploadResult.url;
-          } catch (uploadError) {
-            console.error("缩略图上传失败:", uploadError);
-            toast.error("缩略图上传失败");
-          } finally {
-            setThumbnailUploading(false);
-          }
-        } else if (thumbnailUrl.trim() && thumbnailUrl.trim() !== (asset.thumbnail_url || "")) {
-          // URL 有变化，检查是否需要转存
-          try {
-            newThumbnailUrl = await transferUrlIfTemporary(thumbnailUrl.trim(), asset.project_id);
-          } catch (e) {
-            console.warn("缩略图转存失败，保留原 URL:", e);
-            newThumbnailUrl = thumbnailUrl.trim();
-          }
-        } else if (!thumbnailUrl.trim() && asset.thumbnail_url) {
-          // 用户清空了缩略图 URL
-          newThumbnailUrl = null;
-        }
-
-        if (newThumbnailUrl !== null && newThumbnailUrl !== (asset.thumbnail_url || null)) {
-          updates.thumbnail_url = newThumbnailUrl;
-        } else if (newThumbnailUrl === null && !thumbnailUrl.trim() && asset.thumbnail_url) {
-          updates.thumbnail_url = null;
+      if (asset.type === "virtual_avatar" && thumbnailFile) {
+        try {
+          setThumbnailUploading(true);
+          const uploadResult = await uploadFile(thumbnailFile, {
+            projectId: asset.project_id,
+            type: "image",
+          });
+          updates.thumbnail_url = uploadResult.url;
+        } catch (uploadError) {
+          console.error("缩略图上传失败:", uploadError);
+          toast.error("缩略图上传失败");
+        } finally {
+          setThumbnailUploading(false);
         }
       }
       
@@ -371,9 +346,9 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
           {/* 预览 */}
           {(asset.type === "image" || asset.type === "keyframe" || asset.type === "virtual_avatar") && (
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-              {(thumbnailPreview || thumbnailUrl || asset.thumbnail_url || asset.url) ? (
+              {(thumbnailPreview || asset.thumbnail_url || asset.url) ? (
                 <img
-                  src={thumbnailPreview || thumbnailUrl || asset.thumbnail_url || asset.url}
+                  src={thumbnailPreview || asset.thumbnail_url || asset.url}
                   alt={asset.name}
                   className="w-full h-full object-contain"
                 />
@@ -410,16 +385,49 @@ export function AssetDetailDialog({ asset, allAssets, onClose, onUpdate }: Asset
           {asset.type === "virtual_avatar" && (
             <div className="space-y-2">
               <Label>缩略图</Label>
-              <ThumbnailUpload
-                url={thumbnailUrl}
-                onUrlChange={setThumbnailUrl}
-                preview={thumbnailPreview}
-                onPreviewChange={setThumbnailPreview}
-                file={thumbnailFile}
-                onFileChange={setThumbnailFile}
-                uploading={thumbnailUploading}
-                hint="从火山方舟体验中心复制人像图片地址，或上传本地图片（临时签名 URL 会自动转存为永久地址）"
-              />
+              <div className="flex items-center gap-2">
+                <label className="flex items-center justify-center gap-1.5 h-9 px-3 border border-dashed border-muted-foreground/25 rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                  {thumbnailUploading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>上传中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>上传图片</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={thumbnailUploading}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setThumbnailFile(file);
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setThumbnailPreview(ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+                {thumbnailPreview && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground"
+                    onClick={() => {
+                      setThumbnailFile(null);
+                      setThumbnailPreview(null);
+                    }}
+                  >
+                    取消
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">上传本地图片作为缩略图，仅用于 UI 预览显示</p>
             </div>
           )}
           

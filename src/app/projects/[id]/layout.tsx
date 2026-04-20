@@ -13,8 +13,7 @@ import { onAssetsChanged, emitAssetsChanged } from "@/lib/events";
 import { schedulePush } from "@/lib/auto-sync";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
-import { ThumbnailUpload } from "@/components/thumbnail-upload";
-import { uploadFile, transferUrlIfTemporary } from "@/lib/upload";
+import { uploadFile } from "@/lib/upload";
 import { extractVideoThumbnail } from "@/lib/video-thumbnail";
 import { Task, getTasks, deleteTask, getVideoUrl } from "@/lib/tasks";
 import { useTheme } from "next-themes";
@@ -549,7 +548,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
   const [virtualAvatarDialogOpen, setVirtualAvatarDialogOpen] = useState(false);
   const [avatarDialogMode, setAvatarDialogMode] = useState<"manual" | "select">("select");
   const [globalAvatars, setGlobalAvatars] = useState<GlobalAvatar[]>([]);
-  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "", description: "" });
+  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", description: "" });
   const [virtualAvatarThumbnailFile, setVirtualAvatarThumbnailFile] = useState<File | null>(null);
   const [virtualAvatarThumbnailPreview, setVirtualAvatarThumbnailPreview] = useState<string | null>(null);
   const [virtualAvatarUploading, setVirtualAvatarUploading] = useState(false);
@@ -1610,7 +1609,6 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                             setVirtualAvatarForm({
                               assetId: ga.asset_id,
                               name: "",
-                              thumbnailUrl: ga.thumbnail_url || "",
                               description: ga.description || "",
                             });
                             setVirtualAvatarThumbnailFile(null);
@@ -1668,16 +1666,53 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       <label className="text-sm font-medium mb-1.5 block">
                         缩略图 <span className="text-muted-foreground font-normal">(可选，仅用于 UI 预览)</span>
                       </label>
-                      <ThumbnailUpload
-                        url={virtualAvatarForm.thumbnailUrl}
-                        onUrlChange={(v) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: v }))}
-                        preview={virtualAvatarThumbnailPreview}
-                        onPreviewChange={setVirtualAvatarThumbnailPreview}
-                        file={virtualAvatarThumbnailFile}
-                        onFileChange={setVirtualAvatarThumbnailFile}
-                        uploading={virtualAvatarUploading}
-                        hint="缩略图仅用于素材池显示，不发送给 API"
-                      />
+                      <div className="space-y-2">
+                        {virtualAvatarThumbnailPreview ? (
+                          <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                            <img
+                              src={virtualAvatarThumbnailPreview}
+                              alt="缩略图预览"
+                              className="w-full h-full object-contain"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVirtualAvatarThumbnailFile(null);
+                                setVirtualAvatarThumbnailPreview(null);
+                              }}
+                              className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:opacity-80 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center justify-center gap-1.5 h-9 w-full border border-dashed border-muted-foreground/25 rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                            {virtualAvatarUploading ? (
+                              <span className="animate-pulse">上传中...</span>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>上传缩略图</span>
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={virtualAvatarUploading}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setVirtualAvatarThumbnailFile(file);
+                                const reader = new FileReader();
+                                reader.onload = (ev) => setVirtualAvatarThumbnailPreview(ev.target?.result as string);
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                          </label>
+                        )}
+                        <p className="text-xs text-muted-foreground">上传本地图片作为缩略图，仅用于素材池显示</p>
+                      </div>
                     </div>
                     <div>
                       <label className="text-sm font-medium mb-1.5 block">
@@ -1725,7 +1760,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                     }
                     try {
                       // 如果有本地缩略图文件，先上传到 TOS
-                      let thumbnailUrl = virtualAvatarForm.thumbnailUrl.trim() || null;
+                      let thumbnailUrl: string | null = null;
                       if (virtualAvatarThumbnailFile) {
                         try {
                           setVirtualAvatarUploading(true);
@@ -1736,16 +1771,9 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                           thumbnailUrl = uploadResult.url;
                         } catch (uploadError) {
                           console.error("缩略图上传失败:", uploadError);
-                          toast.error("缩略图上传失败，将使用 URL 或留空");
+                          toast.error("缩略图上传失败");
                         } finally {
                           setVirtualAvatarUploading(false);
-                        }
-                      } else if (thumbnailUrl) {
-                        // 如果是临时签名 URL，自动转存到自有 TOS 获取永久地址
-                        try {
-                          thumbnailUrl = await transferUrlIfTemporary(thumbnailUrl, resolvedParams.id);
-                        } catch (e) {
-                          console.warn("缩略图转存失败，保留原 URL:", e);
                         }
                       }
 
@@ -1783,7 +1811,7 @@ export default function ProjectDetailLayoutInner({ children, params }: ProjectDe
                       // 添加到素材池
                       addAssetToPool({ ...newAsset, isActivated: true } as SelectedAsset);
                       // 重置表单并关闭对话框
-                      setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "", description: "" });
+                      setVirtualAvatarForm({ assetId: "", name: "", description: "" });
                       setVirtualAvatarThumbnailFile(null);
                       setVirtualAvatarThumbnailPreview(null);
                       setVirtualAvatarDialogOpen(false);

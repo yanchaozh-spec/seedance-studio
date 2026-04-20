@@ -25,7 +25,6 @@ import { extractVideoThumbnail } from "@/lib/video-thumbnail";
 import { emitAssetsChanged } from "@/lib/events";
 import { Input } from "@/components/ui/input";
 import { GlobalAvatar, getGlobalAvatars, addGlobalAvatar } from "@/lib/global-avatars";
-import { ThumbnailUpload } from "@/components/thumbnail-upload";
 import { useSettingsStore } from "@/lib/settings";
 
 // dnd-kit 拖拽排序
@@ -105,7 +104,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
   const [virtualAvatarDialogOpen, setVirtualAvatarDialogOpen] = useState(false);
   const [avatarDialogMode, setAvatarDialogMode] = useState<"manual" | "select">("select");
   const [globalAvatars, setGlobalAvatars] = useState<GlobalAvatar[]>([]);
-  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", thumbnailUrl: "", description: "" });
+  const [virtualAvatarForm, setVirtualAvatarForm] = useState({ assetId: "", name: "", description: "" });
   const [virtualAvatarThumbnailFile, setVirtualAvatarThumbnailFile] = useState<File | null>(null);
   const [virtualAvatarThumbnailPreview, setVirtualAvatarThumbnailPreview] = useState<string | null>(null);
   const [virtualAvatarUploading, setVirtualAvatarUploading] = useState(false);
@@ -608,7 +607,6 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                           setVirtualAvatarForm({
                             assetId: ga.asset_id,
                             name: "",
-                            thumbnailUrl: ga.thumbnail_url || "",
                             description: ga.description || "",
                           });
                           setVirtualAvatarThumbnailFile(null);
@@ -665,16 +663,53 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                     <label className="text-sm font-medium mb-1.5 block">
                       缩略图 <span className="text-muted-foreground font-normal">(可选，仅用于 UI 预览)</span>
                     </label>
-                    <ThumbnailUpload
-                      url={virtualAvatarForm.thumbnailUrl}
-                      onUrlChange={(v) => setVirtualAvatarForm((prev) => ({ ...prev, thumbnailUrl: v }))}
-                      preview={virtualAvatarThumbnailPreview}
-                      onPreviewChange={setVirtualAvatarThumbnailPreview}
-                      file={virtualAvatarThumbnailFile}
-                      onFileChange={setVirtualAvatarThumbnailFile}
-                      uploading={virtualAvatarUploading}
-                      hint="缩略图仅用于素材池显示，不发送给 API"
-                    />
+                    <div className="space-y-2">
+                      {virtualAvatarThumbnailPreview ? (
+                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                          <img
+                            src={virtualAvatarThumbnailPreview}
+                            alt="缩略图预览"
+                            className="w-full h-full object-contain"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVirtualAvatarThumbnailFile(null);
+                              setVirtualAvatarThumbnailPreview(null);
+                            }}
+                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:opacity-80 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center justify-center gap-1.5 h-9 w-full border border-dashed border-muted-foreground/25 rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                          {virtualAvatarUploading ? (
+                            <span className="animate-pulse">上传中...</span>
+                          ) : (
+                            <>
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>上传缩略图</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={virtualAvatarUploading}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setVirtualAvatarThumbnailFile(file);
+                              const reader = new FileReader();
+                              reader.onload = (ev) => setVirtualAvatarThumbnailPreview(ev.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                      )}
+                      <p className="text-xs text-muted-foreground">上传本地图片作为缩略图，仅用于素材池显示</p>
+                    </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">
@@ -720,7 +755,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                     return;
                   }
                   try {
-                    let thumbnailUrl = virtualAvatarForm.thumbnailUrl.trim() || null;
+                    let thumbnailUrl: string | null = null;
                     if (virtualAvatarThumbnailFile) {
                       try {
                         setVirtualAvatarUploading(true);
@@ -731,7 +766,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                         thumbnailUrl = uploadResult.url;
                       } catch (uploadError) {
                         console.error("缩略图上传失败:", uploadError);
-                        toast.error("缩略图上传失败，将使用 URL 或留空");
+                        toast.error("缩略图上传失败");
                       } finally {
                         setVirtualAvatarUploading(false);
                       }
@@ -769,7 +804,7 @@ export default function MaterialsPage({ params }: { params: Promise<{ id: string
                     await loadAssets();
                     emitAssetsChanged(resolvedParams.id, "update");
                     // 重置表单并关闭对话框
-                    setVirtualAvatarForm({ assetId: "", name: "", thumbnailUrl: "", description: "" });
+                    setVirtualAvatarForm({ assetId: "", name: "", description: "" });
                     setVirtualAvatarThumbnailFile(null);
                     setVirtualAvatarThumbnailPreview(null);
                     setVirtualAvatarDialogOpen(false);
